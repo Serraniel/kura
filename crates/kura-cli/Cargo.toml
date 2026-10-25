@@ -1,0 +1,24 @@
+[package]
+name = "kura-cli"
+description = "Command line interface of kura"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "kura"
+path = "src/main.rs"
+
+[dependencies]
+kura-core.workspace = true
+kura-i18n.workspace = true
+kura-sbom.workspace = true
+kura-alpm.workspace = true
+lexopt.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

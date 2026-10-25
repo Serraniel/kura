@@ -1,3 +1,5 @@
 /target
 *.profraw
 /coverage
+coverage.json
+coverage.txt
