@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Saves a generation after every transaction, also when pacman is used directly.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Saving the software state for kura's history...
+When = PostTransaction
+Exec = /usr/lib/kura/kura-helper record

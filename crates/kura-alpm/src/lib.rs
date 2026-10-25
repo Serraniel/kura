@@ -8,6 +8,7 @@
 //! `pacman-conf`, which resolves pacman.conf exactly as pacman does.
 
 pub mod apply;
+pub mod history;
 pub mod prepare;
 
 use std::collections::BTreeSet;
