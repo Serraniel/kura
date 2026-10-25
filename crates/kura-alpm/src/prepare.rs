@@ -43,7 +43,8 @@ impl Request {
 }
 
 /// Why libalpm could not prepare the change.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Problem {
     /// `target` needs `dependency`, which nothing provides any more.
     UnsatisfiedDependency {
@@ -58,11 +59,11 @@ pub enum Problem {
         reason: String,
     },
     /// Packages built for another architecture.
-    InvalidArchitecture(Vec<String>),
+    InvalidArchitecture { packages: Vec<String> },
     /// A requested package does not exist.
-    NotFound(String),
+    NotFound { name: String },
     /// Any other libalpm error, as its message.
-    Other(String),
+    Other { message: String },
 }
 
 /// Result of preparing a request.
@@ -197,10 +198,12 @@ pub(crate) fn build(
             for name in names {
                 let found = handle.syncdbs().iter().find_map(|db| db.pkg(name.as_str()).ok());
                 let Some(pkg) = found else {
-                    return Ok(blocked(vec![Problem::NotFound(name.clone())]));
+                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
                 };
                 if let Err(e) = handle.trans_add_pkg(pkg) {
-                    return Ok(blocked(vec![Problem::Other(e.to_string())]));
+                    return Ok(blocked(vec![Problem::Other {
+                        message: e.to_string(),
+                    }]));
                 }
                 explicit.insert(name);
             }
@@ -208,7 +211,7 @@ pub(crate) fn build(
         Request::Remove(names) => {
             for name in names {
                 let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
-                    return Ok(blocked(vec![Problem::NotFound(name.clone())]));
+                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
                 };
                 handle.trans_remove_pkg(pkg)?;
                 explicit.insert(name);
@@ -265,7 +268,9 @@ pub(crate) fn build(
     };
     let plan = match plan.validate(&ctx) {
         Ok(()) | Err(kura_core::plan::PlanError::Empty) => Ok(plan),
-        Err(e) => Err(vec![Problem::Other(e.to_string())]),
+        Err(e) => Err(vec![Problem::Other {
+            message: e.to_string(),
+        }]),
     };
     Ok(Built {
         plan,
@@ -293,11 +298,13 @@ fn problems(e: &alpm::PrepareError<'_>) -> Vec<Problem> {
             })
             .collect(),
         Some(PrepareData::PkgInvalidArch(list)) => {
-            vec![Problem::InvalidArchitecture(
-                list.iter().map(|p| p.name().to_owned()).collect(),
-            )]
+            vec![Problem::InvalidArchitecture {
+                packages: list.iter().map(|p| p.name().to_owned()).collect(),
+            }]
         }
-        None => vec![Problem::Other(e.to_string())],
+        None => vec![Problem::Other {
+            message: e.to_string(),
+        }],
     }
 }
 

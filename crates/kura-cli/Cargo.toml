@@ -17,6 +17,7 @@ kura-core.workspace = true
 kura-i18n.workspace = true
 kura-sbom.workspace = true
 kura-alpm.workspace = true
+kura-helper.workspace = true
 lexopt.workspace = true
 serde_json.workspace = true
 

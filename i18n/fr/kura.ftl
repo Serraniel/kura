@@ -13,6 +13,9 @@ cli-usage =
       history    Afficher les états enregistrés du système
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
+      update     Installer toutes les mises à jour (avec un aperçu d’abord)
+      install    Installer une application : kura install <nom>
+      remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
 cli-missing-command = Aucune commande indiquée.
@@ -69,6 +72,29 @@ history-removed =
 history-start = Point de départ : { $count } paquets
 history-outside = (modifié en dehors de kura)
 list-separator = {", "}
+
+## Applying changes
+
+preview-title = Ceci va changer :
+confirm-update = Installer ces mises à jour ? [o/N]
+confirm-install = Installer ceci ? [o/N]
+confirm-remove = Supprimer ceci ? [o/N]
+confirm-yes = o
+apply-cancelled = Rien n’a été modifié.
+apply-refreshing = Actualisation des listes de paquets…
+apply-downloading = Téléchargement de { $file }
+apply-checking = Vérification des paquets…
+apply-installing = Installation de { $package } ({ $current }/{ $total })
+apply-removing = Suppression de { $package } ({ $current }/{ $total })
+apply-hook = Finalisation : { $name }
+apply-cleanup = Suppression des éléments qui ne sont plus nécessaires…
+apply-done = Terminé. La modification est enregistrée dans l’historique.
+apply-changed = Quelque chose a changé depuis l’aperçu. Veuillez vérifier le nouvel aperçu.
+apply-not-authorized = La modification n’a pas été autorisée. Soit le mot de passe n’a pas été saisi, soit ce compte n’a pas le droit d’installer des logiciels.
+apply-locked = Un autre programme est en train d’installer des logiciels. Veuillez réessayer quand il aura terminé.
+apply-busy = kura effectue déjà une autre modification. Veuillez attendre qu’elle soit terminée.
+apply-failed = La modification a échoué : { $reason }
+error-helper = Le service système de kura n’est pas disponible : { $reason }
 
 ## doctor
 

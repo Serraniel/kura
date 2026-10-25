@@ -8,9 +8,22 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "kura-helper"
+path = "src/main.rs"
+
 [dependencies]
 kura-core.workspace = true
 kura-alpm.workspace = true
+zbus.workspace = true
+blocking.workspace = true
+futures-lite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

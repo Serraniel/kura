@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+#
+# D-Bus starts kura-helper when a program calls it. Installed to
+# /usr/share/dbus-1/system-services/.
+
+[D-BUS Service]
+Name=org.kura.Helper1
+Exec=/usr/lib/kura/kura-helper serve
+User=root
+SystemdService=kura-helper.service

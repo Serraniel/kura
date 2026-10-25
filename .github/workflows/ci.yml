@@ -54,3 +54,25 @@ jobs:
             cat coverage.txt 2>/dev/null || echo 'no report'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    # A throwaway Arch system: kura installs and removes packages for real here.
+    container: archlinux:base-devel
+    steps:
+      - name: Install toolchain and services
+        run: pacman -Syu --noconfirm --needed rust clang lld git dbus polkit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cache cargo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: e2e-${{ hashFiles('Cargo.lock') }}
+      - name: Build
+        run: cargo build --locked -p kura-cli -p kura-helper
+      - name: Run end-to-end test
+        run: scripts/e2e-container.sh target/debug

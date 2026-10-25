@@ -24,6 +24,10 @@ alpm = "5"
 alpm-utils = { version = "5", default-features = false, features = ["alpm", "conf"] }
 pacmanconf = "3"
 lexopt = "0.3"
+zbus = "5"
+blocking = "1"
+futures-lite = "2"
+kura-helper = { path = "crates/kura-helper" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
