@@ -59,7 +59,7 @@ fn run(l: &Localizer) -> Result<String, String> {
     }
 
     match command.as_deref() {
-        Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
+        Some("version") => Ok(format!("kura {}\n", kura_core::VERSION)),
         Some("check") => check(l),
         Some("security") => security(l),
         Some("mirrors") => {
@@ -513,7 +513,7 @@ fn sbom(l: &Localizer, output: Option<&str>) -> Result<String, String> {
         &kura_sbom::RunInfo {
             serial: &serial,
             timestamp: &timestamp,
-            tool_version: env!("CARGO_PKG_VERSION"),
+            tool_version: kura_core::VERSION,
         },
     );
     let text = serde_json::to_string_pretty(&bom).map_err(|e| e.to_string())?;
