@@ -13,12 +13,7 @@ if [ ! -f /.dockerenv ] && [ -z "${KURA_E2E_CONTAINER:-}" ]; then
 fi
 
 bin=${1:-target/debug}
-install -Dm755 "$bin/kura-helper" /usr/lib/kura/kura-helper
-install -Dm755 "$bin/kura" /usr/bin/kura
-install -Dm644 packaging/org.kura.Helper1.service /usr/share/dbus-1/system-services/org.kura.Helper1.service
-install -Dm644 packaging/org.kura.Helper1.conf /usr/share/dbus-1/system.d/org.kura.Helper1.conf
-install -Dm644 packaging/org.kura.policy /usr/share/polkit-1/actions/org.kura.policy
-install -Dm644 packaging/kura-history.hook /usr/share/libalpm/hooks/kura-history.hook
+packaging/install.sh / "$bin"
 
 # Test only: root may use kura's actions without a password prompt.
 install -Dm644 /dev/stdin /etc/polkit-1/rules.d/10-kura-e2e.rules <<'RULES'

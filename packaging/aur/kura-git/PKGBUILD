@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+# Maintainer: Serraniel <mail@serraniel.dev>
+
+pkgname=kura-git
+pkgver=0.0.0.r0.g0000000
+pkgrel=1
+pkgdesc="Friendly software manager for Arch Linux, made for people new to Linux (development version)"
+arch=(x86_64)
+url="https://github.com/Serraniel/kura"
+license=(GPL-3.0-or-later CC-BY-SA-4.0)
+depends=(pacman curl dbus polkit qt6-base qt6-declarative kirigami)
+optdepends=('qqc2-desktop-style: native look on KDE Plasma')
+makedepends=(cargo clang lld git)
+provides=(kura)
+conflicts=(kura)
+options=(!lto)
+source=("git+$url.git")
+sha256sums=(SKIP)
+
+pkgver() {
+  cd kura
+  local described
+  if described=$(git describe --long --tags --abbrev=7 2>/dev/null); then
+    printf '%s' "$described" | sed 's/^v//;s/-/.r/;s/-/./'
+  else
+    printf '0.0.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  fi
+}
+
+prepare() {
+  cd kura
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd kura
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release --workspace
+}
+
+check() {
+  cd kura
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd kura
+  packaging/install.sh "$pkgdir" target/release
+  install -Dm644 LICENSES/* -t "$pkgdir/usr/share/licenses/$pkgname/"
+}
