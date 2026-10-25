@@ -41,6 +41,13 @@ cargo llvm-cov report --json --summary-only --output-path coverage.json
 scripts/coverage-gate.sh coverage.json 90 kura-core kura-i18n kura-sbom
 ```
 
+## Tests that change a system
+
+Tests that install or remove packages run only in CI, inside a throwaway
+Arch Linux container: the `#[ignore]` tests in `kura-alpm` and
+`scripts/e2e-container.sh`. Do not run them on a computer you use. The
+script refuses to run outside a container.
+
 ## Licence
 
 By contributing you agree that your contribution is published under the
