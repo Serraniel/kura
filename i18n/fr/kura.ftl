@@ -51,6 +51,12 @@ undo-unknown = Il n’existe pas d’état enregistré n° { $id }. kura history
 confirm-undo = Revenir à cet état ? [o/N]
 mirrors-running = Test des serveurs de téléchargement proches…
 mirrors-done = { $count } serveurs de téléchargement rapides sont maintenant utilisés. L’ancienne liste a été conservée sous { $backup }.
+solver-found =
+    { $count ->
+        [one] kura a trouvé une solution : un ancien élément qu’aucune application n’utilise plus bloque la mise à jour. Il est supprimé, tout le reste est mis à jour.
+       *[other] kura a trouvé une solution : { $count } anciens éléments qu’aucune application n’utilise plus bloquent la mise à jour. Ils sont supprimés, tout le reste est mis à jour.
+    }
+solver-tested = kura a testé cette solution sans rien modifier.
 error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## history

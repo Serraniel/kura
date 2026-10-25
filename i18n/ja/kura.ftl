@@ -47,6 +47,8 @@ undo-unknown = 保存された状態 #{ $id } はありません。kura history 
 confirm-undo = この状態に戻しますか? [y/N]
 mirrors-running = 近くのダウンロードサーバーをテストしています…
 mirrors-done = 速いダウンロードサーバー { $count } 台を使うようになりました。以前の一覧は { $backup } として保存されています。
+solver-found = kura が解決方法を見つけました: どのアプリも使っていない古い構成要素 { $count } 個がアップデートを妨げています。これらを削除し、ほかはすべて更新します。
+solver-tested = kura は何も変更せずにこの解決方法をテストしました。
 error-check = アップデートを確認できませんでした: { $reason }
 
 ## history

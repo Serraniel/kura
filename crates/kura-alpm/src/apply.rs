@@ -130,7 +130,20 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
         PlanKind::SystemUpdate => Some(Request::Update),
         PlanKind::Install => Some(Request::Install(named(true))),
         PlanKind::Remove => Some(Request::Remove(named(false))),
-        PlanKind::Restore { .. } | PlanKind::Repair => None,
+        PlanKind::Repair => Some(Request::Repair(
+            plan.steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Remove {
+                        name,
+                        why: RemovalReason::Repair,
+                        ..
+                    } => Some(name.clone()),
+                    _ => None,
+                })
+                .collect(),
+        )),
+        PlanKind::Restore { .. } => None,
     }
 }
 
@@ -284,7 +297,10 @@ pub fn apply(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(
     let mut handle = crate::handle(conf)?;
     install_callbacks(&handle, approved, events);
 
-    if matches!(request, Request::Update | Request::Install(_)) {
+    if matches!(
+        request,
+        Request::Update | Request::Install(_) | Request::Repair(_)
+    ) {
         let _ = events.send(Event::Refreshing);
         handle.syncdbs_mut().update(false)?;
     }
@@ -593,7 +609,11 @@ mod tests {
             request_for(&Plan::new(PlanKind::SystemUpdate)),
             Some(Request::Update)
         );
-        assert_eq!(request_for(&Plan::new(PlanKind::Repair)), None);
+        assert_eq!(
+            request_for(&Plan::new(PlanKind::Repair)),
+            Some(Request::Repair(vec![]))
+        );
+        assert_eq!(request_for(&Plan::new(PlanKind::Restore { generation: 1 })), None);
     }
 
     #[test]
@@ -643,6 +663,20 @@ mod tests {
         let removal =
             crate::prepare::prepare(&conf, None, &Request::Remove(vec!["figlet".into()]), false).unwrap();
         apply(&conf, &removal.plan.unwrap(), &tx).unwrap();
+        assert!(crate::installed(&conf).unwrap().get("figlet").is_none());
+
+        // A repair: the full update plus removing figlet, as the solver would propose.
+        let again = crate::prepare::prepare(&conf, None, &target, true).unwrap();
+        apply(&conf, &again.plan.unwrap(), &tx).unwrap();
+        let repair =
+            crate::prepare::prepare(&conf, None, &Request::Repair(vec!["figlet".into()]), false).unwrap();
+        let plan = repair.plan.unwrap();
+        assert!(
+            plan.steps.iter().any(
+                |s| matches!(s, Step::Remove { name, why: RemovalReason::Repair, .. } if name == "figlet")
+            )
+        );
+        apply(&conf, &plan, &tx).unwrap();
         assert!(crate::installed(&conf).unwrap().get("figlet").is_none());
     }
 }

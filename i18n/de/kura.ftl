@@ -50,6 +50,12 @@ undo-unknown = Es gibt keinen gespeicherten Stand #{ $id }. kura history listet 
 confirm-undo = Zu diesem Stand zurückkehren? [j/N]
 mirrors-running = Download-Server in Ihrer Nähe werden getestet …
 mirrors-done = Jetzt werden { $count } schnelle Download-Server verwendet. Die bisherige Liste wurde als { $backup } aufbewahrt.
+solver-found =
+    { $count ->
+        [one] kura hat eine Lösung gefunden: Ein alter Teil, den keine App mehr verwendet, blockiert das Update. Er wird entfernt, alles andere wird aktualisiert.
+       *[other] kura hat eine Lösung gefunden: { $count } alte Teile, die keine App mehr verwendet, blockieren das Update. Sie werden entfernt, alles andere wird aktualisiert.
+    }
+solver-tested = kura hat diese Lösung getestet, ohne etwas zu verändern.
 error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
 
 ## history

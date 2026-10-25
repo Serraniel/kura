@@ -219,8 +219,9 @@ fn prepare_preview() -> Result<Prepared, String> {
     let l = Localizer::from_env();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let conf = kura_alpm::load_config().map_err(fail)?;
-    let outcome =
-        kura_alpm::prepare::prepare(&conf, Some(&check_dir()), &Request::Update, true).map_err(fail)?;
+    let (outcome, repair) =
+        kura_alpm::prepare::prepare_with_repair(&conf, Some(&check_dir()), &Request::Update, true)
+            .map_err(fail)?;
     let mut plan = match outcome.plan {
         Ok(plan) => plan,
         Err(problems) => {
@@ -253,7 +254,16 @@ fn prepare_preview() -> Result<Prepared, String> {
             )
         },
     );
-    let headline = if outcome.available.is_empty() {
+    let solved = repair.map(|r| {
+        format!(
+            "{}\n{}",
+            l.msg_args("solver-found", &[("count", r.remove.len().into())]),
+            l.msg("solver-tested")
+        )
+    });
+    let headline = if let Some(text) = solved {
+        text
+    } else if outcome.available.is_empty() {
         l.msg("check-none")
     } else {
         l.msg_args("check-found", &[("count", outcome.available.len().into())])

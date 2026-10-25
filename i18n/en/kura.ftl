@@ -50,6 +50,12 @@ undo-unknown = There is no saved state #{ $id }. kura history lists the saved st
 confirm-undo = Go back to this state? [y/N]
 mirrors-running = Testing download servers near you…
 mirrors-done = { $count } fast download servers are now used. The previous list was kept as { $backup }.
+solver-found =
+    { $count ->
+        [one] kura found a solution: one old part that no app uses any more blocks the update. It is removed, everything else is updated.
+       *[other] kura found a solution: { $count } old parts that no app uses any more block the update. They are removed, everything else is updated.
+    }
+solver-tested = kura tested this solution without changing anything.
 error-check = Could not look for updates: { $reason }
 
 ## history

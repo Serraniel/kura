@@ -134,7 +134,16 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let config = kura_alpm::load_config().map_err(fail)?;
     let refresh = !matches!(request, Request::Remove(_));
-    let outcome = kura_alpm::prepare::prepare(&config, Some(&check_dir()), request, refresh).map_err(fail)?;
+    let (outcome, repair) =
+        kura_alpm::prepare::prepare_with_repair(&config, Some(&check_dir()), request, refresh)
+            .map_err(fail)?;
+    if let Some(repair) = &repair {
+        say(&format!(
+            "{}\n{}\n",
+            l.msg_args("solver-found", &[("count", repair.remove.len().into())]),
+            l.msg("solver-tested")
+        ));
+    }
     let mut plan = match &outcome.plan {
         Err(problems) => {
             let mut out = l.msg("check-blocked") + "\n";
