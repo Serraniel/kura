@@ -294,6 +294,7 @@ fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
             Event::Progress { .. } => l.msg("apply-checking"),
             Event::Hook { name, .. } => l.msg_args("apply-hook", &[("name", name.into())]),
             Event::CleaningUp => l.msg("apply-cleanup"),
+            Event::UpdatingKeyring => l.msg("apply-keyring"),
         };
         if line != last {
             say(&line);
