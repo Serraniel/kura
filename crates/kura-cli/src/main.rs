@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use std::collections::BTreeSet;
 
-use kura_alpm::apply::{Event, Phase};
+use kura_alpm::apply::Event;
 use kura_alpm::prepare::{Outcome, Problem, Request};
 use kura_core::package::{InstallReason, PackageSet};
 use kura_core::plan::Plan;
@@ -112,26 +112,7 @@ fn check_dir() -> std::path::PathBuf {
 }
 
 fn problem_text(l: &Localizer, p: &Problem) -> String {
-    match p {
-        Problem::UnsatisfiedDependency {
-            target, dependency, ..
-        } => l.msg_args(
-            "problem-unsatisfied",
-            &[
-                ("target", target.clone().into()),
-                ("dependency", dependency.clone().into()),
-            ],
-        ),
-        Problem::Conflict { first, second, .. } => l.msg_args(
-            "problem-conflict",
-            &[("first", first.clone().into()), ("second", second.clone().into())],
-        ),
-        Problem::InvalidArchitecture { packages: pkgs } => {
-            l.msg_args("problem-arch", &[("packages", pkgs.join(", ").into())])
-        }
-        Problem::NotFound { name } => l.msg_args("problem-not-found", &[("name", name.clone().into())]),
-        Problem::Other { message } => message.clone(),
-    }
+    kura_helper::text::problem(l, p)
 }
 
 /// Prepares a request on the private database copy. For updates, packages
@@ -172,12 +153,7 @@ fn render(l: &Localizer, plan: &Plan, outcome: &Outcome, apps: &BTreeSet<String>
         }
         let _ = writeln!(out, "\n{}", l.msg_args(title, &[("count", steps.len().into())]));
         for step in steps {
-            let detail = match step {
-                Step::Upgrade { from, to, .. } | Step::Downgrade { from, to, .. } => format!("{from} → {to}"),
-                Step::Install { version, .. } => format!("+ {version}"),
-                Step::Remove { version, .. } => format!("− {version}"),
-                Step::MarkReason { .. } => String::new(),
-            };
+            let detail = kura_i18n::present::step_detail(step);
             let _ = writeln!(out, "  {:width$}  {detail}", step.package());
         }
     };
@@ -260,42 +236,7 @@ fn confirm(l: &Localizer, question_id: &str) -> bool {
 fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
     let mut last = String::new();
     move |event| {
-        let line = match event {
-            Event::Refreshing => l.msg("apply-refreshing"),
-            Event::Downloading { file, .. } => l.msg_args("apply-downloading", &[("file", file.into())]),
-            Event::Progress {
-                phase: Phase::Installing,
-                package,
-                current,
-                total,
-                ..
-            } => l.msg_args(
-                "apply-installing",
-                &[
-                    ("package", package.into()),
-                    ("current", current.into()),
-                    ("total", total.into()),
-                ],
-            ),
-            Event::Progress {
-                phase: Phase::Removing,
-                package,
-                current,
-                total,
-                ..
-            } => l.msg_args(
-                "apply-removing",
-                &[
-                    ("package", package.into()),
-                    ("current", current.into()),
-                    ("total", total.into()),
-                ],
-            ),
-            Event::Progress { .. } => l.msg("apply-checking"),
-            Event::Hook { name, .. } => l.msg_args("apply-hook", &[("name", name.into())]),
-            Event::CleaningUp => l.msg("apply-cleanup"),
-            Event::UpdatingKeyring => l.msg("apply-keyring"),
-        };
+        let line = kura_helper::text::event(l, &event);
         if line != last {
             say(&line);
             last = line;
@@ -387,14 +328,6 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
     }
 }
 
-fn when(l: &Localizer, created: i64, now: i64) -> String {
-    match (now - created).max(0) / 86_400 {
-        0 => l.msg("history-today"),
-        1 => l.msg("history-yesterday"),
-        days => l.msg_args("history-days-ago", &[("days", days.into())]),
-    }
-}
-
 fn history(l: &Localizer) -> Result<String, String> {
     let journal = kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL))
         .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))?;
@@ -409,27 +342,12 @@ fn history(l: &Localizer) -> Result<String, String> {
         .iter()
         .rev()
         .map(|r| {
-            let s = r.summary();
-            let text = if r.id == 1 {
-                l.msg_args("history-start", &[("count", s.installed.into())])
-            } else {
-                let parts: Vec<String> = [
-                    ("history-upgraded", s.upgraded),
-                    ("history-installed", s.installed),
-                    ("history-downgraded", s.downgraded),
-                    ("history-removed", s.removed),
-                ]
-                .into_iter()
-                .filter(|(_, n)| *n > 0)
-                .map(|(id, n)| l.msg_args(id, &[("count", n.into())]))
-                .collect();
-                let mut text = parts.join(&l.msg("list-separator"));
-                if r.cause.as_deref() == Some("pacman") {
-                    text = format!("{text} {}", l.msg("history-outside"));
-                }
-                text
-            };
-            (format!("#{}", r.id), when(l, r.created, now), text)
+            let text = kura_i18n::present::record_text(l, r);
+            (
+                format!("#{}", r.id),
+                kura_i18n::present::when(l, r.created, now),
+                text,
+            )
         })
         .collect();
     let w0 = rows.iter().map(|r| r.0.chars().count()).max().unwrap_or(0);

@@ -7,6 +7,8 @@
 //! The helper accepts exactly one kind of request: an approved plan. Before
 //! running it, it asks polkit whether the caller may do this kind of change.
 
+pub mod text;
+
 use std::sync::mpsc;
 use std::time::Duration;
 

@@ -1,0 +1,153 @@
+// SPDX-FileCopyrightText: 2026 The kura contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Texts built from kura's data, shared by the command line and the window so
+//! both say the same thing.
+
+use kura_core::history::Record;
+use kura_core::plan::Step;
+
+use crate::Localizer;
+
+/// "today", "yesterday" or "3 days ago".
+pub fn when(l: &Localizer, created: i64, now: i64) -> String {
+    match (now - created).max(0) / 86_400 {
+        0 => l.msg("history-today"),
+        1 => l.msg("history-yesterday"),
+        days => l.msg_args("history-days-ago", &[("days", days.into())]),
+    }
+}
+
+/// What a history record changed, for example "46 updated, 1 removed".
+pub fn record_text(l: &Localizer, record: &Record) -> String {
+    let s = record.summary();
+    if record.id == 1 {
+        return l.msg_args("history-start", &[("count", s.installed.into())]);
+    }
+    let parts: Vec<String> = [
+        ("history-upgraded", s.upgraded),
+        ("history-installed", s.installed),
+        ("history-downgraded", s.downgraded),
+        ("history-removed", s.removed),
+    ]
+    .into_iter()
+    .filter(|(_, n)| *n > 0)
+    .map(|(id, n)| l.msg_args(id, &[("count", n.into())]))
+    .collect();
+    let mut text = parts.join(&l.msg("list-separator"));
+    if record.cause.as_deref() == Some("pacman") {
+        text = format!("{text} {}", l.msg("history-outside"));
+    }
+    text
+}
+
+/// Version change of a step: "151.0 → 152.0", "+ 3.0.6", "− 36.9.0".
+pub fn step_detail(step: &Step) -> String {
+    match step {
+        Step::Upgrade { from, to, .. } | Step::Downgrade { from, to, .. } => format!("{from} → {to}"),
+        Step::Install { version, .. } => format!("+ {version}"),
+        Step::Remove { version, .. } => format!("− {version}"),
+        Step::MarkReason { .. } => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use kura_core::history::{Record, RecordChange};
+    use kura_core::locale::Locale;
+    use kura_core::package::InstallReason;
+    use kura_core::plan::RemovalReason;
+
+    use super::*;
+
+    fn l(lang: &str) -> Localizer {
+        Localizer::new(&[Locale::parse(lang).unwrap()])
+    }
+
+    fn set(name: &str, from: Option<&str>) -> RecordChange {
+        RecordChange::Set {
+            name: name.into(),
+            version: "2".into(),
+            repo: None,
+            reason: InstallReason::Explicit,
+            from: from.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn relative_days() {
+        let en = l("en");
+        assert_eq!(when(&en, 1000, 1000 + 3600), "today");
+        assert_eq!(when(&en, 0, 86_400 + 5), "yesterday");
+        assert_eq!(when(&en, 0, 3 * 86_400), "3 days ago");
+        assert_eq!(when(&en, 5000, 0), "today");
+        assert_eq!(when(&l("de"), 0, 3 * 86_400), "vor 3 Tagen");
+    }
+
+    #[test]
+    fn record_texts() {
+        let en = l("en");
+        let start = Record {
+            id: 1,
+            created: 0,
+            cause: None,
+            changes: vec![set("a", None), set("b", None)],
+        };
+        assert_eq!(record_text(&en, &start), "Starting point: 2 packages");
+        let update = Record {
+            id: 2,
+            created: 0,
+            cause: Some("kura:system-update".into()),
+            changes: vec![
+                set("a", Some("1")),
+                RecordChange::Unset {
+                    name: "b".into(),
+                    version: "2".into(),
+                },
+            ],
+        };
+        assert_eq!(record_text(&en, &update), "1 updated, 1 removed");
+        let outside = Record {
+            cause: Some("pacman".into()),
+            ..update.clone()
+        };
+        assert_eq!(
+            record_text(&en, &outside),
+            "1 updated, 1 removed (changed outside kura)"
+        );
+        assert_eq!(record_text(&l("ja"), &update), "更新 1 件、削除 1 件");
+    }
+
+    #[test]
+    fn step_details() {
+        let up = Step::Upgrade {
+            name: "f".into(),
+            from: "1".into(),
+            to: "2".into(),
+        };
+        assert_eq!(step_detail(&up), "1 → 2");
+        let down = Step::Downgrade {
+            name: "f".into(),
+            from: "2".into(),
+            to: "1".into(),
+        };
+        assert_eq!(step_detail(&down), "2 → 1");
+        let add = Step::Install {
+            name: "g".into(),
+            version: "3".into(),
+            reason: InstallReason::Explicit,
+        };
+        assert_eq!(step_detail(&add), "+ 3");
+        let rm = Step::Remove {
+            name: "e".into(),
+            version: "36".into(),
+            why: RemovalReason::Orphan,
+        };
+        assert_eq!(step_detail(&rm), "− 36");
+        let mark = Step::MarkReason {
+            name: "m".into(),
+            reason: InstallReason::Explicit,
+        };
+        assert_eq!(step_detail(&mark), "");
+    }
+}
