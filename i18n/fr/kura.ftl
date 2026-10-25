@@ -8,12 +8,34 @@ cli-usage =
     Utilisation : kura <commande>
 
     Commandes :
+      check      Rechercher des mises à jour et montrer ce qui changerait
       doctor     Afficher un résumé de ce système pour les rapports de problème
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
 cli-missing-command = Aucune commande indiquée.
+
+## check
+
+check-running = Recherche de mises à jour…
+check-none = Tout est à jour.
+check-found =
+    { $count ->
+        [one] Une mise à jour est disponible.
+       *[other] { $count } mises à jour sont disponibles.
+    }
+check-group-apps = Applications ({ $count })
+check-group-system = Composants du système ({ $count })
+check-group-replaced = Remplacés pendant la mise à jour ({ $count })
+check-group-cleanup = Plus nécessaires ({ $count })
+check-sizes = Téléchargement : { $download } · Espace disque : { $delta }
+check-preview-only = Rien n’a été modifié. L’installation des mises à jour arrivera dans une version ultérieure de kura.
+check-blocked = La mise à jour ne peut pas être préparée :
+problem-unsatisfied = { $target } a besoin de { $dependency }, qui n’est plus disponible.
+problem-conflict = { $first } et { $second } ne peuvent pas être installés ensemble.
+problem-arch = Conçu pour un autre type de processeur : { $packages }
+error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## doctor
 

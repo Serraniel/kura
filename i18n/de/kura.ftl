@@ -7,12 +7,34 @@ cli-usage =
     Aufruf: kura <Befehl>
 
     Befehle:
+      check      Nach Updates suchen und zeigen, was sich ändern würde
       doctor     Übersicht über dieses System für Problemberichte anzeigen
       orphans    Pakete auflisten, die nichts mehr braucht
       sbom       Liste aller installierten Software schreiben (CycloneDX)
       version    Version von kura anzeigen
 cli-unknown-command = Unbekannter Befehl: { $command }
 cli-missing-command = Kein Befehl angegeben.
+
+## check
+
+check-running = Suche nach Updates …
+check-none = Alles ist aktuell.
+check-found =
+    { $count ->
+        [one] Ein Update ist verfügbar.
+       *[other] { $count } Updates sind verfügbar.
+    }
+check-group-apps = Apps ({ $count })
+check-group-system = Systemteile ({ $count })
+check-group-replaced = Werden beim Update ersetzt ({ $count })
+check-group-cleanup = Nicht mehr benötigt ({ $count })
+check-sizes = Download: { $download } · Speicherplatz: { $delta }
+check-preview-only = Es wurde nichts verändert. Das Installieren von Updates kommt mit einer späteren Version von kura.
+check-blocked = Das Update kann nicht vorbereitet werden:
+problem-unsatisfied = { $target } benötigt { $dependency }, das nicht mehr verfügbar ist.
+problem-conflict = { $first } und { $second } können nicht gemeinsam installiert werden.
+problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
+error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
 
 ## doctor
 

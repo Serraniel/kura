@@ -6,6 +6,9 @@
 //! Never parse pacman's text output: it is translated and changes between
 //! versions. Everything goes through libalpm.
 
+pub mod check;
+pub mod conf;
+
 use std::path::Path;
 
 use alpm::{Alpm, PackageReason, SigLevel};
@@ -38,28 +41,19 @@ impl Default for Paths<'_> {
     }
 }
 
-/// Repository names in the order pacman.conf lists them.
-///
-/// Only section headers are read. `Include` lines and options do not change
-/// which repositories exist.
-pub fn repositories(pacman_conf: &str) -> Vec<String> {
-    pacman_conf
-        .lines()
-        .map(str::trim)
-        .filter_map(|l| l.strip_prefix('[')?.strip_suffix(']'))
-        .filter(|name| *name != "options")
-        .map(str::to_owned)
-        .collect()
+/// Reads pacman.conf and the files it includes.
+pub fn config(paths: &Paths<'_>) -> Result<conf::Config, Error> {
+    conf::parse(&conf::Disk, Path::new(paths.config)).ok_or_else(|| Error::Io {
+        path: paths.config.to_owned(),
+        source: std::io::Error::from(std::io::ErrorKind::NotFound),
+    })
 }
 
 /// Reads all installed packages and the repository each one belongs to.
 pub fn installed(paths: &Paths<'_>) -> Result<PackageSet, Error> {
-    let conf = std::fs::read_to_string(paths.config).map_err(|source| Error::Io {
-        path: paths.config.to_owned(),
-        source,
-    })?;
+    let conf = config(paths)?;
     let handle = Alpm::new(paths.root, paths.dbpath)?;
-    for repo in repositories(&conf) {
+    for repo in conf.repos.iter().map(|r| r.name.as_str()) {
         // A repository whose database was never downloaded is simply empty.
         if Path::new(paths.dbpath)
             .join("sync")
@@ -99,9 +93,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn repositories_in_order() {
-        let conf = "[options]\nHoldPkg = pacman\n\n[endeavouros]\nInclude = /etc/pacman.d/endeavouros-mirrorlist\n\n[core]\nInclude = x\n# [testing]\n[extra]\n  [multilib]  \n";
-        assert_eq!(repositories(conf), ["endeavouros", "core", "extra", "multilib"]);
+    fn missing_config_is_an_error() {
+        let paths = Paths {
+            config: "/nonexistent/pacman.conf",
+            ..Paths::default()
+        };
+        assert!(matches!(config(&paths), Err(Error::Io { .. })));
     }
 
     /// Reads the real system database. Run with `cargo test -- --ignored` on Arch.
