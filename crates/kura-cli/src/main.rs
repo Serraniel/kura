@@ -61,6 +61,7 @@ fn run(l: &Localizer) -> Result<String, String> {
     match command.as_deref() {
         Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
         Some("check") => check(l),
+        Some("undo") => undo(l, names.first().map(String::as_str)),
         Some("update") => change(l, &Request::Update, "confirm-update"),
         Some("install") if !names.is_empty() => change(l, &Request::Install(names), "confirm-install"),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
@@ -142,7 +143,7 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
 }
 
 /// The preview of a plan, grouped the way the window groups it.
-fn render(l: &Localizer, plan: &Plan, outcome: &Outcome, apps: &BTreeSet<String>) -> String {
+fn render(l: &Localizer, plan: &Plan, outcome: Option<&Outcome>, apps: &BTreeSet<String>) -> String {
     let is_app = |p: &str| apps.contains(p);
     let groups = plan.groups(&is_app);
     let mut out = String::new();
@@ -170,15 +171,17 @@ fn render(l: &Localizer, plan: &Plan, outcome: &Outcome, apps: &BTreeSet<String>
     section("check-group-system", &system);
     section("check-group-replaced", &replaced);
     section("check-group-cleanup", &groups.cleanup);
-    if plan.steps.iter().any(|s| {
-        !matches!(
-            s,
-            Step::Remove {
-                why: RemovalReason::Orphan,
-                ..
-            }
-        )
-    }) {
+    if let Some(outcome) = outcome
+        && plan.steps.iter().any(|s| {
+            !matches!(
+                s,
+                Step::Remove {
+                    why: RemovalReason::Orphan,
+                    ..
+                }
+            )
+        })
+    {
         let _ = writeln!(
             out,
             "\n{}",
@@ -211,7 +214,7 @@ fn check(l: &Localizer) -> Result<String, String> {
     Ok(format!(
         "{}\n{}\n{}\n",
         headline(l, &outcome),
-        render(l, &plan, &outcome, &apps),
+        render(l, &plan, Some(&outcome), &apps),
         l.msg("check-preview-only")
     ))
 }
@@ -283,7 +286,7 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
     } else {
         l.msg("preview-title")
     };
-    say(&format!("{title}\n{}", render(l, &plan, &outcome, &apps)));
+    say(&format!("{title}\n{}", render(l, &plan, Some(&outcome), &apps)));
     let mut question_id = question_id;
     if matches!(request, Request::Update) {
         match news_for(&plan) {
@@ -308,7 +311,7 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
                 say(&format!(
                     "\n{}\n{}",
                     l.msg("apply-changed"),
-                    render(l, &plan, &outcome, &apps)
+                    render(l, &plan, Some(&outcome), &apps)
                 ));
             }
             Reply::Blocked { problems } => {
@@ -325,6 +328,57 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
                 return Err(l.msg_args("apply-failed", &[("reason", message.into())]));
             }
         }
+    }
+}
+
+/// Goes back to an earlier generation, by default the one before the newest.
+fn undo(l: &Localizer, arg: Option<&str>) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let journal =
+        kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL)).map_err(fail)?;
+    let latest = journal.latest().id;
+    let target = match arg {
+        Some(a) => a
+            .trim_start_matches('#')
+            .parse::<u64>()
+            .map_err(|_| l.msg("cli-usage"))?,
+        None => latest.saturating_sub(1),
+    };
+    let unknown = || l.msg_args("undo-unknown", &[("id", target.into())]);
+    if target == latest && latest > 0 {
+        return Ok(l.msg("undo-nothing") + "\n");
+    }
+    let plan = kura_alpm::restore::plan(&journal, target).ok_or_else(unknown)?;
+    if plan.steps.is_empty() {
+        return Ok(l.msg("undo-nothing") + "\n");
+    }
+    let config = kura_alpm::load_config().map_err(fail)?;
+    let generation = journal.generation(target).ok_or_else(unknown)?;
+    if let Err(problems) = kura_alpm::restore::sources(&config.cache_dir, &plan, &generation) {
+        let mut out = l.msg("check-blocked") + "\n";
+        for p in &problems {
+            let _ = writeln!(out, "  {}", problem_text(l, p));
+        }
+        return Err(out);
+    }
+    let apps = kura_alpm::apps(&config).map_err(fail)?;
+    let when = kura_i18n::present::when(l, generation.created, kura_alpm::background::now());
+    say(&format!(
+        "{}\n{}\n{}",
+        l.msg_args("undo-title", &[("id", target.into()), ("when", when.into())]),
+        render(l, &plan, None, &apps),
+        l.msg("undo-limits")
+    ));
+    if !confirm(l, "confirm-undo") {
+        return Ok(l.msg("apply-cancelled") + "\n");
+    }
+    let reply = kura_helper::apply(&plan, progress_printer(l))
+        .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+    let text = kura_helper::text::reply(l, &reply);
+    if reply == Reply::Done {
+        Ok(text + "\n")
+    } else {
+        Err(text)
     }
 }
 

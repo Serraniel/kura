@@ -62,6 +62,8 @@ pub enum Problem {
     InvalidArchitecture { packages: Vec<String> },
     /// A requested package does not exist.
     NotFound { name: String },
+    /// An old version is neither cached nor available from the Arch archive.
+    NotRestorable { name: String, version: String },
     /// Any other libalpm error, as its message.
     Other { message: String },
 }
@@ -279,7 +281,7 @@ pub(crate) fn build(
     })
 }
 
-fn problems(e: &alpm::PrepareError<'_>) -> Vec<Problem> {
+pub(crate) fn problems(e: &alpm::PrepareError<'_>) -> Vec<Problem> {
     match e.data() {
         Some(PrepareData::UnsatisfiedDeps(list)) => list
             .iter()

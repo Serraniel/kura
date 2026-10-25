@@ -16,6 +16,7 @@ cli-usage =
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
+      undo       以前の状態に戻します: kura undo [番号]
       version    kura のバージョンを表示します
 cli-unknown-command = 不明なコマンドです: { $command }
 cli-missing-command = コマンドが指定されていません。
@@ -36,6 +37,12 @@ problem-unsatisfied = { $target } には { $dependency } が必要ですが、�
 problem-conflict = { $first } と { $second } は同時にインストールできません。
 problem-arch = 別の種類のプロセッサー向けにビルドされています: { $packages }
 problem-not-found = { $name } という名前のパッケージは見つかりませんでした。
+problem-not-restorable = { $name } { $version } を元に戻せません。AUR から入手したか、このコンピューターでビルドしたもので、パッケージキャッシュにファイルが残っていません。
+undo-title = { $when } の状態 #{ $id } に戻します:
+undo-limits = 設定や個人のファイルは変更されません。次のアップデートで新しいバージョンに戻るため、修正が出るまで問題を回避するために使ってください。
+undo-nothing = これはすでに現在の状態です。
+undo-unknown = 保存された状態 #{ $id } はありません。kura history で保存された状態を確認できます。
+confirm-undo = この状態に戻しますか? [y/N]
 error-check = アップデートを確認できませんでした: { $reason }
 
 ## history
@@ -119,8 +126,19 @@ error-write = { $path } に書き込めませんでした: { $reason }
 ## Window
 
 nav-overview = 概要
+nav-updates = アップデート
+gui-review = 確認してインストール
+gui-check-now = 今すぐアップデートを確認
+gui-install = インストール
+gui-install-news = お知らせを読みました。インストール
+gui-read-news = お知らせを読む
+gui-go-back = この状態に戻す
+gui-cancel = キャンセル
+gui-updates-intro = 変更されるのは以下のすべてです。「インストール」を押すまで何も起こりません。
+gui-tray-mono = トレイアイコンを単色にする
+gui-tray-mono-hint = パネルのほかのアイコンと合わせます。
+gui-last-check = 最終確認: { $when }。
 nav-history = 履歴
 nav-settings = 設定
 overview-subtitle = このコンピューターの概要です。
 overview-refresh = 再読み込み
-prototype-note = これは初期の試作版です。情報を読み取るだけで、何も変更しません。

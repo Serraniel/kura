@@ -15,6 +15,7 @@ cli-usage =
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
+      undo       Go back to an earlier state: kura undo [number]
       version    Show the version of kura
 cli-unknown-command = Unknown command: { $command }
 cli-missing-command = No command given.
@@ -39,6 +40,12 @@ problem-unsatisfied = { $target } needs { $dependency }, which is no longer avai
 problem-conflict = { $first } and { $second } cannot be installed together.
 problem-arch = Built for a different processor type: { $packages }
 problem-not-found = No package named { $name } was found.
+problem-not-restorable = kura cannot bring back { $name } { $version }: it came from the AUR or was built on this computer, and the file is no longer in the package cache.
+undo-title = Going back to state #{ $id } from { $when }:
+undo-limits = Settings and personal files are not changed. The next update brings the newer versions back, so use this to get around a problem until a fix is released.
+undo-nothing = This is already the current state.
+undo-unknown = There is no saved state #{ $id }. kura history lists the saved states.
+confirm-undo = Go back to this state? [y/N]
 error-check = Could not look for updates: { $reason }
 
 ## history
@@ -134,8 +141,19 @@ error-write = Could not write { $path }: { $reason }
 ## Window
 
 nav-overview = Overview
+nav-updates = Updates
+gui-review = Review and install
+gui-check-now = Look for updates now
+gui-install = Install
+gui-install-news = I have read the news. Install
+gui-read-news = Read the announcement
+gui-go-back = Go back to this state
+gui-cancel = Cancel
+gui-updates-intro = This is everything that will change. Nothing happens until you press Install.
+gui-tray-mono = Monochrome tray icon
+gui-tray-mono-hint = Matches the other icons in the panel.
+gui-last-check = Last checked { $when }.
 nav-history = History
 nav-settings = Settings
 overview-subtitle = A short overview of this computer.
 overview-refresh = Refresh
-prototype-note = This is an early prototype. It only reads information and changes nothing.

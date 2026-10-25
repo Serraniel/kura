@@ -16,6 +16,7 @@ cli-usage =
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
+      undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
 cli-missing-command = Aucune commande indiquée.
@@ -40,6 +41,12 @@ problem-unsatisfied = { $target } a besoin de { $dependency }, qui n’est plus 
 problem-conflict = { $first } et { $second } ne peuvent pas être installés ensemble.
 problem-arch = Conçu pour un autre type de processeur : { $packages }
 problem-not-found = Aucun paquet nommé { $name } n’a été trouvé.
+problem-not-restorable = kura ne peut pas récupérer { $name } { $version } : il provient de l’AUR ou a été compilé sur cet ordinateur, et le fichier n’est plus dans le cache des paquets.
+undo-title = Retour à l’état n° { $id } du { $when } :
+undo-limits = Les paramètres et les fichiers personnels ne sont pas modifiés. La prochaine mise à jour ramènera les versions plus récentes : utilisez ceci pour contourner un problème en attendant un correctif.
+undo-nothing = C’est déjà l’état actuel.
+undo-unknown = Il n’existe pas d’état enregistré n° { $id }. kura history liste les états enregistrés.
+confirm-undo = Revenir à cet état ? [o/N]
 error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## history
@@ -147,8 +154,19 @@ error-write = Impossible d’écrire { $path } : { $reason }
 ## Window
 
 nav-overview = Vue d’ensemble
+nav-updates = Mises à jour
+gui-review = Voir et installer
+gui-check-now = Rechercher des mises à jour maintenant
+gui-install = Installer
+gui-install-news = J’ai lu les actualités. Installer
+gui-read-news = Lire l’annonce
+gui-go-back = Revenir à cet état
+gui-cancel = Annuler
+gui-updates-intro = Voici tout ce qui va changer. Rien ne se passe avant que vous cliquiez sur Installer.
+gui-tray-mono = Icône monochrome dans la zone de notification
+gui-tray-mono-hint = S’accorde avec les autres icônes du tableau de bord.
+gui-last-check = Dernière vérification : { $when }.
 nav-history = Historique
 nav-settings = Paramètres
 overview-subtitle = Un bref aperçu de cet ordinateur.
 overview-refresh = Actualiser
-prototype-note = Ceci est un premier prototype. Il lit uniquement des informations et ne modifie rien.

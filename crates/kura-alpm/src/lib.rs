@@ -11,6 +11,7 @@ pub mod apply;
 pub mod background;
 pub mod history;
 pub mod prepare;
+pub mod restore;
 
 use std::collections::BTreeSet;
 

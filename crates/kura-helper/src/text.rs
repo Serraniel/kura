@@ -29,6 +29,10 @@ pub fn problem(l: &Localizer, p: &Problem) -> String {
             l.msg_args("problem-arch", &[("packages", packages.join(", ").into())])
         }
         Problem::NotFound { name } => l.msg_args("problem-not-found", &[("name", name.clone().into())]),
+        Problem::NotRestorable { name, version } => l.msg_args(
+            "problem-not-restorable",
+            &[("name", name.clone().into()), ("version", version.clone().into())],
+        ),
         Problem::Other { message } => message.clone(),
     }
 }
@@ -192,6 +196,10 @@ mod tests {
                     packages: vec!["e".into(), "f".into()],
                 },
                 Problem::NotFound { name: "g".into() },
+                Problem::NotRestorable {
+                    name: "yay-bin".into(),
+                    version: "12".into(),
+                },
                 Problem::Other { message: "h".into() },
             ],
         };
@@ -200,6 +208,7 @@ mod tests {
         assert!(text.contains("c and d cannot be installed together"));
         assert!(text.contains("e, f"));
         assert!(text.contains("No package named g"));
+        assert!(text.contains("yay-bin 12"));
         assert!(text.ends_with("\n  h"));
         for r in [
             Reply::NotAuthorized,
