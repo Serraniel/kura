@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- SPDX-FileCopyrightText: 2026 The kura contributors -->
+  <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+  <!-- Monochrome tray icon; Plasma recolours ColorScheme-Text to match the panel. -->
+  <style id="current-color-scheme">.ColorScheme-Text { color: #232629; }</style>
+  <path class="ColorScheme-Text" fill="currentColor" d="M8 1 1 5v2h14V5zM2 8v7h5v-4h2v4h5V8z"/>
+</svg>

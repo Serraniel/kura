@@ -80,6 +80,17 @@ apply-busy = kura は別の変更を行っています。終わるまでお待�
 apply-failed = 変更に失敗しました: { $reason }
 error-helper = kura のシステムサービスを利用できません: { $reason }
 
+## Tray
+
+tray-uptodate = すべて最新の状態です
+tray-updates = { $count } 件のアップデートの準備ができました
+tray-attention = 確認が必要なアップデートがあります
+tray-unknown = kura はまだアップデートを確認していません
+tray-open-hint = クリックすると kura を開きます。
+notify-updates-body = インストールする前に、kura を開いて変更内容を確認してください。
+notify-attention-body = kura を開いて対応方法を確認してください。何も変更されていません。
+notify-open = kura を開く
+
 ## doctor
 
 doctor-title = システムの概要

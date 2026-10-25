@@ -87,6 +87,21 @@ apply-busy = kura nimmt bereits eine andere Änderung vor. Bitte warten Sie, bis
 apply-failed = Die Änderung ist fehlgeschlagen: { $reason }
 error-helper = Der Systemdienst von kura ist nicht verfügbar: { $reason }
 
+## Tray
+
+tray-uptodate = Alles ist aktuell
+tray-updates =
+    { $count ->
+        [one] Ein Update ist bereit
+       *[other] { $count } Updates sind bereit
+    }
+tray-attention = Ein Update braucht Ihre Aufmerksamkeit
+tray-unknown = kura hat noch nicht nach Updates gesucht
+tray-open-hint = Klicken, um kura zu öffnen.
+notify-updates-body = Öffnen Sie kura, um vor der Installation zu sehen, was sich ändert.
+notify-attention-body = Öffnen Sie kura, um zu sehen, was zu tun ist. Es wurde nichts verändert.
+notify-open = kura öffnen
+
 ## doctor
 
 doctor-title = Systemübersicht

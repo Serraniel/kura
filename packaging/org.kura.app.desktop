@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+[Desktop Entry]
+Type=Application
+Name=kura
+GenericName=Software Manager
+GenericName[de]=Softwareverwaltung
+GenericName[fr]=Gestionnaire de logiciels
+GenericName[ja]=ソフトウェアの管理
+Comment=Install, update and remove software
+Comment[de]=Software installieren, aktualisieren und entfernen
+Comment[fr]=Installer, mettre à jour et supprimer des logiciels
+Comment[ja]=ソフトウェアのインストール、アップデート、削除
+Keywords=update;install;software;package;app;
+Keywords[de]=Update;Aktualisierung;installieren;Software;Paket;App;
+Keywords[fr]=mise à jour;installer;logiciel;paquet;application;
+Keywords[ja]=アップデート;インストール;ソフトウェア;パッケージ;アプリ;
+Exec=kura-gui
+Icon=kura
+Categories=System;PackageManager;Settings;Qt;KDE;
+StartupNotify=true

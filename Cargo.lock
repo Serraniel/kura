@@ -725,6 +725,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kura-agent"
+version = "0.0.0"
+dependencies = [
+ "kura-alpm",
+ "kura-core",
+ "kura-i18n",
+ "serde",
+ "serde_json",
+ "zbus",
+]
+
+[[package]]
 name = "kura-alpm"
 version = "0.0.0"
 dependencies = [

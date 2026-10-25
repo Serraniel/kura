@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+# Installed to /etc/xdg/autostart/: starts the tray icon with the session.
+[Desktop Entry]
+Type=Application
+Name=kura tray icon
+Name[de]=kura-Symbol im Systemabschnitt
+Name[fr]=Icône de kura dans la zone de notification
+Name[ja]=kura のトレイアイコン
+Exec=/usr/lib/kura/kura-agent
+Icon=kura
+NoDisplay=true
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true
