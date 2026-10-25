@@ -185,6 +185,37 @@ gui-updates-intro = This is everything that will change. Nothing happens until y
 gui-tray-mono = Monochrome tray icon
 gui-tray-mono-hint = Matches the other icons in the panel.
 gui-last-check = Last checked { $when }.
+nav-health = System health
+nav-software = Software
+health-cpu = Processor
+health-gpu = Graphics
+health-memory = Memory
+health-disk = Storage
+health-disk-used = { $used } of { $total } used
+health-cache = Old update files: { $size }
+health-kernels = Kernels
+health-kernel-running = in use
+health-suggestions = Suggestions
+suggest-backup-kernel = Install a backup kernel
+suggest-backup-kernel-text = If an update ever stops the computer from starting, the backup can be chosen in the start menu.
+suggest-snapshots = Turn on automatic snapshots
+suggest-snapshots-text = Your disk supports snapshots. Setting them up comes in a later version of kura.
+suggest-mirrors = Choose faster download servers
+suggest-mirrors-text = kura tests servers near you and uses the fastest.
+suggest-cleanup =
+    { $count ->
+        [one] One package is no longer needed
+       *[other] { $count } packages are no longer needed
+    }
+suggest-cleanup-text = They are removed with the next update.
+search-placeholder = Search apps, for example “photo” or “music”
+search-none = No apps found. Try a different word.
+gui-installed = Installed
+gui-remove = Remove
+gui-install-title = Install { $name }
+gui-remove-title = Remove { $name }
+gui-setup = Set up
+gui-details = Details
 nav-history = History
 nav-settings = Settings
 overview-subtitle = A short overview of this computer.

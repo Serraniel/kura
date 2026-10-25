@@ -46,6 +46,16 @@ Kirigami.ApplicationWindow {
                 onTriggered: { root.show(updatesPage); kura.prepareUpdate() }
             },
             Kirigami.Action {
+                text: kura.tr("nav-software")
+                icon.name: "plasmadiscover"
+                onTriggered: root.show(softwarePage)
+            },
+            Kirigami.Action {
+                text: kura.tr("nav-health")
+                icon.name: "computer"
+                onTriggered: { kura.refreshHealth(); root.show(healthPage) }
+            },
+            Kirigami.Action {
                 text: kura.tr("nav-history")
                 icon.name: "view-history"
                 onTriggered: { kura.refresh(); root.show(historyPage) }
@@ -111,6 +121,16 @@ Kirigami.ApplicationWindow {
                     }
                 }
 
+                Repeater {
+                    model: JSON.parse(kura.securityJson)
+                    Kirigami.InlineMessage {
+                        Layout.fillWidth: true
+                        visible: true
+                        type: Kirigami.MessageType.Error
+                        text: "<b>" + modelData.title + "</b><br>" + modelData.lines.join("<br>")
+                    }
+                }
+
                 Kirigami.FormLayout {
                     Layout.fillWidth: true
 
@@ -157,8 +177,7 @@ Kirigami.ApplicationWindow {
                         onClicked: root.show(overviewPage)
                     }
                     Controls.Button {
-                        readonly property bool restoring: kura.previewTitle !== kura.tr("nav-updates")
-                        text: restoring ? kura.tr("gui-go-back") : news.length > 0 ? kura.tr("gui-install-news") : kura.tr("gui-install")
+                        text: news.length > 0 ? kura.tr("gui-install-news") : kura.actionLabel
                         icon.name: "run-install"
                         highlighted: true
                         onClicked: kura.installUpdate()
@@ -291,6 +310,147 @@ Kirigami.ApplicationWindow {
                     width: parent.width - Kirigami.Units.gridUnit * 4
                     visible: records.length === 0
                     text: kura.tr("history-empty")
+                }
+            }
+        }
+    }
+
+    Component {
+        id: softwarePage
+
+        Kirigami.ScrollablePage {
+            title: kura.tr("nav-software")
+            property var results: JSON.parse(kura.resultsJson)
+
+            header: Kirigami.SearchField {
+                id: searchField
+                placeholderText: kura.tr("search-placeholder")
+                onAccepted: kura.search(text)
+            }
+
+            ListView {
+                model: results
+                delegate: Controls.ItemDelegate {
+                    width: ListView.view.width
+                    contentItem: RowLayout {
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Controls.Label {
+                                text: modelData.name
+                                font.bold: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            Controls.Label {
+                                text: modelData.description
+                                color: Kirigami.Theme.disabledTextColor
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+                        Controls.Button {
+                            text: modelData.installed ? kura.tr("gui-remove") : kura.tr("gui-install")
+                            icon.name: modelData.installed ? "edit-delete" : "run-install"
+                            onClicked: {
+                                root.show(updatesPage)
+                                if (modelData.installed) kura.prepareRemove(modelData.name)
+                                else kura.prepareInstall(modelData.name)
+                            }
+                        }
+                    }
+                }
+                Kirigami.PlaceholderMessage {
+                    anchors.centerIn: parent
+                    width: parent.width - Kirigami.Units.gridUnit * 4
+                    visible: results.length === 0 && searchField.text.length > 0
+                    text: kura.tr("search-none")
+                }
+            }
+        }
+    }
+
+    Component {
+        id: healthPage
+
+        Kirigami.ScrollablePage {
+            title: kura.tr("nav-health")
+            property var health: JSON.parse(kura.healthJson)
+
+            ColumnLayout {
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: kura.message.length > 0
+                    type: Kirigami.MessageType.Information
+                    text: kura.message
+                }
+
+                Kirigami.FormLayout {
+                    Layout.fillWidth: true
+                    Repeater {
+                        model: health.facts || []
+                        Controls.Label {
+                            Kirigami.FormData.label: modelData[0].length > 0 ? modelData[0] + ":" : ""
+                            text: modelData[1]
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                Kirigami.Heading {
+                    text: kura.tr("health-kernels")
+                    level: 3
+                }
+                Repeater {
+                    model: health.kernels || []
+                    RowLayout {
+                        Controls.Label { text: modelData.name + " " + modelData.version }
+                        Controls.Label {
+                            visible: modelData.running
+                            text: "(" + kura.tr("health-kernel-running") + ")"
+                            color: Kirigami.Theme.positiveTextColor
+                        }
+                    }
+                }
+
+                Kirigami.Heading {
+                    text: kura.tr("health-suggestions")
+                    level: 3
+                    visible: (health.suggestions || []).length > 0
+                }
+                Repeater {
+                    model: health.suggestions || []
+                    Kirigami.AbstractCard {
+                        Layout.fillWidth: true
+                        contentItem: RowLayout {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Controls.Label {
+                                    text: modelData.title
+                                    font.bold: true
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                }
+                                Controls.Label {
+                                    text: modelData.text
+                                    wrapMode: Text.WordWrap
+                                    color: Kirigami.Theme.disabledTextColor
+                                    Layout.fillWidth: true
+                                }
+                            }
+                            Controls.Button {
+                                visible: modelData.id !== "snapshots"
+                                enabled: !kura.busy
+                                text: modelData.id === "cleanup" ? kura.tr("gui-review") : kura.tr("gui-setup")
+                                onClicked: {
+                                    if (modelData.id === "mirrors") kura.rankMirrors()
+                                    else if (modelData.id === "backup-kernel") { root.show(updatesPage); kura.prepareInstall("linux-lts linux-lts-headers") }
+                                    else { root.show(updatesPage); kura.prepareUpdate() }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

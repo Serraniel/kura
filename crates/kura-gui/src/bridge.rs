@@ -39,6 +39,12 @@ pub mod qobject {
         /// `[{"id": .., "when": .., "text": ..}]`, newest first.
         #[qproperty(QString, history_json, cxx_name = "historyJson")]
         #[qproperty(bool, monochrome)]
+        // Text of the button that runs the previewed plan; JSON for the health
+        // page (see health_value), the security cards and the search results.
+        #[qproperty(QString, action_label, cxx_name = "actionLabel")]
+        #[qproperty(QString, health_json, cxx_name = "healthJson")]
+        #[qproperty(QString, security_json, cxx_name = "securityJson")]
+        #[qproperty(QString, results_json, cxx_name = "resultsJson")]
         type Kura = super::KuraRust;
     }
 
@@ -69,6 +75,26 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "setTrayMonochrome"]
         fn set_tray_monochrome(self: Pin<&mut Kura>, on: bool);
+
+        /// Collects the facts for the system health page.
+        #[qinvokable]
+        #[cxx_name = "refreshHealth"]
+        fn refresh_health(self: Pin<&mut Kura>);
+
+        #[qinvokable]
+        fn search(self: Pin<&mut Kura>, query: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "prepareInstall"]
+        fn prepare_install(self: Pin<&mut Kura>, names: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "prepareRemove"]
+        fn prepare_remove(self: Pin<&mut Kura>, name: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "rankMirrors"]
+        fn rank_mirrors(self: Pin<&mut Kura>);
     }
 
     impl cxx_qt::Threading for Kura {}
@@ -108,6 +134,10 @@ pub struct KuraRust {
     message: QString,
     history_json: QString,
     monochrome: bool,
+    action_label: QString,
+    health_json: QString,
+    security_json: QString,
+    results_json: QString,
     localizer: Localizer,
     pending: Option<Plan>,
 }
@@ -137,6 +167,10 @@ impl Default for KuraRust {
                 .get("tray_monochrome")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            action_label: QString::default(),
+            health_json: QString::from("{}"),
+            security_json: QString::from("[]"),
+            results_json: QString::from("[]"),
             localizer: Localizer::from_env(),
             pending: None,
         }
@@ -215,15 +249,15 @@ struct Prepared {
 }
 
 /// Runs in a background thread.
-fn prepare_preview() -> Result<Prepared, String> {
+fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     let l = Localizer::from_env();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let conf = kura_alpm::load_config().map_err(fail)?;
     let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
         &conf,
         Some(&check_dir()),
-        &Request::Update,
-        true,
+        request,
+        !matches!(request, Request::Remove(_)),
         &user_locales(),
     )
     .map_err(fail)?;
@@ -238,27 +272,33 @@ fn prepare_preview() -> Result<Prepared, String> {
             return Err(text);
         }
     };
-    let set = kura_alpm::installed(&conf).map_err(fail)?;
-    let cleanup = kura_alpm::cleanup(&set);
-    plan.add_cleanup(cleanup.iter().map(|(n, v)| (n.as_str(), v.as_str())));
+    if matches!(request, Request::Update) {
+        let set = kura_alpm::installed(&conf).map_err(fail)?;
+        let cleanup = kura_alpm::cleanup(&set);
+        plan.add_cleanup(cleanup.iter().map(|(n, v)| (n.as_str(), v.as_str())));
+    }
     let apps = kura_alpm::apps(&conf).map_err(fail)?;
 
     let packages: BTreeSet<String> = plan.steps.iter().map(|s| s.package().to_owned()).collect();
-    let news = kura_alpm::background::fetch_news().map_or_else(
-        || json!([{"title": l.msg("news-unavailable"), "link": "https://archlinux.org/news/"}]),
-        |items| {
-            let since = kura_alpm::background::news_since(
-                Path::new(kura_alpm::history::JOURNAL),
-                kura_alpm::background::now(),
-            );
-            let hits = kura_core::news::affecting(&items, since, &packages);
-            Value::Array(
-                hits.iter()
-                    .map(|i| json!({"title": i.title, "link": i.link}))
-                    .collect(),
-            )
-        },
-    );
+    let news = if matches!(request, Request::Update) {
+        kura_alpm::background::fetch_news().map_or_else(
+            || json!([{"title": l.msg("news-unavailable"), "link": "https://archlinux.org/news/"}]),
+            |items| {
+                let since = kura_alpm::background::news_since(
+                    Path::new(kura_alpm::history::JOURNAL),
+                    kura_alpm::background::now(),
+                );
+                let hits = kura_core::news::affecting(&items, since, &packages);
+                Value::Array(
+                    hits.iter()
+                        .map(|i| json!({"title": i.title, "link": i.link}))
+                        .collect(),
+                )
+            },
+        )
+    } else {
+        json!([])
+    };
     let solved = repair.map(|r| {
         format!(
             "{}\n{}",
@@ -268,6 +308,8 @@ fn prepare_preview() -> Result<Prepared, String> {
     });
     let headline = if let Some(text) = solved {
         text
+    } else if !matches!(request, Request::Update) {
+        String::new()
     } else if outcome.available.is_empty() {
         l.msg("check-none")
     } else {
@@ -337,6 +379,7 @@ impl qobject::Kura {
                 },
             )
             .to_string();
+        let security = security_value(l, &status.security).to_string();
         let loaded = kura_alpm::load_config().and_then(|conf| kura_alpm::installed(&conf));
         let error_text = loaded
             .as_ref()
@@ -349,6 +392,7 @@ impl qobject::Kura {
         self.as_mut().set_status_text(QString::from(&text));
         self.as_mut().set_last_check(QString::from(&last_check));
         self.as_mut().set_history_json(QString::from(&history));
+        self.as_mut().set_security_json(QString::from(&security));
         self.as_mut().set_error(QString::from(&error_text));
         if let Ok(set) = loaded {
             let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
@@ -360,20 +404,47 @@ impl qobject::Kura {
         }
     }
 
-    fn prepare_update(mut self: Pin<&mut Self>) {
+    fn prepare_update(self: Pin<&mut Self>) {
+        let title = self.localizer.msg("nav-updates");
+        let label = self.localizer.msg("gui-install");
+        self.start_preview(Request::Update, &title, &label);
+    }
+
+    fn prepare_install(self: Pin<&mut Self>, names: &QString) {
+        let names: Vec<String> = names.to_string().split_whitespace().map(str::to_owned).collect();
+        let title = self
+            .localizer
+            .msg_args("gui-install-title", &[("name", names.join(", ").into())]);
+        let label = self.localizer.msg("gui-install");
+        self.start_preview(Request::Install(names), &title, &label);
+    }
+
+    fn prepare_remove(self: Pin<&mut Self>, name: &QString) {
+        let name = name.to_string();
+        let title = self
+            .localizer
+            .msg_args("gui-remove-title", &[("name", name.clone().into())]);
+        let label = self.localizer.msg("gui-remove");
+        self.start_preview(Request::Remove(vec![name]), &title, &label);
+    }
+
+    /// Prepares any request in a background thread and shows it as the preview.
+    fn start_preview(mut self: Pin<&mut Self>, request: Request, title: &str, label: &str) {
         if *self.busy() {
             return;
         }
         let running = self.localizer.msg("check-running");
-        let title = self.localizer.msg("nav-updates");
-        self.as_mut().set_preview_title(QString::from(&title));
+        self.as_mut().set_preview_title(QString::from(title));
+        self.as_mut().set_action_label(QString::from(label));
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
         self.as_mut().set_message(QString::default());
+        self.as_mut().set_preview_json(QString::from("[]"));
+        self.as_mut().set_news_json(QString::from("[]"));
         self.as_mut().set_progress_text(QString::from(&running));
         let qt = self.qt_thread();
         std::thread::spawn(move || {
-            let result = prepare_preview();
+            let result = prepare_preview(&request);
             let _ = qt.queue(move |mut this| {
                 match result {
                     Ok(p) => {
@@ -386,12 +457,52 @@ impl qobject::Kura {
                         this.as_mut().rust_mut().pending = Some(p.plan);
                     }
                     Err(text) => {
-                        this.as_mut().set_preview_json(QString::from("[]"));
                         this.as_mut().set_message(QString::from(&text));
                         this.as_mut().set_progress_text(QString::default());
                     }
                 }
                 this.as_mut().set_busy(false);
+            });
+        });
+    }
+
+    fn refresh_health(mut self: Pin<&mut Self>) {
+        let value = kura_alpm::load_config()
+            .and_then(|conf| kura_alpm::system::collect(&conf))
+            .map_or_else(|_| json!({}), |info| health_value(&self.localizer, &info));
+        self.as_mut().set_health_json(QString::from(&value.to_string()));
+    }
+
+    fn search(mut self: Pin<&mut Self>, query: &QString) {
+        let hits = kura_alpm::load_config()
+            .and_then(|conf| kura_alpm::system::search(&conf, &query.to_string(), 40))
+            .unwrap_or_default();
+        let value: Vec<Value> = hits
+            .iter()
+            .map(|h| json!({"name": h.name, "version": h.version, "description": h.description, "installed": h.installed}))
+            .collect();
+        self.as_mut()
+            .set_results_json(QString::from(&Value::Array(value).to_string()));
+    }
+
+    fn rank_mirrors(mut self: Pin<&mut Self>) {
+        if *self.busy() {
+            return;
+        }
+        let running = self.localizer.msg("mirrors-running");
+        self.as_mut().set_busy(true);
+        self.as_mut().set_message(QString::from(&running));
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let l = Localizer::from_env();
+            let text = match kura_helper::rank_mirrors() {
+                Ok(reply) => kura_helper::text::reply(&l, &reply),
+                Err(e) => l.msg_args("error-helper", &[("reason", e.to_string().into())]),
+            };
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_message(QString::from(&text));
+                this.as_mut().set_busy(false);
+                this.as_mut().refresh_health();
             });
         });
     }
@@ -439,7 +550,9 @@ impl qobject::Kura {
         let limits = l.msg("undo-limits");
         match prepared {
             Ok((plan, preview, title)) => {
+                let label = self.localizer.msg("gui-go-back");
                 self.as_mut().set_preview_title(QString::from(&title));
+                self.as_mut().set_action_label(QString::from(&label));
                 self.as_mut().set_preview_json(QString::from(&preview));
                 self.as_mut().set_news_json(QString::from("[]"));
                 self.as_mut().set_summary_text(QString::from(&limits));
@@ -507,6 +620,110 @@ impl qobject::Kura {
         }
         self.as_mut().set_monochrome(on);
     }
+}
+
+/// The health page as JSON: `{"facts": [[label, value]], "kernels": [..], "suggestions": [{"id", "title", "text"}]}`.
+fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
+    let mut facts: Vec<Value> = Vec::new();
+    if let Some(cpu) = &info.cpu {
+        facts.push(json!([l.msg("health-cpu"), cpu]));
+    }
+    for gpu in &info.graphics {
+        facts.push(json!([l.msg("health-gpu"), gpu]));
+    }
+    if let Some(mem) = info.memory {
+        facts.push(json!([l.msg("health-memory"), l.size(mem)]));
+    }
+    if let Some((used, total)) = info.disk {
+        let text = l.msg_args(
+            "health-disk-used",
+            &[("used", l.size(used).into()), ("total", l.size(total).into())],
+        );
+        facts.push(json!([l.msg("health-disk"), text]));
+    }
+    facts.push(json!([
+        "",
+        l.msg_args("health-cache", &[("size", l.size(info.cache).into())])
+    ]));
+    let kernels: Vec<Value> = info
+        .kernels
+        .iter()
+        .map(|(name, version)| {
+            let running = info
+                .running
+                .starts_with(&version.replace(".arch", "-arch").replace('-', "."))
+                || info
+                    .running
+                    .replace('-', ".")
+                    .starts_with(&version.replace('-', "."));
+            json!({"name": name, "version": version, "running": running})
+        })
+        .collect();
+    let suggestions: Vec<Value> = kura_core::health::suggestions(&info.facts)
+        .into_iter()
+        .map(|s| {
+            let (id, title, text) = match s {
+                kura_core::health::Suggestion::BackupKernel => (
+                    "backup-kernel",
+                    l.msg("suggest-backup-kernel"),
+                    l.msg("suggest-backup-kernel-text"),
+                ),
+                kura_core::health::Suggestion::Snapshots => (
+                    "snapshots",
+                    l.msg("suggest-snapshots"),
+                    l.msg("suggest-snapshots-text"),
+                ),
+                kura_core::health::Suggestion::Mirrors => {
+                    ("mirrors", l.msg("suggest-mirrors"), l.msg("suggest-mirrors-text"))
+                }
+                kura_core::health::Suggestion::Cleanup { count } => (
+                    "cleanup",
+                    l.msg_args("suggest-cleanup", &[("count", count.into())]),
+                    l.msg("suggest-cleanup-text"),
+                ),
+            };
+            json!({"id": id, "title": title, "text": text})
+        })
+        .collect();
+    json!({"facts": facts, "kernels": kernels, "suggestions": suggestions})
+}
+
+/// Security findings as cards, named by the apps that use the vulnerable part.
+fn security_value(l: &Localizer, findings: &[kura_core::security::Finding]) -> Value {
+    Value::Array(
+        findings
+            .iter()
+            .map(|f| {
+                let who = if f.apps.is_empty() {
+                    l.msg("security-system")
+                } else {
+                    f.apps.join(", ")
+                };
+                let mut lines = vec![l.msg_args(
+                    "security-detail",
+                    &[
+                        ("package", f.package.clone().into()),
+                        ("installed", f.installed.clone().into()),
+                        ("kind", f.kind.clone().into()),
+                    ],
+                )];
+                lines.push(match &f.fixed {
+                    Some(v) => format!(
+                        "{} · {}",
+                        l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
+                        l.msg("security-fix")
+                    ),
+                    None => l.msg("security-nofix"),
+                });
+                lines.push(format!("{} {}", f.advisory, f.cves.join(" ")));
+                json!({
+                    "title": format!("{who} ({})", present::severity(l, f.severity)),
+                    "lines": lines,
+                    "fixed": f.fixed.is_some(),
+                })
+            })
+            .collect(),
+    )
 }
 
 /// The user's languages, most preferred first.

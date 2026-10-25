@@ -13,6 +13,7 @@ pub mod history;
 pub mod mirrors;
 pub mod prepare;
 pub mod restore;
+pub mod system;
 
 use std::collections::BTreeSet;
 

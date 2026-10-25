@@ -185,6 +185,37 @@ gui-updates-intro = Das ist alles, was sich ändert. Es passiert nichts, bevor S
 gui-tray-mono = Einfarbiges Symbol im Systemabschnitt
 gui-tray-mono-hint = Passt zu den anderen Symbolen in der Kontrollleiste.
 gui-last-check = Zuletzt geprüft: { $when }.
+nav-health = Systemzustand
+nav-software = Software
+health-cpu = Prozessor
+health-gpu = Grafik
+health-memory = Arbeitsspeicher
+health-disk = Speicher
+health-disk-used = { $used } von { $total } belegt
+health-cache = Alte Update-Dateien: { $size }
+health-kernels = Kernel
+health-kernel-running = in Verwendung
+health-suggestions = Vorschläge
+suggest-backup-kernel = Einen Ersatz-Kernel installieren
+suggest-backup-kernel-text = Falls ein Update den Computer einmal nicht mehr starten lässt, kann der Ersatz im Startmenü ausgewählt werden.
+suggest-snapshots = Automatische Snapshots einschalten
+suggest-snapshots-text = Ihre Festplatte unterstützt Snapshots. Das Einrichten kommt in einer späteren Version von kura.
+suggest-mirrors = Schnellere Download-Server auswählen
+suggest-mirrors-text = kura testet Server in Ihrer Nähe und verwendet die schnellsten.
+suggest-cleanup =
+    { $count ->
+        [one] Ein Paket wird nicht mehr gebraucht
+       *[other] { $count } Pakete werden nicht mehr gebraucht
+    }
+suggest-cleanup-text = Sie werden mit dem nächsten Update entfernt.
+search-placeholder = Apps suchen, zum Beispiel „Foto“ oder „Musik“
+search-none = Keine Apps gefunden. Versuchen Sie ein anderes Wort.
+gui-installed = Installiert
+gui-remove = Entfernen
+gui-install-title = { $name } installieren
+gui-remove-title = { $name } entfernen
+gui-setup = Einrichten
+gui-details = Details
 nav-history = Verlauf
 nav-settings = Einstellungen
 overview-subtitle = Ein kurzer Überblick über diesen Computer.
