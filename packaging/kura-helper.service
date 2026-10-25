@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+#
+# Started on demand through D-Bus; exits after a minute without work.
+# Package installs must write almost anywhere and run package scripts, so
+# file system sandboxing is not possible here. What is restricted below does
+# not affect installs.
+
+[Unit]
+Description=kura system service
+Documentation=https://github.com/Serraniel/kura
+
+[Service]
+Type=dbus
+BusName=org.kura.Helper1
+ExecStart=/usr/lib/kura/kura-helper serve
+LockPersonality=yes
+RestrictRealtime=yes
+ProtectClock=yes
+ProtectHostname=yes

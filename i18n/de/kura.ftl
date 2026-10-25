@@ -12,6 +12,9 @@ cli-usage =
       history    Gespeicherte Systemstände anzeigen
       orphans    Pakete auflisten, die nichts mehr braucht
       sbom       Liste aller installierten Software schreiben (CycloneDX)
+      update     Alle Updates installieren (zeigt vorher eine Vorschau)
+      install    Eine App installieren: kura install <Name>
+      remove     Eine App entfernen und was nur sie brauchte: kura remove <Name>
       version    Version von kura anzeigen
 cli-unknown-command = Unbekannter Befehl: { $command }
 cli-missing-command = Kein Befehl angegeben.
@@ -56,6 +59,29 @@ history-removed = { $count } entfernt
 history-start = Ausgangsstand: { $count } Pakete
 history-outside = (außerhalb von kura geändert)
 list-separator = {", "}
+
+## Applying changes
+
+preview-title = Das wird geändert:
+confirm-update = Diese Updates installieren? [j/N]
+confirm-install = Das installieren? [j/N]
+confirm-remove = Das entfernen? [j/N]
+confirm-yes = j
+apply-cancelled = Es wurde nichts verändert.
+apply-refreshing = Paketlisten werden aktualisiert …
+apply-downloading = { $file } wird heruntergeladen
+apply-checking = Pakete werden geprüft …
+apply-installing = { $package } wird installiert ({ $current }/{ $total })
+apply-removing = { $package } wird entfernt ({ $current }/{ $total })
+apply-hook = Abschluss: { $name }
+apply-cleanup = Nicht mehr benötigte Teile werden entfernt …
+apply-done = Fertig. Die Änderung ist im Verlauf gespeichert.
+apply-changed = Seit der Vorschau hat sich etwas geändert. Bitte prüfen Sie die neue Vorschau.
+apply-not-authorized = Die Änderung wurde nicht erlaubt. Entweder wurde das Passwort nicht eingegeben, oder dieses Konto darf keine Software installieren.
+apply-locked = Ein anderes Programm installiert gerade Software. Bitte versuchen Sie es erneut, wenn es fertig ist.
+apply-busy = kura nimmt bereits eine andere Änderung vor. Bitte warten Sie, bis sie abgeschlossen ist.
+apply-failed = Die Änderung ist fehlgeschlagen: { $reason }
+error-helper = Der Systemdienst von kura ist nicht verfügbar: { $reason }
 
 ## doctor
 

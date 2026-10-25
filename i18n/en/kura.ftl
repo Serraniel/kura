@@ -12,6 +12,9 @@ cli-usage =
       history    Show saved states of this system
       orphans    List packages that nothing needs any more
       sbom       Write a list of all installed software (CycloneDX)
+      update     Install all updates (shows a preview first)
+      install    Install an app: kura install <name>
+      remove     Remove an app and what only it needed: kura remove <name>
       version    Show the version of kura
 cli-unknown-command = Unknown command: { $command }
 cli-missing-command = No command given.
@@ -56,6 +59,29 @@ history-removed = { $count } removed
 history-start = Starting point: { $count } packages
 history-outside = (changed outside kura)
 list-separator = {", "}
+
+## Applying changes
+
+preview-title = This will change:
+confirm-update = Install these updates? [y/N]
+confirm-install = Install this? [y/N]
+confirm-remove = Remove this? [y/N]
+confirm-yes = y
+apply-cancelled = Nothing was changed.
+apply-refreshing = Refreshing the package lists…
+apply-downloading = Downloading { $file }
+apply-checking = Checking the packages…
+apply-installing = Installing { $package } ({ $current }/{ $total })
+apply-removing = Removing { $package } ({ $current }/{ $total })
+apply-hook = Finishing: { $name }
+apply-cleanup = Removing parts that are no longer needed…
+apply-done = Done. The change is saved in the history.
+apply-changed = Something changed since the preview. Please check the new preview.
+apply-not-authorized = The change was not allowed. Either the password was not entered, or this account may not install software.
+apply-locked = Another program is installing software right now. Please try again when it has finished.
+apply-busy = kura is already making another change. Please wait until it has finished.
+apply-failed = The change failed: { $reason }
+error-helper = kura's system service is not available: { $reason }
 
 ## doctor
 

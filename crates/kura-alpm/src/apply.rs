@@ -17,7 +17,8 @@ use crate::prepare::{Problem, Request, available_upgrades, build, flags};
 use crate::{Config, Error};
 
 /// What the user sees while a plan runs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "event", rename_all = "kebab-case")]
 pub enum Event {
     /// Database refresh started.
     Refreshing,
@@ -41,7 +42,8 @@ pub enum Event {
     CleaningUp,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Phase {
     CheckingFiles,
     CheckingSpace,

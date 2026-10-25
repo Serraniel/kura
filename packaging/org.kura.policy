@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The kura contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Installed to /usr/share/polkit-1/actions/. auth_admin_keep: one password
+     prompt covers the steps of one change. Keep the texts in sync with i18n/. -->
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>kura</vendor>
+  <vendor_url>https://github.com/Serraniel/kura</vendor_url>
+  <icon_name>system-software-install</icon_name>
+  <action id="org.kura.update">
+    <description>Install updates</description>
+    <description xml:lang="de">Updates installieren</description>
+    <description xml:lang="fr">Installer des mises à jour</description>
+    <description xml:lang="ja">アップデートのインストール</description>
+    <message>Authentication is required to install updates.</message>
+    <message xml:lang="de">Zum Installieren von Updates ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour installer des mises à jour.</message>
+    <message xml:lang="ja">アップデートをインストールするには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+  <action id="org.kura.install">
+    <description>Install software</description>
+    <description xml:lang="de">Software installieren</description>
+    <description xml:lang="fr">Installer des logiciels</description>
+    <description xml:lang="ja">ソフトウェアのインストール</description>
+    <message>Authentication is required to install software.</message>
+    <message xml:lang="de">Zum Installieren von Software ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour installer des logiciels.</message>
+    <message xml:lang="ja">ソフトウェアをインストールするには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+  <action id="org.kura.remove">
+    <description>Remove software</description>
+    <description xml:lang="de">Software entfernen</description>
+    <description xml:lang="fr">Supprimer des logiciels</description>
+    <description xml:lang="ja">ソフトウェアの削除</description>
+    <message>Authentication is required to remove software.</message>
+    <message xml:lang="de">Zum Entfernen von Software ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour supprimer des logiciels.</message>
+    <message xml:lang="ja">ソフトウェアを削除するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+  <action id="org.kura.restore">
+    <description>Go back to an earlier state</description>
+    <description xml:lang="de">Zu einem früheren Stand zurückkehren</description>
+    <description xml:lang="fr">Revenir à un état antérieur</description>
+    <description xml:lang="ja">以前の状態に戻す</description>
+    <message>Authentication is required to go back to an earlier state of the system.</message>
+    <message xml:lang="de">Zum Zurückkehren zu einem früheren Systemstand ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour revenir à un état antérieur du système.</message>
+    <message xml:lang="ja">システムを以前の状態に戻すには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

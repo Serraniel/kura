@@ -13,6 +13,9 @@ cli-usage =
       history    保存されたシステムの状態を表示します
       orphans    どこからも必要とされていないパッケージを表示します
       sbom       インストール済みソフトウェアの一覧を書き出します (CycloneDX)
+      update     すべてのアップデートをインストールします (先にプレビューを表示します)
+      install    アプリをインストールします: kura install <名前>
+      remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
       version    kura のバージョンを表示します
 cli-unknown-command = 不明なコマンドです: { $command }
 cli-missing-command = コマンドが指定されていません。
@@ -49,6 +52,29 @@ history-removed = 削除 { $count } 件
 history-start = 起点: { $count } 個のパッケージ
 history-outside = (kura 以外で変更)
 list-separator = {"、"}
+
+## Applying changes
+
+preview-title = 次のように変更されます:
+confirm-update = これらのアップデートをインストールしますか? [y/N]
+confirm-install = これをインストールしますか? [y/N]
+confirm-remove = これを削除しますか? [y/N]
+confirm-yes = y
+apply-cancelled = 何も変更されていません。
+apply-refreshing = パッケージ一覧を更新しています…
+apply-downloading = { $file } をダウンロードしています
+apply-checking = パッケージを確認しています…
+apply-installing = { $package } をインストールしています ({ $current }/{ $total })
+apply-removing = { $package } を削除しています ({ $current }/{ $total })
+apply-hook = 仕上げ: { $name }
+apply-cleanup = 不要になったものを削除しています…
+apply-done = 完了しました。変更は履歴に保存されています。
+apply-changed = プレビューの後に変更がありました。新しいプレビューを確認してください。
+apply-not-authorized = 変更は許可されませんでした。パスワードが入力されなかったか、このアカウントにはソフトウェアをインストールする権限がありません。
+apply-locked = 別のプログラムがソフトウェアをインストールしています。終わってからもう一度お試しください。
+apply-busy = kura は別の変更を行っています。終わるまでお待ちください。
+apply-failed = 変更に失敗しました: { $reason }
+error-helper = kura のシステムサービスを利用できません: { $reason }
 
 ## doctor
 
