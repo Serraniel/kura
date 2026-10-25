@@ -1,0 +1,14 @@
+name: Idea or feature request
+description: Suggest something kura should do
+labels: ["type/feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should kura do?

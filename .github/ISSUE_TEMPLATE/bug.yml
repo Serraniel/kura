@@ -1,0 +1,26 @@
+name: Something does not work
+description: kura did something wrong or could not finish a task
+labels: ["type/bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Problem report
+      description: If kura offered a problem report, paste it here. Otherwise run `kura doctor` and paste the output.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: kura version
+  - type: dropdown
+    id: distro
+    attributes:
+      label: Distribution
+      options: [Arch Linux, EndeavourOS, CachyOS, Garuda, Other]
