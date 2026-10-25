@@ -136,18 +136,14 @@ mod tests {
 
     #[test]
     fn system_hook_directory_comes_first() {
-        let conf = Config {
-            hook_dir: vec!["/etc/pacman.d/hooks/".into()],
-            ..Config::default()
-        };
+        let mut conf = Config::default();
+        conf.hook_dir = vec!["/etc/pacman.d/hooks/".into()];
         assert_eq!(
             hook_dirs(&conf),
             ["/usr/share/libalpm/hooks/", "/etc/pacman.d/hooks/"]
         );
-        let twice = Config {
-            hook_dir: vec!["/usr/share/libalpm/hooks".into()],
-            ..Config::default()
-        };
+        let mut twice = Config::default();
+        twice.hook_dir = vec!["/usr/share/libalpm/hooks".into()];
         assert_eq!(hook_dirs(&twice), ["/usr/share/libalpm/hooks/"]);
     }
 
