@@ -10,6 +10,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Arch's rustc uses the system LLVM, so the matching tools are in /usr/bin.
+  LLVM_COV: /usr/bin/llvm-cov
+  LLVM_PROFDATA: /usr/bin/llvm-profdata
 
 jobs:
   rust:
