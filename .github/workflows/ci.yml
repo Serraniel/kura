@@ -22,7 +22,7 @@ jobs:
     container: archlinux:base-devel
     steps:
       - name: Install toolchain
-        run: pacman -Syu --noconfirm --needed rust clang llvm cargo-llvm-cov git jq
+        run: pacman -Syu --noconfirm --needed rust clang llvm lld cargo-llvm-cov git jq qt6-base qt6-declarative
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Cache cargo
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
