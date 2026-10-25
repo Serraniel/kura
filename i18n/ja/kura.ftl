@@ -57,6 +57,9 @@ list-separator = {"、"}
 
 preview-title = 次のように変更されます:
 confirm-update = これらのアップデートをインストールしますか? [y/N]
+news-title = このアップデートに関する Arch Linux のお知らせ:
+news-unavailable = Arch Linux のお知らせを読み込めませんでした。アップデートの前に https://archlinux.org/news/ をお読みください。
+confirm-update-news = 上のお知らせを読んだうえで、アップデートをインストールしますか? [y/N]
 confirm-install = これをインストールしますか? [y/N]
 confirm-remove = これを削除しますか? [y/N]
 confirm-yes = y

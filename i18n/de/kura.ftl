@@ -64,6 +64,9 @@ list-separator = {", "}
 
 preview-title = Das wird geändert:
 confirm-update = Diese Updates installieren? [j/N]
+news-title = Arch-Linux-Neuigkeiten zu diesem Update:
+news-unavailable = Die Arch-Linux-Neuigkeiten konnten nicht geladen werden. Bitte lesen Sie vor dem Update https://archlinux.org/news/.
+confirm-update-news = Haben Sie die Neuigkeiten oben gelesen und möchten Sie die Updates installieren? [j/N]
 confirm-install = Das installieren? [j/N]
 confirm-remove = Das entfernen? [j/N]
 confirm-yes = j

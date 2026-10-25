@@ -303,6 +303,58 @@ fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
     }
 }
 
+const NEWS_FEED: &str = "https://archlinux.org/feeds/news/";
+
+/// Arch news items that concern this update, or `None` if the feed could not be read.
+fn news_for(plan: &Plan) -> Option<Vec<kura_core::news::Item>> {
+    let out = std::process::Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--max-time",
+            "20",
+            NEWS_FEED,
+        ])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())?;
+    let items = kura_core::news::parse_rss(&String::from_utf8_lossy(&out.stdout));
+    let packages: BTreeSet<String> = plan.steps.iter().map(|s| s.package().to_owned()).collect();
+    // News since the last recorded update; without a history, the last 30 days.
+    let journal = kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL)).ok();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
+    let since = journal
+        .as_ref()
+        .and_then(|j| {
+            j.records()
+                .iter()
+                .rev()
+                .find(|r| r.summary().upgraded > 0)
+                .map(|r| r.created)
+        })
+        .unwrap_or(now - 30 * 86_400);
+    Some(
+        kura_core::news::affecting(&items, since, &packages)
+            .into_iter()
+            .cloned()
+            .collect(),
+    )
+}
+
+fn show_news(l: &Localizer, items: &[kura_core::news::Item]) {
+    say(&format!("\n{}", l.msg("news-title")));
+    for item in items {
+        say(&format!("\n  {}\n  {}", item.title, item.link));
+        for line in item.text.lines().take(8) {
+            say(&format!("    {line}"));
+        }
+    }
+}
+
 /// Preview, confirm, apply. If the system changed since the preview, the new
 /// preview is shown and confirmed again.
 fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String, String> {
@@ -317,6 +369,17 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
         l.msg("preview-title")
     };
     say(&format!("{title}\n{}", render(l, &plan, &outcome, &apps)));
+    let mut question_id = question_id;
+    if matches!(request, Request::Update) {
+        match news_for(&plan) {
+            Some(items) if !items.is_empty() => {
+                show_news(l, &items);
+                question_id = "confirm-update-news";
+            }
+            Some(_) => {}
+            None => say(&format!("\n{}", l.msg("news-unavailable"))),
+        }
+    }
     loop {
         if !confirm(l, question_id) {
             return Ok(l.msg("apply-cancelled") + "\n");

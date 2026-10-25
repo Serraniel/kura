@@ -64,6 +64,9 @@ list-separator = {", "}
 
 preview-title = This will change:
 confirm-update = Install these updates? [y/N]
+news-title = Arch Linux news about this update:
+news-unavailable = The Arch Linux news could not be loaded. Please read https://archlinux.org/news/ before updating.
+confirm-update-news = Have you read the news above, and do you want to install the updates? [y/N]
 confirm-install = Install this? [y/N]
 confirm-remove = Remove this? [y/N]
 confirm-yes = y
