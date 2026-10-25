@@ -34,6 +34,7 @@ check-blocked = Das Update kann nicht vorbereitet werden:
 problem-unsatisfied = { $target } benötigt { $dependency }, das nicht mehr verfügbar ist.
 problem-conflict = { $first } und { $second } können nicht gemeinsam installiert werden.
 problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
+problem-not-found = Es wurde kein Paket namens { $name } gefunden.
 error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
 
 ## doctor

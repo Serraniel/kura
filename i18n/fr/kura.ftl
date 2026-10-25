@@ -35,6 +35,7 @@ check-blocked = La mise à jour ne peut pas être préparée :
 problem-unsatisfied = { $target } a besoin de { $dependency }, qui n’est plus disponible.
 problem-conflict = { $first } et { $second } ne peuvent pas être installés ensemble.
 problem-arch = Conçu pour un autre type de processeur : { $packages }
+problem-not-found = Aucun paquet nommé { $name } n’a été trouvé.
 error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## doctor
