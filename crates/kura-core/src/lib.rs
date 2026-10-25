@@ -6,6 +6,7 @@
 
 pub mod generation;
 pub mod history;
+pub mod langpacks;
 pub mod locale;
 pub mod mirrors;
 pub mod news;

@@ -156,21 +156,41 @@ fn install_callbacks(handle: &Alpm, plan: &Plan, events: &Sender<Event>) {
             _ => None,
         })
         .collect();
+    let planned: BTreeSet<String> = plan
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Install { name, .. } => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
     // Answers follow the plan; anything the user did not see is declined.
-    handle.set_question_cb(replaced, |q, replaced: &mut BTreeSet<String>| {
-        match q.question() {
-            Question::Replace(r) => r.set_replace(replaced.contains(r.oldpkg().name())),
-            Question::Conflict(mut c) => {
-                let other = c.conflict().package2().name().to_owned();
-                c.set_remove(replaced.contains(&other));
+    handle.set_question_cb(
+        (replaced, planned),
+        |q, data: &mut (BTreeSet<String>, BTreeSet<String>)| {
+            let (replaced, planned) = (&data.0, &data.1);
+            match q.question() {
+                Question::Replace(r) => r.set_replace(replaced.contains(r.oldpkg().name())),
+                Question::Conflict(mut c) => {
+                    let other = c.conflict().package2().name().to_owned();
+                    c.set_remove(replaced.contains(&other));
+                }
+                Question::Corrupted(mut c) => c.set_remove(true),
+                Question::RemovePkgs(mut r) => r.set_skip(false),
+                Question::SelectProvider(mut s) => {
+                    // Take the provider the approved plan installs.
+                    let index = s
+                        .providers()
+                        .iter()
+                        .position(|p| planned.contains(p.name()))
+                        .unwrap_or(0);
+                    s.set_index(i32::try_from(index).unwrap_or(0));
+                }
+                Question::ImportKey(mut k) => k.set_import(false),
+                Question::InstallIgnorepkg(mut i) => i.set_install(false),
             }
-            Question::Corrupted(mut c) => c.set_remove(true),
-            Question::RemovePkgs(mut r) => r.set_skip(false),
-            Question::SelectProvider(mut s) => s.set_index(0),
-            Question::ImportKey(mut k) => k.set_import(false),
-            Question::InstallIgnorepkg(mut i) => i.set_install(false),
-        }
-    });
+        },
+    );
 
     let tx = events.clone();
     handle.set_progress_cb(
@@ -639,7 +659,7 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
 
         let target = Request::Install(vec!["figlet".into()]);
-        let preview = crate::prepare::prepare(&conf, None, &target, true).unwrap();
+        let preview = crate::prepare::prepare(&conf, None, &target, true, &[]).unwrap();
         let plan = preview.plan.unwrap();
         apply(&conf, &plan, &tx).unwrap();
         assert!(crate::installed(&conf).unwrap().get("figlet").is_some());
@@ -661,15 +681,17 @@ mod tests {
         assert!(matches!(apply(&conf, &stale, &tx), Err(ApplyError::Changed(_))));
 
         let removal =
-            crate::prepare::prepare(&conf, None, &Request::Remove(vec!["figlet".into()]), false).unwrap();
+            crate::prepare::prepare(&conf, None, &Request::Remove(vec!["figlet".into()]), false, &[])
+                .unwrap();
         apply(&conf, &removal.plan.unwrap(), &tx).unwrap();
         assert!(crate::installed(&conf).unwrap().get("figlet").is_none());
 
         // A repair: the full update plus removing figlet, as the solver would propose.
-        let again = crate::prepare::prepare(&conf, None, &target, true).unwrap();
+        let again = crate::prepare::prepare(&conf, None, &target, true, &[]).unwrap();
         apply(&conf, &again.plan.unwrap(), &tx).unwrap();
         let repair =
-            crate::prepare::prepare(&conf, None, &Request::Repair(vec!["figlet".into()]), false).unwrap();
+            crate::prepare::prepare(&conf, None, &Request::Repair(vec!["figlet".into()]), false, &[])
+                .unwrap();
         let plan = repair.plan.unwrap();
         assert!(
             plan.steps.iter().any(

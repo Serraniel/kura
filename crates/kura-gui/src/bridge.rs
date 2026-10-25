@@ -219,9 +219,14 @@ fn prepare_preview() -> Result<Prepared, String> {
     let l = Localizer::from_env();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let conf = kura_alpm::load_config().map_err(fail)?;
-    let (outcome, repair) =
-        kura_alpm::prepare::prepare_with_repair(&conf, Some(&check_dir()), &Request::Update, true)
-            .map_err(fail)?;
+    let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
+        &conf,
+        Some(&check_dir()),
+        &Request::Update,
+        true,
+        &user_locales(),
+    )
+    .map_err(fail)?;
     let mut plan = match outcome.plan {
         Ok(plan) => plan,
         Err(problems) => {
@@ -502,6 +507,11 @@ impl qobject::Kura {
         }
         self.as_mut().set_monochrome(on);
     }
+}
+
+/// The user's languages, most preferred first.
+fn user_locales() -> Vec<kura_core::locale::Locale> {
+    kura_core::locale::Locale::from_env_vars(|k| std::env::var(k).ok())
 }
 
 #[cfg(test)]

@@ -70,6 +70,13 @@ if pacman -Q figlet 2>/dev/null; then
 fi
 grep -q '"cause":"kura:restore"' /var/lib/kura/history.jsonl
 
+# Language: a German user gets the German dictionary and German OCR data.
+printf 'j\n' | LANG=de_DE.UTF-8 kura install hunspell
+pacman -Q hunspell-de
+printf 'j\n' | LANG=de_DE.UTF-8 kura install tesseract
+pacman -Q tesseract-data-deu
+printf 'j\n' | LANG=de_DE.UTF-8 kura remove tesseract hunspell hunspell-de
+
 kura security
 grep -q '"checked"' /var/lib/kura/status.json
 

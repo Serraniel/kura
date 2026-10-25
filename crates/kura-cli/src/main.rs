@@ -134,9 +134,14 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let config = kura_alpm::load_config().map_err(fail)?;
     let refresh = !matches!(request, Request::Remove(_));
-    let (outcome, repair) =
-        kura_alpm::prepare::prepare_with_repair(&config, Some(&check_dir()), request, refresh)
-            .map_err(fail)?;
+    let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
+        &config,
+        Some(&check_dir()),
+        request,
+        refresh,
+        &user_locales(),
+    )
+    .map_err(fail)?;
     if let Some(repair) = &repair {
         say(&format!(
             "{}\n{}\n",
@@ -538,4 +543,9 @@ fn sbom(l: &Localizer, output: Option<&str>) -> Result<String, String> {
             Ok(l.msg_args("sbom-written", &[("path", path.to_owned().into())]) + "\n")
         }
     }
+}
+
+/// The user's languages, most preferred first.
+fn user_locales() -> Vec<kura_core::locale::Locale> {
+    kura_core::locale::Locale::from_env_vars(|k| std::env::var(k).ok())
 }
