@@ -38,7 +38,24 @@ pub fn handle(conf: &Config) -> Result<Alpm, Error> {
     let mut alpm = alpm_utils::alpm_with_conf(conf)?;
     // alpm-utils does not apply IgnoreGroup.
     alpm.set_ignoregroups(conf.ignore_group.iter())?;
+    alpm.set_hookdirs(hook_dirs(conf).iter())?;
     Ok(alpm)
+}
+
+/// Where pacman looks for hooks. pacman always adds its system directory
+/// first and the configured `HookDir`s after it; `pacman-conf` lists only the
+/// configured ones. Without the system directory, hooks for the initramfs,
+/// the boot menu, DKMS and systemd would not run.
+pub fn hook_dirs(conf: &Config) -> Vec<String> {
+    const SYSTEM_HOOKS: &str = "/usr/share/libalpm/hooks/";
+    let mut dirs = vec![SYSTEM_HOOKS.to_owned()];
+    dirs.extend(
+        conf.hook_dir
+            .iter()
+            .filter(|d| d.trim_end_matches('/') != SYSTEM_HOOKS.trim_end_matches('/'))
+            .cloned(),
+    );
+    dirs
 }
 
 /// Whether this process runs as root.
@@ -115,6 +132,23 @@ mod tests {
             InstalledPackage::new("electron36", "36.9.0-1", InstallReason::Dependency),
         ]);
         assert_eq!(cleanup(&set), [("electron36".to_owned(), "36.9.0-1".to_owned())]);
+    }
+
+    #[test]
+    fn system_hook_directory_comes_first() {
+        let conf = Config {
+            hook_dir: vec!["/etc/pacman.d/hooks/".into()],
+            ..Config::default()
+        };
+        assert_eq!(
+            hook_dirs(&conf),
+            ["/usr/share/libalpm/hooks/", "/etc/pacman.d/hooks/"]
+        );
+        let twice = Config {
+            hook_dir: vec!["/usr/share/libalpm/hooks".into()],
+            ..Config::default()
+        };
+        assert_eq!(hook_dirs(&twice), ["/usr/share/libalpm/hooks/"]);
     }
 
     #[test]
