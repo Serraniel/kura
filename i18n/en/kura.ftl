@@ -64,6 +64,9 @@ list-separator = {", "}
 
 preview-title = This will change:
 confirm-update = Install these updates? [y/N]
+news-title = Arch Linux news about this update:
+news-unavailable = The Arch Linux news could not be loaded. Please read https://archlinux.org/news/ before updating.
+confirm-update-news = Have you read the news above, and do you want to install the updates? [y/N]
 confirm-install = Install this? [y/N]
 confirm-remove = Remove this? [y/N]
 confirm-yes = y
@@ -74,6 +77,7 @@ apply-checking = Checking the packages…
 apply-installing = Installing { $package } ({ $current }/{ $total })
 apply-removing = Removing { $package } ({ $current }/{ $total })
 apply-hook = Finishing: { $name }
+apply-keyring = Updating the signing keys first…
 apply-cleanup = Removing parts that are no longer needed…
 apply-done = Done. The change is saved in the history.
 apply-changed = Something changed since the preview. Please check the new preview.
@@ -82,6 +86,21 @@ apply-locked = Another program is installing software right now. Please try agai
 apply-busy = kura is already making another change. Please wait until it has finished.
 apply-failed = The change failed: { $reason }
 error-helper = kura's system service is not available: { $reason }
+
+## Tray
+
+tray-uptodate = Everything is up to date
+tray-updates =
+    { $count ->
+        [one] One update is ready
+       *[other] { $count } updates are ready
+    }
+tray-attention = An update needs your attention
+tray-unknown = kura has not looked for updates yet
+tray-open-hint = Click to open kura.
+notify-updates-body = Open kura to see what changes before installing.
+notify-attention-body = Open kura to see what to do. Nothing has been changed.
+notify-open = Open kura
 
 ## doctor
 

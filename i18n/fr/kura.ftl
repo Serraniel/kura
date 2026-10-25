@@ -77,6 +77,9 @@ list-separator = {", "}
 
 preview-title = Ceci va changer :
 confirm-update = Installer ces mises à jour ? [o/N]
+news-title = Actualités d’Arch Linux concernant cette mise à jour :
+news-unavailable = Les actualités d’Arch Linux n’ont pas pu être chargées. Veuillez lire https://archlinux.org/news/ avant de mettre à jour.
+confirm-update-news = Avez-vous lu les actualités ci-dessus et voulez-vous installer les mises à jour ? [o/N]
 confirm-install = Installer ceci ? [o/N]
 confirm-remove = Supprimer ceci ? [o/N]
 confirm-yes = o
@@ -87,6 +90,7 @@ apply-checking = Vérification des paquets…
 apply-installing = Installation de { $package } ({ $current }/{ $total })
 apply-removing = Suppression de { $package } ({ $current }/{ $total })
 apply-hook = Finalisation : { $name }
+apply-keyring = Mise à jour des clés de signature en premier…
 apply-cleanup = Suppression des éléments qui ne sont plus nécessaires…
 apply-done = Terminé. La modification est enregistrée dans l’historique.
 apply-changed = Quelque chose a changé depuis l’aperçu. Veuillez vérifier le nouvel aperçu.
@@ -95,6 +99,21 @@ apply-locked = Un autre programme est en train d’installer des logiciels. Veui
 apply-busy = kura effectue déjà une autre modification. Veuillez attendre qu’elle soit terminée.
 apply-failed = La modification a échoué : { $reason }
 error-helper = Le service système de kura n’est pas disponible : { $reason }
+
+## Tray
+
+tray-uptodate = Tout est à jour
+tray-updates =
+    { $count ->
+        [one] Une mise à jour est prête
+       *[other] { $count } mises à jour sont prêtes
+    }
+tray-attention = Une mise à jour demande votre attention
+tray-unknown = kura n’a pas encore recherché de mises à jour
+tray-open-hint = Cliquez pour ouvrir kura.
+notify-updates-body = Ouvrez kura pour voir ce qui change avant l’installation.
+notify-attention-body = Ouvrez kura pour voir ce qu’il faut faire. Rien n’a été modifié.
+notify-open = Ouvrir kura
 
 ## doctor
 

@@ -8,6 +8,7 @@
 //! `pacman-conf`, which resolves pacman.conf exactly as pacman does.
 
 pub mod apply;
+pub mod background;
 pub mod history;
 pub mod prepare;
 

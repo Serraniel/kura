@@ -40,6 +40,8 @@ pub enum Event {
     },
     /// Old orphaned packages are being removed.
     CleaningUp,
+    /// Signing keys are updated before the rest of the update.
+    UpdatingKeyring,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -204,6 +206,73 @@ fn install_callbacks(handle: &Alpm, plan: &Plan, events: &Sender<Event>) {
     });
 }
 
+/// Opens a transaction, runs `f` and always releases the transaction again.
+fn with_trans<T>(
+    handle: &mut Alpm,
+    flags: alpm::TransFlag,
+    f: impl FnOnce(&mut Alpm) -> Result<T, ApplyError>,
+) -> Result<T, ApplyError> {
+    handle.trans_init(flags)?;
+    let result = f(handle);
+    handle.trans_release()?;
+    result
+}
+
+fn commit(handle: &mut Alpm) -> Result<(), ApplyError> {
+    handle.trans_commit().map_err(|e| match e.data() {
+        // alpm 5 types this list as package conflicts although libalpm fills it
+        // with file conflicts, so the entries are not read.
+        Some(CommitData::FileConflict(_)) => ApplyError::FileConflicts(e.to_string()),
+        Some(CommitData::PkgInvalid(list)) => ApplyError::Failed(format!(
+            "invalid packages: {}",
+            list.iter().collect::<Vec<_>>().join(", ")
+        )),
+        None => ApplyError::Failed(e.to_string()),
+    })
+}
+
+/// Keyring packages the plan upgrades. Arch recommends updating these first so
+/// that packages signed by new packager keys can be verified.
+pub fn keyring_upgrades(plan: &Plan) -> Vec<String> {
+    plan.steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Upgrade { name, .. } if name.ends_with("-keyring") => Some(name.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The plan without its keyring upgrades: what is left after they ran first.
+fn without(plan: &Plan, names: &[String]) -> Plan {
+    Plan {
+        kind: plan.kind,
+        steps: plan
+            .steps
+            .iter()
+            .filter(|s| !names.iter().any(|n| n == s.package()))
+            .cloned()
+            .collect(),
+    }
+}
+
+enum First {
+    Done,
+    Keyrings(Vec<String>),
+}
+
+/// Prepares the request again, checks it against the approved plan and returns it.
+fn verified(handle: &mut Alpm, request: &Request, approved: &Plan) -> Result<Plan, ApplyError> {
+    let available = available_upgrades(handle);
+    let built = build(handle, request, &available)?;
+    let fresh = built.plan.map_err(ApplyError::Blocked)?;
+    if same_change(approved, &fresh) {
+        Ok(fresh)
+    } else {
+        Err(ApplyError::Changed(Box::new(fresh)))
+    }
+}
+
 /// Runs an approved plan. Returns `Changed` with the new plan when the
 /// system moved on since the preview.
 pub fn apply(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
@@ -219,30 +288,42 @@ pub fn apply(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(
         let _ = events.send(Event::Refreshing);
         handle.syncdbs_mut().update(false)?;
     }
-    let available = available_upgrades(&handle);
-    handle.trans_init(flags(&request))?;
-    let result = (|| {
-        let built = build(&mut handle, &request, &available)?;
-        let fresh = built.plan.map_err(ApplyError::Blocked)?;
-        if !same_change(approved, &fresh) {
-            return Err(ApplyError::Changed(Box::new(fresh)));
-        }
+    let first = with_trans(&mut handle, flags(&request), |h| {
+        let fresh = verified(h, &request, approved)?;
+        let keyrings = keyring_upgrades(&fresh);
+        let upgrades = fresh
+            .steps
+            .iter()
+            .filter(|s| matches!(s, Step::Upgrade { .. }))
+            .count();
         if fresh.steps.is_empty() {
-            return Ok(());
+            return Ok(First::Done);
         }
-        handle.trans_commit().map_err(|e| match e.data() {
-            // alpm 5 types this list as package conflicts although libalpm fills it
-            // with file conflicts, so the entries are not read.
-            Some(CommitData::FileConflict(_)) => ApplyError::FileConflicts(e.to_string()),
-            Some(CommitData::PkgInvalid(list)) => ApplyError::Failed(format!(
-                "invalid packages: {}",
-                list.iter().collect::<Vec<_>>().join(", ")
-            )),
-            None => ApplyError::Failed(e.to_string()),
-        })
-    })();
-    handle.trans_release()?;
-    result?;
+        if keyrings.is_empty() || keyrings.len() == upgrades && fresh.steps.len() == upgrades {
+            commit(h)?;
+            return Ok(First::Done);
+        }
+        Ok(First::Keyrings(keyrings))
+    })?;
+
+    if let First::Keyrings(names) = first {
+        let _ = events.send(Event::UpdatingKeyring);
+        with_trans(&mut handle, alpm::TransFlag::NONE, |h| {
+            for name in &names {
+                let pkg = h.syncdbs().iter().find_map(|db| db.pkg(name.as_str()).ok());
+                let pkg = pkg.ok_or_else(|| ApplyError::Failed(format!("{name} disappeared")))?;
+                h.trans_add_pkg(pkg)
+                    .map_err(|e| ApplyError::Failed(e.to_string()))?;
+            }
+            h.trans_prepare().map_err(|e| ApplyError::Failed(e.to_string()))?;
+            commit(h)
+        })?;
+        let rest = without(approved, &names);
+        with_trans(&mut handle, flags(&request), |h| {
+            verified(h, &request, &rest)?;
+            commit(h)
+        })?;
+    }
 
     cleanup(&mut handle, approved, events)
 }
@@ -330,6 +411,23 @@ mod tests {
             steps: vec![up("firefox", "2"), up("mesa", "2")],
         };
         assert!(!same_change(&a, &d));
+    }
+
+    #[test]
+    fn keyrings_are_found_and_split_off() {
+        let plan = Plan {
+            kind: PlanKind::SystemUpdate,
+            steps: vec![
+                up("archlinux-keyring", "2"),
+                up("firefox", "2"),
+                up("endeavouros-keyring", "3"),
+            ],
+        };
+        let keys = keyring_upgrades(&plan);
+        assert_eq!(keys, ["archlinux-keyring", "endeavouros-keyring"]);
+        let rest = without(&plan, &keys);
+        assert_eq!(rest.steps, vec![up("firefox", "2")]);
+        assert_eq!(keyring_upgrades(&rest), Vec::<String>::new());
     }
 
     #[test]

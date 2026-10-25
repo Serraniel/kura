@@ -725,6 +725,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kura-agent"
+version = "0.0.0"
+dependencies = [
+ "kura-alpm",
+ "kura-core",
+ "kura-i18n",
+ "serde",
+ "serde_json",
+ "zbus",
+]
+
+[[package]]
 name = "kura-alpm"
 version = "0.0.0"
 dependencies = [
@@ -733,6 +745,7 @@ dependencies = [
  "kura-core",
  "pacmanconf",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 
@@ -779,6 +792,7 @@ dependencies = [
  "futures-lite",
  "kura-alpm",
  "kura-core",
+ "kura-i18n",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

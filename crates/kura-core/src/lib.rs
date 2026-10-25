@@ -7,6 +7,8 @@
 pub mod generation;
 pub mod history;
 pub mod locale;
+pub mod news;
 pub mod package;
 pub mod plan;
+pub mod status;
 pub mod version;

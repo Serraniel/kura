@@ -57,6 +57,9 @@ list-separator = {"、"}
 
 preview-title = 次のように変更されます:
 confirm-update = これらのアップデートをインストールしますか? [y/N]
+news-title = このアップデートに関する Arch Linux のお知らせ:
+news-unavailable = Arch Linux のお知らせを読み込めませんでした。アップデートの前に https://archlinux.org/news/ をお読みください。
+confirm-update-news = 上のお知らせを読んだうえで、アップデートをインストールしますか? [y/N]
 confirm-install = これをインストールしますか? [y/N]
 confirm-remove = これを削除しますか? [y/N]
 confirm-yes = y
@@ -67,6 +70,7 @@ apply-checking = パッケージを確認しています…
 apply-installing = { $package } をインストールしています ({ $current }/{ $total })
 apply-removing = { $package } を削除しています ({ $current }/{ $total })
 apply-hook = 仕上げ: { $name }
+apply-keyring = 先に署名鍵を更新しています…
 apply-cleanup = 不要になったものを削除しています…
 apply-done = 完了しました。変更は履歴に保存されています。
 apply-changed = プレビューの後に変更がありました。新しいプレビューを確認してください。
@@ -75,6 +79,17 @@ apply-locked = 別のプログラムがソフトウェアをインストール�
 apply-busy = kura は別の変更を行っています。終わるまでお待ちください。
 apply-failed = 変更に失敗しました: { $reason }
 error-helper = kura のシステムサービスを利用できません: { $reason }
+
+## Tray
+
+tray-uptodate = すべて最新の状態です
+tray-updates = { $count } 件のアップデートの準備ができました
+tray-attention = 確認が必要なアップデートがあります
+tray-unknown = kura はまだアップデートを確認していません
+tray-open-hint = クリックすると kura を開きます。
+notify-updates-body = インストールする前に、kura を開いて変更内容を確認してください。
+notify-attention-body = kura を開いて対応方法を確認してください。何も変更されていません。
+notify-open = kura を開く
 
 ## doctor
 

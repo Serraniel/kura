@@ -6,6 +6,8 @@
 //! Messages live in `i18n/<locale>/kura.ftl` at the repository root and are
 //! compiled into the binary. English is the source and the last fallback.
 
+pub mod present;
+
 use std::borrow::Cow;
 
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};

@@ -7,6 +7,8 @@
 //!   after a polkit check and exits after a minute without work.
 //! - `kura-helper record` is run by a pacman hook after every transaction and
 //!   appends the new generation to the history.
+//! - `kura-helper check` is run by a timer: finds and downloads updates
+//!   without installing them and writes the status for the tray.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -180,6 +182,22 @@ fn serve() -> Result<(), String> {
     }
 }
 
+/// Run by kura-check.timer: looks for updates, downloads them and writes the status.
+fn check() -> Result<(), String> {
+    use kura_alpm::background::{CHECK_DB, STATUS, check, fetch_news, news_since, now, write_status};
+    let conf = kura_alpm::load_config().map_err(|e| e.to_string())?;
+    let news = fetch_news();
+    let since = news_since(Path::new(JOURNAL), now());
+    let status =
+        check(&conf, Path::new(CHECK_DB), true, news.as_deref(), since).map_err(|e| e.to_string())?;
+    write_status(Path::new(STATUS), &status).map_err(|e| e.to_string())?;
+    eprintln!(
+        "kura: {} updates, downloaded: {}",
+        status.updates, status.downloaded
+    );
+    Ok(())
+}
+
 fn record() -> Result<(), String> {
     let conf = kura_alpm::load_config().map_err(|e| e.to_string())?;
     match kura_alpm::history::record(&conf, Path::new(JOURNAL), Path::new(CAUSE))
@@ -195,7 +213,8 @@ fn main() -> ExitCode {
     let result = match std::env::args().nth(1).as_deref() {
         Some("serve") => serve(),
         Some("record") => record(),
-        _ => Err("usage: kura-helper serve | record".to_owned()),
+        Some("check") => check(),
+        _ => Err("usage: kura-helper serve | record | check".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
