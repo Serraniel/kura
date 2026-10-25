@@ -37,6 +37,11 @@ for _ in $(seq 50); do
   sleep 0.2
 done
 
+# The background check writes a status and installs nothing.
+/usr/lib/kura/kura-helper check
+test -s /var/lib/kura/status.json
+cat /var/lib/kura/status.json
+
 printf 'y\n' | kura install figlet
 pacman -Q figlet
 grep -q '"cause":"kura:install"' /var/lib/kura/history.jsonl

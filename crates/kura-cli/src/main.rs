@@ -303,40 +303,14 @@ fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
     }
 }
 
-const NEWS_FEED: &str = "https://archlinux.org/feeds/news/";
-
 /// Arch news items that concern this update, or `None` if the feed could not be read.
 fn news_for(plan: &Plan) -> Option<Vec<kura_core::news::Item>> {
-    let out = std::process::Command::new("curl")
-        .args([
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--max-time",
-            "20",
-            NEWS_FEED,
-        ])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())?;
-    let items = kura_core::news::parse_rss(&String::from_utf8_lossy(&out.stdout));
+    let items = kura_alpm::background::fetch_news()?;
     let packages: BTreeSet<String> = plan.steps.iter().map(|s| s.package().to_owned()).collect();
-    // News since the last recorded update; without a history, the last 30 days.
-    let journal = kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL)).ok();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
-    let since = journal
-        .as_ref()
-        .and_then(|j| {
-            j.records()
-                .iter()
-                .rev()
-                .find(|r| r.summary().upgraded > 0)
-                .map(|r| r.created)
-        })
-        .unwrap_or(now - 30 * 86_400);
+    let since = kura_alpm::background::news_since(
+        std::path::Path::new(kura_alpm::history::JOURNAL),
+        kura_alpm::background::now(),
+    );
     Some(
         kura_core::news::affecting(&items, since, &packages)
             .into_iter()

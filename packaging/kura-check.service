@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC0-1.0
+#
+# Looks for updates and downloads them into pacman's cache. Installs nothing.
+
+[Unit]
+Description=Look for software updates (kura)
+Documentation=https://github.com/Serraniel/kura
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kura/kura-helper check
+Nice=19
+IOSchedulingClass=idle
+ProtectSystem=strict
+ReadWritePaths=/var/lib/kura /var/cache/pacman/pkg
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
