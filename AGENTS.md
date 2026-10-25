@@ -36,7 +36,8 @@ is. Technical detail goes behind "Details".
 
 ## Code
 
-- Rust, edition and toolchain as in `rust-toolchain.toml`.
+- Rust from Arch's `rust` package (no rustup needed). Minimum version and
+  edition are set in the workspace `Cargo.toml`.
 - `cargo fmt`, `cargo clippy -- -D warnings` and `cargo test` must pass.
 - Core crates (`kura-core`, `kura-sbom`, `kura-i18n`) keep at least 90 % line
   coverage. Put logic in core crates behind traits so it can be tested

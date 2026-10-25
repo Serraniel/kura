@@ -1,0 +1,16 @@
+[package]
+name = "kura-sbom"
+description = "CycloneDX SBOM of an Arch Linux system's installed packages"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+kura-core.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

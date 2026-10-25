@@ -22,6 +22,25 @@ working on a larger change; it explains what kura does and does not do.
 - Changed user-visible text needs updates in every language file. See
   [docs/i18n.md](docs/i18n.md).
 
+## Building
+
+On Arch Linux:
+
+```
+sudo pacman -S --needed rust clang
+cargo build
+cargo test
+./target/debug/kura doctor
+```
+
+Coverage, as checked in CI (needs `cargo-llvm-cov` and `jq`):
+
+```
+cargo llvm-cov --workspace --no-report
+cargo llvm-cov report --json --summary-only --output-path coverage.json
+scripts/coverage-gate.sh coverage.json 90 kura-core kura-i18n kura-sbom
+```
+
 ## Licence
 
 By contributing you agree that your contribution is published under the

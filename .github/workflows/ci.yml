@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    # Build against the libalpm, Qt and Rust that Arch users actually have.
+    container: archlinux:base-devel
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed rust clang llvm cargo-llvm-cov git jq
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Cache cargo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test with coverage
+        run: |
+          cargo llvm-cov --workspace --locked --no-report
+          # The real-database test needs an installed system; the container has one.
+          cargo llvm-cov --workspace --locked --no-report -- --ignored
+          cargo llvm-cov report --summary-only | tee coverage.txt
+          cargo llvm-cov report --json --summary-only --output-path coverage.json
+      - name: Coverage gate (core crates at least 90 %)
+        run: scripts/coverage-gate.sh coverage.json 90 kura-core kura-i18n kura-sbom
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            cat coverage.txt 2>/dev/null || echo 'no report'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
