@@ -31,6 +31,7 @@ check-blocked = アップデートを準備できません:
 problem-unsatisfied = { $target } には { $dependency } が必要ですが、もう提供されていません。
 problem-conflict = { $first } と { $second } は同時にインストールできません。
 problem-arch = 別の種類のプロセッサー向けにビルドされています: { $packages }
+problem-not-found = { $name } という名前のパッケージは見つかりませんでした。
 error-check = アップデートを確認できませんでした: { $reason }
 
 ## doctor

@@ -82,7 +82,7 @@ impl qobject::Kura {
             })
             .unwrap_or_else(|| "Linux".to_owned());
         self.as_mut().set_distro(QString::from(&distro));
-        match kura_alpm::installed(&kura_alpm::Paths::default()) {
+        match kura_alpm::load_config().and_then(|conf| kura_alpm::installed(&conf)) {
             Ok(set) => {
                 let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
                 let foreign = set.iter().filter(|p| p.repo.is_none()).count();

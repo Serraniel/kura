@@ -1,0 +1,334 @@
+// SPDX-FileCopyrightText: 2026 The kura contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Turns a request (update, install, remove) into a plan without changing
+//! anything (L1 simulation).
+//!
+//! For previews this works on a private copy of the sync databases, like
+//! pacman-contrib's `checkupdates`: the local database is linked, sync
+//! databases are refreshed in kura's own directory. The system's sync
+//! databases are never touched, so a later `pacman -S` cannot turn into a
+//! partial upgrade because of kura.
+
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
+
+use alpm::{Alpm, PrepareData, TransFlag};
+use kura_core::package::InstallReason;
+use kura_core::plan::{Context, Plan, PlanKind, RemovalReason, Step};
+
+use crate::{Config, Error};
+
+/// What the user wants.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Request {
+    /// Upgrade everything.
+    Update,
+    /// Install these packages. Pending upgrades are included, because
+    /// installing against newer databases without upgrading is a partial upgrade.
+    Install(Vec<String>),
+    /// Remove these packages and what only they needed.
+    Remove(Vec<String>),
+}
+
+impl Request {
+    pub fn kind(&self) -> PlanKind {
+        match self {
+            Request::Update => PlanKind::SystemUpdate,
+            Request::Install(_) => PlanKind::Install,
+            Request::Remove(_) => PlanKind::Remove,
+        }
+    }
+}
+
+/// Why libalpm could not prepare the change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Problem {
+    /// `target` needs `dependency`, which nothing provides any more.
+    UnsatisfiedDependency {
+        target: String,
+        dependency: String,
+        causing: Option<String>,
+    },
+    /// Two packages cannot be installed together.
+    Conflict {
+        first: String,
+        second: String,
+        reason: String,
+    },
+    /// Packages built for another architecture.
+    InvalidArchitecture(Vec<String>),
+    /// A requested package does not exist.
+    NotFound(String),
+    /// Any other libalpm error, as its message.
+    Other(String),
+}
+
+/// Result of preparing a request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Outcome {
+    /// The prepared plan, or why it could not be prepared.
+    pub plan: Result<Plan, Vec<Problem>>,
+    /// Packages that have a newer version.
+    pub available: Vec<String>,
+    /// Bytes still to download (packages already in the cache count as zero).
+    pub download_size: u64,
+    /// Change of installed size in bytes.
+    pub installed_delta: i64,
+}
+
+/// Links the real local database into `workdir` and seeds the sync
+/// databases from the system's copies when ours are older.
+fn prepare_workdir(real_dbpath: &str, workdir: &Path) -> Result<(), Error> {
+    let io = |path: &Path| {
+        let path = path.display().to_string();
+        move |source| Error::Io { path, source }
+    };
+    let sync = workdir.join("sync");
+    fs::create_dir_all(&sync).map_err(io(&sync))?;
+    let local = workdir.join("local");
+    let target = Path::new(real_dbpath).join("local");
+    if fs::read_link(&local).ok().as_deref() != Some(target.as_path()) {
+        let _ = fs::remove_file(&local);
+        std::os::unix::fs::symlink(&target, &local).map_err(io(&local))?;
+    }
+    if let Ok(entries) = fs::read_dir(Path::new(real_dbpath).join("sync")) {
+        for entry in entries.flatten() {
+            let from = entry.path();
+            if from.extension().and_then(|e| e.to_str()) != Some("db") {
+                continue;
+            }
+            let to = sync.join(entry.file_name());
+            let modified = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
+            if modified(&to) < modified(&from) {
+                fs::copy(&from, &to).map_err(io(&to))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Opens a handle for a preview. With `workdir`, a private database copy is
+/// used; without, the real databases (only the helper does that).
+pub(crate) fn open(conf: &Config, workdir: Option<&Path>) -> Result<Alpm, Error> {
+    let Some(workdir) = workdir else {
+        return crate::handle(conf);
+    };
+    prepare_workdir(&conf.db_path, workdir)?;
+    let mut private = conf.clone();
+    private.db_path = workdir.to_str().map(str::to_owned).ok_or_else(|| Error::Io {
+        path: workdir.display().to_string(),
+        source: std::io::Error::other("path is not valid UTF-8"),
+    })?;
+    if !crate::is_root() {
+        // Switching to the download user needs root.
+        private.download_user = None;
+    }
+    crate::handle(&private)
+}
+
+/// Prepares a request: optionally refreshes the databases, then builds the plan.
+pub fn prepare(
+    conf: &Config,
+    workdir: Option<&Path>,
+    request: &Request,
+    refresh: bool,
+) -> Result<Outcome, Error> {
+    let mut handle = open(conf, workdir)?;
+    if refresh {
+        // Downloads all databases in parallel.
+        handle.syncdbs_mut().update(false)?;
+    }
+    let available = available_upgrades(&handle);
+    handle.trans_init(flags(request))?;
+    let built = build(&mut handle, request, &available);
+    handle.trans_release()?;
+    let built = built?;
+    Ok(Outcome {
+        plan: built.plan,
+        available: available.into_iter().collect(),
+        download_size: built.download_size,
+        installed_delta: built.installed_delta,
+    })
+}
+
+pub(crate) fn flags(request: &Request) -> TransFlag {
+    match request {
+        // Like `pacman -Rs`: also remove dependencies nothing else needs.
+        Request::Remove(_) => TransFlag::RECURSE,
+        _ => TransFlag::NONE,
+    }
+}
+
+pub(crate) fn available_upgrades(handle: &Alpm) -> BTreeSet<String> {
+    handle
+        .localdb()
+        .pkgs()
+        .iter()
+        .filter(|p| p.sync_new_version(handle.syncdbs()).is_some())
+        .map(|p| p.name().to_owned())
+        .collect()
+}
+
+pub(crate) struct Built {
+    pub plan: Result<Plan, Vec<Problem>>,
+    pub download_size: u64,
+    pub installed_delta: i64,
+}
+
+/// Adds the request to an initialised transaction, prepares it and reads the
+/// result back as a plan. The transaction stays open for the caller.
+pub(crate) fn build(
+    handle: &mut Alpm,
+    request: &Request,
+    available: &BTreeSet<String>,
+) -> Result<Built, Error> {
+    let blocked = |problems| Built {
+        plan: Err(problems),
+        download_size: 0,
+        installed_delta: 0,
+    };
+    let mut explicit: BTreeSet<&str> = BTreeSet::new();
+    match request {
+        Request::Update => handle.sync_sysupgrade(false)?,
+        Request::Install(names) => {
+            handle.sync_sysupgrade(false)?;
+            for name in names {
+                let found = handle.syncdbs().iter().find_map(|db| db.pkg(name.as_str()).ok());
+                let Some(pkg) = found else {
+                    return Ok(blocked(vec![Problem::NotFound(name.clone())]));
+                };
+                if let Err(e) = handle.trans_add_pkg(pkg) {
+                    return Ok(blocked(vec![Problem::Other(e.to_string())]));
+                }
+                explicit.insert(name);
+            }
+        }
+        Request::Remove(names) => {
+            for name in names {
+                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
+                    return Ok(blocked(vec![Problem::NotFound(name.clone())]));
+                };
+                handle.trans_remove_pkg(pkg)?;
+                explicit.insert(name);
+            }
+        }
+    }
+    if let Err(e) = handle.trans_prepare() {
+        return Ok(blocked(problems(&e)));
+    }
+
+    let mut plan = Plan::new(request.kind());
+    let (mut download, mut delta) = (0u64, 0i64);
+    for pkg in handle.trans_add() {
+        download += u64::try_from(pkg.download_size().max(0)).unwrap_or(0);
+        delta += pkg.isize();
+        match handle.localdb().pkg(pkg.name()) {
+            Ok(old) => {
+                delta -= old.isize();
+                plan.steps.push(Step::Upgrade {
+                    name: pkg.name().to_owned(),
+                    from: old.version().as_str().to_owned(),
+                    to: pkg.version().as_str().to_owned(),
+                });
+            }
+            Err(_) => plan.steps.push(Step::Install {
+                name: pkg.name().to_owned(),
+                version: pkg.version().as_str().to_owned(),
+                reason: if explicit.contains(pkg.name()) {
+                    InstallReason::Explicit
+                } else {
+                    InstallReason::Dependency
+                },
+            }),
+        }
+    }
+    for pkg in handle.trans_remove() {
+        delta -= pkg.isize();
+        let why = match request {
+            Request::Remove(_) if explicit.contains(pkg.name()) => RemovalReason::Requested,
+            Request::Remove(_) => RemovalReason::Orphan,
+            _ => RemovalReason::Replaced,
+        };
+        plan.steps.push(Step::Remove {
+            name: pkg.name().to_owned(),
+            version: pkg.version().as_str().to_owned(),
+            why,
+        });
+    }
+
+    // The rule every plan follows; a violation here would be a bug in kura.
+    let ctx = Context {
+        available_upgrades: available.clone(),
+        ..Context::default()
+    };
+    let plan = match plan.validate(&ctx) {
+        Ok(()) | Err(kura_core::plan::PlanError::Empty) => Ok(plan),
+        Err(e) => Err(vec![Problem::Other(e.to_string())]),
+    };
+    Ok(Built {
+        plan,
+        download_size: download,
+        installed_delta: delta,
+    })
+}
+
+fn problems(e: &alpm::PrepareError<'_>) -> Vec<Problem> {
+    match e.data() {
+        Some(PrepareData::UnsatisfiedDeps(list)) => list
+            .iter()
+            .map(|m| Problem::UnsatisfiedDependency {
+                target: m.target().to_owned(),
+                dependency: m.depend().to_string(),
+                causing: m.causing_pkg().map(str::to_owned),
+            })
+            .collect(),
+        Some(PrepareData::ConflictingDeps(list)) => list
+            .iter()
+            .map(|c| Problem::Conflict {
+                first: c.package1().name().to_owned(),
+                second: c.package2().name().to_owned(),
+                reason: c.reason().to_string(),
+            })
+            .collect(),
+        Some(PrepareData::PkgInvalidArch(list)) => {
+            vec![Problem::InvalidArchitecture(
+                list.iter().map(|p| p.name().to_owned()).collect(),
+            )]
+        }
+        None => vec![Problem::Other(e.to_string())],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_kinds_and_flags() {
+        assert_eq!(Request::Update.kind(), PlanKind::SystemUpdate);
+        assert_eq!(Request::Install(vec![]).kind(), PlanKind::Install);
+        assert_eq!(Request::Remove(vec![]).kind(), PlanKind::Remove);
+        assert_eq!(flags(&Request::Remove(vec![])), TransFlag::RECURSE);
+        assert_eq!(flags(&Request::Update), TransFlag::NONE);
+    }
+
+    #[test]
+    fn workdir_links_local_and_copies_sync() {
+        let base = std::env::temp_dir().join(format!("kura-prepare-test-{}", std::process::id()));
+        let real = base.join("real");
+        fs::create_dir_all(real.join("local")).unwrap();
+        fs::create_dir_all(real.join("sync")).unwrap();
+        fs::write(real.join("sync/core.db"), b"db").unwrap();
+        fs::write(real.join("sync/core.db.sig"), b"sig").unwrap();
+        let work = base.join("work");
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        assert_eq!(fs::read_link(work.join("local")).unwrap(), real.join("local"));
+        assert_eq!(fs::read(work.join("sync/core.db")).unwrap(), b"db");
+        assert!(!work.join("sync/core.db.sig").exists());
+        // A second run keeps the link and does not fail.
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+}

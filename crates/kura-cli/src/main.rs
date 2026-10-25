@@ -8,7 +8,7 @@ use std::io::Write as _;
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use kura_alpm::check::Problem;
+use kura_alpm::prepare::{Problem, Request};
 use kura_core::package::{InstallReason, PackageSet};
 use kura_core::plan::{RemovalReason, Step};
 use kura_i18n::Localizer;
@@ -71,7 +71,8 @@ fn run(l: &Localizer) -> Result<String, String> {
 }
 
 fn load(l: &Localizer) -> Result<PackageSet, String> {
-    kura_alpm::installed(&kura_alpm::Paths::default())
+    kura_alpm::load_config()
+        .and_then(|conf| kura_alpm::installed(&conf))
         .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))
 }
 
@@ -117,16 +118,17 @@ fn problem_text(l: &Localizer, p: &Problem) -> String {
         Problem::InvalidArchitecture(pkgs) => {
             l.msg_args("problem-arch", &[("packages", pkgs.join(", ").into())])
         }
+        Problem::NotFound(name) => l.msg_args("problem-not-found", &[("name", name.clone().into())]),
         Problem::Other(msg) => msg.clone(),
     }
 }
 
 fn check(l: &Localizer) -> Result<String, String> {
     eprintln!("{}", l.msg("check-running"));
-    let paths = kura_alpm::Paths::default();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
-    let config = kura_alpm::config(&paths).map_err(fail)?;
-    let outcome = kura_alpm::check::check(&paths, &config, &check_dir(), true).map_err(fail)?;
+    let config = kura_alpm::load_config().map_err(fail)?;
+    let outcome =
+        kura_alpm::prepare::prepare(&config, Some(&check_dir()), &Request::Update, true).map_err(fail)?;
 
     let plan = match outcome.plan {
         Err(problems) => {
@@ -139,11 +141,11 @@ fn check(l: &Localizer) -> Result<String, String> {
         Ok(plan) => plan,
     };
     let set = load(l)?;
-    let cleanup = kura_alpm::check::cleanup(&set);
+    let cleanup = kura_alpm::cleanup(&set);
     if plan.steps.is_empty() && cleanup.is_empty() {
         return Ok(l.msg("check-none") + "\n");
     }
-    let apps = kura_alpm::check::apps(&paths).map_err(fail)?;
+    let apps = kura_alpm::apps(&config).map_err(fail)?;
     let is_app = |p: &str| apps.contains(p);
     let groups = plan.groups(&is_app);
 

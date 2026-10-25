@@ -22,6 +22,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "alpm-utils"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a59a6ffb120311a82dd5569a3bfa0098db8a1c1d8b5ec568e97b61cff3b10729"
+dependencies = [
+ "alpm",
+ "pacmanconf",
+]
+
+[[package]]
 name = "anstyle"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -56,6 +66,12 @@ name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
+
+[[package]]
+name = "cini"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8628d1f5b9a7b1196ce1aa660e3ba7e2559d350649cbe94993519c127df667f2"
 
 [[package]]
 name = "clang-format"
@@ -407,7 +423,9 @@ name = "kura-alpm"
 version = "0.0.0"
 dependencies = [
  "alpm",
+ "alpm-utils",
  "kura-core",
+ "pacmanconf",
  "thiserror 2.0.21",
 ]
 
@@ -489,6 +507,15 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "pacmanconf"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1087f8994e545eed9f7453376282f2964f18ca4b739e42f0dc7f2fed246d76c3"
+dependencies = [
+ "cini",
+]
 
 [[package]]
 name = "pkg-config"
