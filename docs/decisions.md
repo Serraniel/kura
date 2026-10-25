@@ -20,6 +20,8 @@ Consequences:
 - Every warning comes with something the user can do, or a clear statement
   that nothing needs to be done.
 - kura picks the lowest-risk option automatically wherever it can.
+- The window never changes its size on its own. Content scrolls inside it.
+  See [ui.md](ui.md).
 
 ## Scope
 
