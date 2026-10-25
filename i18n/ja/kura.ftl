@@ -39,3 +39,12 @@ sbom-written = ソフトウェア一覧を { $path } に保存しました。
 
 error-database = パッケージデータベースを読み込めませんでした: { $reason }
 error-write = { $path } に書き込めませんでした: { $reason }
+
+## Window
+
+nav-overview = 概要
+nav-history = 履歴
+nav-settings = 設定
+overview-subtitle = このコンピューターの概要です。
+overview-refresh = 再読み込み
+prototype-note = これは初期の試作版です。情報を読み取るだけで、何も変更しません。

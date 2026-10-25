@@ -42,3 +42,12 @@ sbom-written = Softwareliste gespeichert unter { $path }.
 
 error-database = Die Paketdatenbank konnte nicht gelesen werden: { $reason }
 error-write = { $path } konnte nicht geschrieben werden: { $reason }
+
+## Window
+
+nav-overview = Übersicht
+nav-history = Verlauf
+nav-settings = Einstellungen
+overview-subtitle = Ein kurzer Überblick über diesen Computer.
+overview-refresh = Aktualisieren
+prototype-note = Dies ist ein früher Prototyp. Er liest nur Informationen und verändert nichts.

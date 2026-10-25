@@ -24,7 +24,7 @@ alpm = "5"
 lexopt = "0.3"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]
