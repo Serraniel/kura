@@ -781,7 +781,9 @@ dependencies = [
  "cxx-qt-lib",
  "kura-alpm",
  "kura-core",
+ "kura-helper",
  "kura-i18n",
+ "serde_json",
 ]
 
 [[package]]

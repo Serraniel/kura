@@ -147,8 +147,18 @@ error-write = Impossible d’écrire { $path } : { $reason }
 ## Window
 
 nav-overview = Vue d’ensemble
+nav-updates = Mises à jour
+gui-review = Voir et installer
+gui-check-now = Rechercher des mises à jour maintenant
+gui-install = Installer
+gui-install-news = J’ai lu les actualités. Installer
+gui-read-news = Lire l’annonce
+gui-cancel = Annuler
+gui-updates-intro = Voici tout ce qui va changer. Rien ne se passe avant que vous cliquiez sur Installer.
+gui-tray-mono = Icône monochrome dans la zone de notification
+gui-tray-mono-hint = S’accorde avec les autres icônes du tableau de bord.
+gui-last-check = Dernière vérification : { $when }.
 nav-history = Historique
 nav-settings = Paramètres
 overview-subtitle = Un bref aperçu de cet ordinateur.
 overview-refresh = Actualiser
-prototype-note = Ceci est un premier prototype. Il lit uniquement des informations et ne modifie rien.

@@ -119,8 +119,18 @@ error-write = { $path } に書き込めませんでした: { $reason }
 ## Window
 
 nav-overview = 概要
+nav-updates = アップデート
+gui-review = 確認してインストール
+gui-check-now = 今すぐアップデートを確認
+gui-install = インストール
+gui-install-news = お知らせを読みました。インストール
+gui-read-news = お知らせを読む
+gui-cancel = キャンセル
+gui-updates-intro = 変更されるのは以下のすべてです。「インストール」を押すまで何も起こりません。
+gui-tray-mono = トレイアイコンを単色にする
+gui-tray-mono-hint = パネルのほかのアイコンと合わせます。
+gui-last-check = 最終確認: { $when }。
 nav-history = 履歴
 nav-settings = 設定
 overview-subtitle = このコンピューターの概要です。
 overview-refresh = 再読み込み
-prototype-note = これは初期の試作版です。情報を読み取るだけで、何も変更しません。

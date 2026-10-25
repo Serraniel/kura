@@ -134,8 +134,18 @@ error-write = Could not write { $path }: { $reason }
 ## Window
 
 nav-overview = Overview
+nav-updates = Updates
+gui-review = Review and install
+gui-check-now = Look for updates now
+gui-install = Install
+gui-install-news = I have read the news. Install
+gui-read-news = Read the announcement
+gui-cancel = Cancel
+gui-updates-intro = This is everything that will change. Nothing happens until you press Install.
+gui-tray-mono = Monochrome tray icon
+gui-tray-mono-hint = Matches the other icons in the panel.
+gui-last-check = Last checked { $when }.
 nav-history = History
 nav-settings = Settings
 overview-subtitle = A short overview of this computer.
 overview-refresh = Refresh
-prototype-note = This is an early prototype. It only reads information and changes nothing.

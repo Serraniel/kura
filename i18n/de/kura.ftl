@@ -134,8 +134,18 @@ error-write = { $path } konnte nicht geschrieben werden: { $reason }
 ## Window
 
 nav-overview = Übersicht
+nav-updates = Updates
+gui-review = Ansehen und installieren
+gui-check-now = Jetzt nach Updates suchen
+gui-install = Installieren
+gui-install-news = Ich habe die Neuigkeiten gelesen. Installieren
+gui-read-news = Ankündigung lesen
+gui-cancel = Abbrechen
+gui-updates-intro = Das ist alles, was sich ändert. Es passiert nichts, bevor Sie auf Installieren klicken.
+gui-tray-mono = Einfarbiges Symbol im Systemabschnitt
+gui-tray-mono-hint = Passt zu den anderen Symbolen in der Kontrollleiste.
+gui-last-check = Zuletzt geprüft: { $when }.
 nav-history = Verlauf
 nav-settings = Einstellungen
 overview-subtitle = Ein kurzer Überblick über diesen Computer.
 overview-refresh = Aktualisieren
-prototype-note = Dies ist ein früher Prototyp. Er liest nur Informationen und verändert nichts.
