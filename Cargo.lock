@@ -464,6 +464,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kura-helper"
+version = "0.0.0"
+dependencies = [
+ "kura-alpm",
+ "kura-core",
+]
+
+[[package]]
 name = "kura-i18n"
 version = "0.0.0"
 dependencies = [

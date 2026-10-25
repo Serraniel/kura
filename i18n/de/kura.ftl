@@ -9,6 +9,7 @@ cli-usage =
     Befehle:
       check      Nach Updates suchen und zeigen, was sich ändern würde
       doctor     Übersicht über dieses System für Problemberichte anzeigen
+      history    Gespeicherte Systemstände anzeigen
       orphans    Pakete auflisten, die nichts mehr braucht
       sbom       Liste aller installierten Software schreiben (CycloneDX)
       version    Version von kura anzeigen
@@ -36,6 +37,25 @@ problem-conflict = { $first } und { $second } können nicht gemeinsam installier
 problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
 problem-not-found = Es wurde kein Paket namens { $name } gefunden.
 error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
+
+## history
+
+history-title = Gespeicherte Systemstände
+history-empty = Es wurde noch nichts gespeichert. kura speichert ab jetzt jede Änderung.
+history-today = heute
+history-yesterday = gestern
+history-days-ago =
+    { $days ->
+        [one] vor einem Tag
+       *[other] vor { $days } Tagen
+    }
+history-installed = { $count } installiert
+history-upgraded = { $count } aktualisiert
+history-downgraded = { $count } auf ältere Version zurückgesetzt
+history-removed = { $count } entfernt
+history-start = Ausgangsstand: { $count } Pakete
+history-outside = (außerhalb von kura geändert)
+list-separator = {", "}
 
 ## doctor
 

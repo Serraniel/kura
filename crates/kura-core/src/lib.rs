@@ -5,6 +5,7 @@
 //! can be tested without root or a pacman database.
 
 pub mod generation;
+pub mod history;
 pub mod locale;
 pub mod package;
 pub mod plan;

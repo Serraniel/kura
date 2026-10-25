@@ -54,6 +54,7 @@ fn run(l: &Localizer) -> Result<String, String> {
     match command.as_deref() {
         Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
         Some("check") => check(l),
+        Some("history") => history(l),
         Some("doctor") => doctor(l),
         Some("orphans") => orphans(l),
         Some("sbom") => sbom(l, output.as_deref()),
@@ -212,6 +213,60 @@ fn check(l: &Localizer) -> Result<String, String> {
         );
     }
     let _ = writeln!(out, "\n{}", l.msg("check-preview-only"));
+    Ok(out)
+}
+
+fn when(l: &Localizer, created: i64, now: i64) -> String {
+    match (now - created).max(0) / 86_400 {
+        0 => l.msg("history-today"),
+        1 => l.msg("history-yesterday"),
+        days => l.msg_args("history-days-ago", &[("days", days.into())]),
+    }
+}
+
+fn history(l: &Localizer) -> Result<String, String> {
+    let journal = kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL))
+        .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))?;
+    if journal.is_empty() {
+        return Ok(l.msg("history-empty") + "\n");
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
+    let rows: Vec<(String, String, String)> = journal
+        .records()
+        .iter()
+        .rev()
+        .map(|r| {
+            let s = r.summary();
+            let text = if r.id == 1 {
+                l.msg_args("history-start", &[("count", s.installed.into())])
+            } else {
+                let parts: Vec<String> = [
+                    ("history-upgraded", s.upgraded),
+                    ("history-installed", s.installed),
+                    ("history-downgraded", s.downgraded),
+                    ("history-removed", s.removed),
+                ]
+                .into_iter()
+                .filter(|(_, n)| *n > 0)
+                .map(|(id, n)| l.msg_args(id, &[("count", n.into())]))
+                .collect();
+                let mut text = parts.join(&l.msg("list-separator"));
+                if r.cause.as_deref() == Some("pacman") {
+                    text = format!("{text} {}", l.msg("history-outside"));
+                }
+                text
+            };
+            (format!("#{}", r.id), when(l, r.created, now), text)
+        })
+        .collect();
+    let w0 = rows.iter().map(|r| r.0.chars().count()).max().unwrap_or(0);
+    let w1 = rows.iter().map(|r| r.1.chars().count()).max().unwrap_or(0);
+    let mut out = l.msg("history-title") + "\n\n";
+    for (id, day, text) in rows {
+        let _ = writeln!(out, "  {id:>w0$}  {day:w1$}  {text}");
+    }
     Ok(out)
 }
 

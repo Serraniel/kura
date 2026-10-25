@@ -1,0 +1,16 @@
+[package]
+name = "kura-helper"
+description = "The only part of kura that changes the system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+kura-core.workspace = true
+kura-alpm.workspace = true
+
+[lints]
+workspace = true

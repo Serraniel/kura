@@ -10,6 +10,7 @@ cli-usage =
     コマンド:
       check      アップデートを確認し、変更内容を表示します
       doctor     問題報告用にこのシステムの概要を表示します
+      history    保存されたシステムの状態を表示します
       orphans    どこからも必要とされていないパッケージを表示します
       sbom       インストール済みソフトウェアの一覧を書き出します (CycloneDX)
       version    kura のバージョンを表示します
@@ -33,6 +34,21 @@ problem-conflict = { $first } と { $second } は同時にインストールで�
 problem-arch = 別の種類のプロセッサー向けにビルドされています: { $packages }
 problem-not-found = { $name } という名前のパッケージは見つかりませんでした。
 error-check = アップデートを確認できませんでした: { $reason }
+
+## history
+
+history-title = 保存されたシステムの状態
+history-empty = まだ何も保存されていません。これから kura は変更のたびに保存します。
+history-today = 今日
+history-yesterday = 昨日
+history-days-ago = { $days } 日前
+history-installed = インストール { $count } 件
+history-upgraded = 更新 { $count } 件
+history-downgraded = 以前のバージョンに戻したもの { $count } 件
+history-removed = 削除 { $count } 件
+history-start = 起点: { $count } 個のパッケージ
+history-outside = (kura 以外で変更)
+list-separator = {"、"}
 
 ## doctor
 

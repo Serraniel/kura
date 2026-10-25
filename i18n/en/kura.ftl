@@ -9,6 +9,7 @@ cli-usage =
     Commands:
       check      Look for updates and show what would change
       doctor     Show a summary of this system for problem reports
+      history    Show saved states of this system
       orphans    List packages that nothing needs any more
       sbom       Write a list of all installed software (CycloneDX)
       version    Show the version of kura
@@ -36,6 +37,25 @@ problem-conflict = { $first } and { $second } cannot be installed together.
 problem-arch = Built for a different processor type: { $packages }
 problem-not-found = No package named { $name } was found.
 error-check = Could not look for updates: { $reason }
+
+## history
+
+history-title = Saved states of this system
+history-empty = Nothing has been saved yet. kura saves every change from now on.
+history-today = today
+history-yesterday = yesterday
+history-days-ago =
+    { $days ->
+        [one] one day ago
+       *[other] { $days } days ago
+    }
+history-installed = { $count } installed
+history-upgraded = { $count } updated
+history-downgraded = { $count } went back to an older version
+history-removed = { $count } removed
+history-start = Starting point: { $count } packages
+history-outside = (changed outside kura)
+list-separator = {", "}
 
 ## doctor
 

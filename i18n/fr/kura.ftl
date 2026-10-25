@@ -10,6 +10,7 @@ cli-usage =
     Commandes :
       check      Rechercher des mises à jour et montrer ce qui changerait
       doctor     Afficher un résumé de ce système pour les rapports de problème
+      history    Afficher les états enregistrés du système
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
       version    Afficher la version de kura
@@ -37,6 +38,37 @@ problem-conflict = { $first } et { $second } ne peuvent pas être installés ens
 problem-arch = Conçu pour un autre type de processeur : { $packages }
 problem-not-found = Aucun paquet nommé { $name } n’a été trouvé.
 error-check = Impossible de rechercher des mises à jour : { $reason }
+
+## history
+
+history-title = États enregistrés du système
+history-empty = Rien n’a encore été enregistré. kura enregistre désormais chaque modification.
+history-today = aujourd’hui
+history-yesterday = hier
+history-days-ago =
+    { $days ->
+        [one] il y a un jour
+       *[other] il y a { $days } jours
+    }
+history-installed =
+    { $count ->
+        [one] { $count } installé
+       *[other] { $count } installés
+    }
+history-upgraded = { $count } mis à jour
+history-downgraded =
+    { $count ->
+        [one] { $count } revenu à une version antérieure
+       *[other] { $count } revenus à une version antérieure
+    }
+history-removed =
+    { $count ->
+        [one] { $count } supprimé
+       *[other] { $count } supprimés
+    }
+history-start = Point de départ : { $count } paquets
+history-outside = (modifié en dehors de kura)
+list-separator = {", "}
 
 ## doctor
 
