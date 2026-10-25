@@ -8,7 +8,9 @@ use std::io::Write as _;
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use kura_alpm::check::Problem;
 use kura_core::package::{InstallReason, PackageSet};
+use kura_core::plan::{RemovalReason, Step};
 use kura_i18n::Localizer;
 
 fn main() -> ExitCode {
@@ -51,6 +53,7 @@ fn run(l: &Localizer) -> Result<String, String> {
 
     match command.as_deref() {
         Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
+        Some("check") => check(l),
         Some("doctor") => doctor(l),
         Some("orphans") => orphans(l),
         Some("sbom") => sbom(l, output.as_deref()),
@@ -84,6 +87,130 @@ fn os_release() -> (String, String) {
         field("NAME").unwrap_or_else(|| "Linux".into()),
         field("ID").unwrap_or_else(|| "linux".into()),
     )
+}
+
+/// Private copy of the sync databases, so checks never touch pacman's own.
+fn check_dir() -> std::path::PathBuf {
+    let base = std::env::var_os("XDG_CACHE_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".cache")))
+        .unwrap_or_else(std::env::temp_dir);
+    base.join("kura").join("checkdb")
+}
+
+fn problem_text(l: &Localizer, p: &Problem) -> String {
+    match p {
+        Problem::UnsatisfiedDependency {
+            target, dependency, ..
+        } => l.msg_args(
+            "problem-unsatisfied",
+            &[
+                ("target", target.clone().into()),
+                ("dependency", dependency.clone().into()),
+            ],
+        ),
+        Problem::Conflict { first, second, .. } => l.msg_args(
+            "problem-conflict",
+            &[("first", first.clone().into()), ("second", second.clone().into())],
+        ),
+        Problem::InvalidArchitecture(pkgs) => {
+            l.msg_args("problem-arch", &[("packages", pkgs.join(", ").into())])
+        }
+        Problem::Other(msg) => msg.clone(),
+    }
+}
+
+fn check(l: &Localizer) -> Result<String, String> {
+    eprintln!("{}", l.msg("check-running"));
+    let paths = kura_alpm::Paths::default();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let config = kura_alpm::config(&paths).map_err(fail)?;
+    let outcome = kura_alpm::check::check(&paths, &config, &check_dir(), true).map_err(fail)?;
+
+    let plan = match outcome.plan {
+        Err(problems) => {
+            let mut out = l.msg("check-blocked") + "\n";
+            for p in &problems {
+                let _ = writeln!(out, "  {}", problem_text(l, p));
+            }
+            return Err(out);
+        }
+        Ok(plan) => plan,
+    };
+    let set = load(l)?;
+    let cleanup = kura_alpm::check::cleanup(&set);
+    if plan.steps.is_empty() && cleanup.is_empty() {
+        return Ok(l.msg("check-none") + "\n");
+    }
+    let apps = kura_alpm::check::apps(&paths).map_err(fail)?;
+    let is_app = |p: &str| apps.contains(p);
+    let groups = plan.groups(&is_app);
+
+    let mut out = if outcome.available.is_empty() {
+        l.msg("check-none")
+    } else {
+        l.msg_args("check-found", &[("count", outcome.available.len().into())])
+    } + "\n";
+    let width = plan
+        .steps
+        .iter()
+        .map(|s| s.package().len())
+        .chain(cleanup.iter().map(|(n, _)| n.len()))
+        .max()
+        .unwrap_or(0);
+    let mut section = |title: &str, steps: &[&Step]| {
+        if steps.is_empty() {
+            return;
+        }
+        let _ = writeln!(out, "\n{}", l.msg_args(title, &[("count", steps.len().into())]));
+        for step in steps {
+            let detail = match step {
+                Step::Upgrade { from, to, .. } | Step::Downgrade { from, to, .. } => format!("{from} → {to}"),
+                Step::Install { version, .. } => format!("+ {version}"),
+                Step::Remove { version, .. } => format!("− {version}"),
+                Step::MarkReason { .. } => String::new(),
+            };
+            let _ = writeln!(out, "  {:width$}  {detail}", step.package());
+        }
+    };
+    let (replaced, system): (Vec<&Step>, Vec<&Step>) = groups.system.iter().partition(|s| {
+        matches!(
+            s,
+            Step::Remove {
+                why: RemovalReason::Replaced,
+                ..
+            }
+        )
+    });
+    section("check-group-apps", &groups.apps);
+    section("check-group-system", &system);
+    section("check-group-replaced", &replaced);
+    if !cleanup.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{}",
+            l.msg_args("check-group-cleanup", &[("count", cleanup.len().into())])
+        );
+        for (name, version) in &cleanup {
+            let _ = writeln!(out, "  {name:width$}  − {version}");
+        }
+    }
+    if !plan.steps.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{}",
+            l.msg_args(
+                "check-sizes",
+                &[
+                    ("download", l.size(outcome.download_size).into()),
+                    ("delta", l.size_delta(outcome.installed_delta).into()),
+                ]
+            )
+        );
+    }
+    let _ = writeln!(out, "\n{}", l.msg("check-preview-only"));
+    Ok(out)
 }
 
 fn doctor(l: &Localizer) -> Result<String, String> {

@@ -37,6 +37,8 @@ pub enum RemovalReason {
     Orphan,
     /// Part of a repair strategy.
     Repair,
+    /// Replaced by another package during an update (pacman's `replaces`).
+    Replaced,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

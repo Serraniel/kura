@@ -95,6 +95,38 @@ impl Localizer {
         self.format(id, Some(&fa))
     }
 
+    /// A size in bytes for people: `184 MB`, `1,2 GB` in German.
+    ///
+    /// Decimal units (1 MB = 1,000,000 bytes), as file managers show them.
+    /// A no-break space keeps number and unit on one line.
+    pub fn size(&self, bytes: u64) -> String {
+        const UNITS: [&str; 5] = ["B", "kB", "MB", "GB", "TB"];
+        let mut unit = 0;
+        let mut whole = bytes;
+        let mut tenths = 0;
+        while whole >= 1000 && unit < UNITS.len() - 1 {
+            tenths = (whole % 1000) / 100;
+            whole /= 1000;
+            unit += 1;
+        }
+        let sep = if matches!(self.language().as_str(), "de" | "fr") {
+            ','
+        } else {
+            '.'
+        };
+        if unit > 0 && whole < 10 && tenths > 0 {
+            format!("{whole}{sep}{tenths}\u{a0}{}", UNITS[unit])
+        } else {
+            format!("{whole}\u{a0}{}", UNITS[unit])
+        }
+    }
+
+    /// A size change with sign: `+184 MB`, `−12 MB`.
+    pub fn size_delta(&self, bytes: i64) -> String {
+        let sign = if bytes < 0 { '\u{2212}' } else { '+' };
+        format!("{sign}{}", self.size(bytes.unsigned_abs()))
+    }
+
     fn format(&self, id: &str, args: Option<&FluentArgs<'_>>) -> String {
         for b in &self.bundles {
             if let Some(pattern) = b.get_message(id).and_then(|m| m.value()) {
@@ -209,6 +241,22 @@ mod tests {
             loc("de").msg_args("cli-unknown-command", &[("command", "foo".into())]),
             "Unbekannter Befehl: foo"
         );
+    }
+
+    #[test]
+    fn sizes_follow_the_language() {
+        let en = loc("en");
+        assert_eq!(en.size(0), "0\u{a0}B");
+        assert_eq!(en.size(999), "999\u{a0}B");
+        assert_eq!(en.size(1_000), "1\u{a0}kB");
+        assert_eq!(en.size(184_200_000), "184\u{a0}MB");
+        assert_eq!(en.size(1_250_000_000), "1.2\u{a0}GB");
+        assert_eq!(en.size(5_000_000_000_000_000), "5000\u{a0}TB");
+        assert_eq!(loc("de").size(1_250_000_000), "1,2\u{a0}GB");
+        assert_eq!(loc("fr").size(2_100_000_000), "2,1\u{a0}GB");
+        assert_eq!(loc("ja").size(2_100_000_000), "2.1\u{a0}GB");
+        assert_eq!(en.size_delta(184_000_000), "+184\u{a0}MB");
+        assert_eq!(en.size_delta(-12_000_000), "\u{2212}12\u{a0}MB");
     }
 
     #[test]
