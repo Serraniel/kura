@@ -61,6 +61,7 @@ fn run(l: &Localizer) -> Result<String, String> {
     match command.as_deref() {
         Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
         Some("check") => check(l),
+        Some("security") => security(l),
         Some("mirrors") => {
             eprintln!("{}", l.msg("mirrors-running"));
             let reply = kura_helper::rank_mirrors()
@@ -328,6 +329,51 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
             other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
+}
+
+/// Known vulnerabilities, named by the apps that use the affected package.
+fn security(l: &Localizer) -> Result<String, String> {
+    eprintln!("{}", l.msg("security-running"));
+    let advisories =
+        kura_alpm::background::fetch_advisories().ok_or_else(|| l.msg("security-unavailable"))?;
+    let set = load(l)?;
+    let findings = kura_core::security::scan(&advisories, &set);
+    let mut out = kura_i18n::present::security_headline(l, &findings) + "\n";
+    for f in &findings {
+        let _ = writeln!(
+            out,
+            "\n  {} ({})\n    {}",
+            if f.apps.is_empty() {
+                l.msg("security-system")
+            } else {
+                f.apps.join(", ")
+            },
+            kura_i18n::present::severity(l, f.severity),
+            l.msg_args(
+                "security-detail",
+                &[
+                    ("package", f.package.clone().into()),
+                    ("installed", f.installed.clone().into()),
+                    ("kind", f.kind.clone().into()),
+                ]
+            ),
+        );
+        match &f.fixed {
+            Some(v) => {
+                let _ = writeln!(
+                    out,
+                    "    {} · {}",
+                    l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
+                    l.msg("security-fix")
+                );
+            }
+            None => {
+                let _ = writeln!(out, "    {}", l.msg("security-nofix"));
+            }
+        }
+        let _ = writeln!(out, "    {} {}", f.advisory, f.cves.join(" "));
+    }
+    Ok(out)
 }
 
 /// Goes back to an earlier generation, by default the one before the newest.

@@ -82,7 +82,7 @@ Kirigami.ApplicationWindow {
                     contentItem: RowLayout {
                         spacing: Kirigami.Units.largeSpacing
                         Kirigami.Icon {
-                            source: kura.state === 3 ? "data-warning" : kura.state === 2 ? "update-medium" : "data-success"
+                            source: kura.state === 4 ? "security-low" : kura.state === 3 ? "data-warning" : kura.state === 2 ? "update-medium" : "data-success"
                             Layout.preferredWidth: Kirigami.Units.iconSizes.large
                             Layout.preferredHeight: Kirigami.Units.iconSizes.large
                         }

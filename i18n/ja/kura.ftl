@@ -17,6 +17,7 @@ cli-usage =
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
+      security   インストール済みソフトウェアの既知のセキュリティ問題を表示します
       undo       以前の状態に戻します: kura undo [番号]
       version    kura のバージョンを表示します
 cli-unknown-command = 不明なコマンドです: { $command }
@@ -100,6 +101,24 @@ tray-open-hint = クリックすると kura を開きます。
 notify-updates-body = インストールする前に、kura を開いて変更内容を確認してください。
 notify-attention-body = kura を開いて対応方法を確認してください。何も変更されていません。
 notify-open = kura を開く
+
+## Security
+
+security-one-app = { $app } に既知のセキュリティ問題があります
+security-more-apps = { $app } とほかのアプリ { $count } 件に既知のセキュリティ問題があります
+security-system = システムに既知のセキュリティ問題があります
+security-fix = アップデートで修正されます。早めにインストールしてください。
+security-nofix = まだ修正はありません。kura が毎日確認し、修正が出たらお知らせします。
+security-none = 既知のセキュリティ問題はありません。
+security-running = 既知のセキュリティ問題を確認しています…
+security-unavailable = 既知のセキュリティ問題の一覧を読み込めませんでした。
+security-detail = { $package } { $installed }: { $kind }
+security-fixed-in = 修正済みバージョン: { $version }
+security-used-by = 使用しているアプリ: { $apps }
+severity-low = 低リスク
+severity-medium = 中リスク
+severity-high = 高リスク
+severity-critical = 重大なリスク
 
 ## doctor
 

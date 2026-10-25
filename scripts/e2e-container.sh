@@ -70,5 +70,8 @@ if pacman -Q figlet 2>/dev/null; then
 fi
 grep -q '"cause":"kura:restore"' /var/lib/kura/history.jsonl
 
+kura security
+grep -q '"checked"' /var/lib/kura/status.json
+
 kura history
 echo "e2e passed"

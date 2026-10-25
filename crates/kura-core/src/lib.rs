@@ -11,5 +11,6 @@ pub mod mirrors;
 pub mod news;
 pub mod package;
 pub mod plan;
+pub mod security;
 pub mod status;
 pub mod version;

@@ -17,6 +17,7 @@ cli-usage =
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
+      security   Afficher les problèmes de sécurité connus des logiciels installés
       undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
@@ -124,6 +125,28 @@ tray-open-hint = Cliquez pour ouvrir kura.
 notify-updates-body = Ouvrez kura pour voir ce qui change avant l’installation.
 notify-attention-body = Ouvrez kura pour voir ce qu’il faut faire. Rien n’a été modifié.
 notify-open = Ouvrir kura
+
+## Security
+
+security-one-app = { $app } a un problème de sécurité connu
+security-more-apps =
+    { $count ->
+        [one] { $app } et une autre application ont un problème de sécurité connu
+       *[other] { $app } et { $count } autres applications ont un problème de sécurité connu
+    }
+security-system = Le système a un problème de sécurité connu
+security-fix = Une mise à jour le corrige. Veuillez l’installer bientôt.
+security-nofix = Il n’existe pas encore de correctif. kura vérifie chaque jour et vous prévient dès qu’il y en a un.
+security-none = Aucun problème de sécurité connu.
+security-running = Recherche des problèmes de sécurité connus…
+security-unavailable = La liste des problèmes de sécurité connus n’a pas pu être chargée.
+security-detail = { $package } { $installed } : { $kind }
+security-fixed-in = Corrigé dans { $version }
+security-used-by = Utilisé par : { $apps }
+severity-low = risque faible
+severity-medium = risque moyen
+severity-high = risque élevé
+severity-critical = risque critique
 
 ## doctor
 

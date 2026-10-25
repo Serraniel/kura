@@ -6,6 +6,7 @@
 
 use kura_core::history::Record;
 use kura_core::plan::Step;
+use kura_core::security::{Finding, Severity};
 
 use crate::Localizer;
 
@@ -49,6 +50,30 @@ pub fn step_detail(step: &Step) -> String {
         Step::Remove { version, .. } => format!("− {version}"),
         Step::MarkReason { .. } => String::new(),
     }
+}
+
+/// One sentence naming what is affected, by the apps the user knows.
+pub fn security_headline(l: &Localizer, findings: &[Finding]) -> String {
+    let apps = kura_core::security::affected_apps(findings);
+    let mut apps = apps.into_iter();
+    match (apps.next(), apps.count()) {
+        (None, _) if findings.is_empty() => l.msg("security-none"),
+        (None, _) => l.msg("security-system"),
+        (Some(app), 0) => l.msg_args("security-one-app", &[("app", app.to_owned().into())]),
+        (Some(app), more) => l.msg_args(
+            "security-more-apps",
+            &[("app", app.to_owned().into()), ("count", more.into())],
+        ),
+    }
+}
+
+pub fn severity(l: &Localizer, s: Severity) -> String {
+    l.msg(match s {
+        Severity::Low => "severity-low",
+        Severity::Medium => "severity-medium",
+        Severity::High => "severity-high",
+        Severity::Critical => "severity-critical",
+    })
 }
 
 #[cfg(test)]
@@ -116,6 +141,45 @@ mod tests {
             "1 updated, 1 removed (changed outside kura)"
         );
         assert_eq!(record_text(&l("ja"), &update), "更新 1 件、削除 1 件");
+    }
+
+    fn finding(apps: &[&str], fixed: bool) -> Finding {
+        Finding {
+            advisory: "AVG-1".into(),
+            package: "ffmpeg".into(),
+            installed: "1".into(),
+            fixed: fixed.then(|| "2".into()),
+            severity: Severity::High,
+            kind: "arbitrary code execution".into(),
+            cves: vec![],
+            apps: apps.iter().map(|s| (*s).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn security_headlines() {
+        let en = l("en");
+        assert_eq!(security_headline(&en, &[]), "No known security problems.");
+        assert_eq!(
+            security_headline(&en, &[finding(&[], true)]),
+            "The system has a known security problem"
+        );
+        assert_eq!(
+            security_headline(&en, &[finding(&["kdenlive"], true)]),
+            "kdenlive has a known security problem"
+        );
+        assert_eq!(
+            security_headline(&en, &[finding(&["kdenlive", "vlc"], true)]),
+            "kdenlive and one other app have a known security problem"
+        );
+        assert_eq!(
+            security_headline(&en, &[finding(&["a", "b", "c"], true)]),
+            "a and 2 other apps have a known security problem"
+        );
+        assert_eq!(severity(&en, Severity::Critical), "critical risk");
+        assert_eq!(severity(&en, Severity::Low), "low risk");
+        assert_eq!(severity(&l("de"), Severity::Medium), "mittleres Risiko");
+        assert_eq!(severity(&en, Severity::High), "high risk");
     }
 
     #[test]

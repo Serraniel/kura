@@ -21,7 +21,7 @@ pub mod qobject {
         #[qproperty(i32, foreign_count, cxx_name = "foreignCount")]
         #[qproperty(i32, orphan_count, cxx_name = "orphanCount")]
         #[qproperty(QString, error)]
-        /// 0 unknown, 1 up to date, 2 updates ready, 3 needs attention.
+        /// 0 unknown, 1 up to date, 2 updates ready, 3 needs attention, 4 security problem.
         #[qproperty(i32, state)]
         #[qproperty(QString, status_text, cxx_name = "statusText")]
         #[qproperty(QString, last_check, cxx_name = "lastCheck")]
@@ -292,6 +292,7 @@ impl qobject::Kura {
         let status = kura_alpm::background::read_status(Path::new(kura_alpm::background::STATUS));
         let now = kura_alpm::background::now();
         let (state, text) = match status.state() {
+            State::Security => (4, present::security_headline(l, &status.security)),
             State::Unknown => (0, l.msg("tray-unknown")),
             State::UpToDate => (1, l.msg("tray-uptodate")),
             State::UpdatesReady => (2, l.msg_args("tray-updates", &[("count", status.updates.into())])),
