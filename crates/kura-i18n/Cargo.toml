@@ -1,0 +1,20 @@
+[package]
+name = "kura-i18n"
+description = "Translations for kura, based on Project Fluent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+kura-core.workspace = true
+fluent-bundle.workspace = true
+unic-langid.workspace = true
+
+[dev-dependencies]
+fluent-syntax = "0.12"
+
+[lints]
+workspace = true
