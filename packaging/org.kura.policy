@@ -69,4 +69,19 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.mirrors">
+    <description>Choose download servers</description>
+    <description xml:lang="de">Download-Server auswählen</description>
+    <description xml:lang="fr">Choisir les serveurs de téléchargement</description>
+    <description xml:lang="ja">ダウンロードサーバーの選択</description>
+    <message>Authentication is required to change the download servers.</message>
+    <message xml:lang="de">Zum Ändern der Download-Server ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour changer les serveurs de téléchargement.</message>
+    <message xml:lang="ja">ダウンロードサーバーを変更するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

@@ -19,6 +19,7 @@ path = "src/main.rs"
 kura-core.workspace = true
 kura-alpm.workspace = true
 kura-i18n.workspace = true
+kura-sbom.workspace = true
 zbus.workspace = true
 blocking.workspace = true
 futures-lite.workspace = true

@@ -10,6 +10,7 @@ cli-usage =
       check      Look for updates and show what would change
       doctor     Show a summary of this system for problem reports
       history    Show saved states of this system
+      mirrors    Choose fast download servers
       orphans    List packages that nothing needs any more
       sbom       Write a list of all installed software (CycloneDX)
       update     Install all updates (shows a preview first)
@@ -46,6 +47,8 @@ undo-limits = Settings and personal files are not changed. The next update bring
 undo-nothing = This is already the current state.
 undo-unknown = There is no saved state #{ $id }. kura history lists the saved states.
 confirm-undo = Go back to this state? [y/N]
+mirrors-running = Testing download servers near you…
+mirrors-done = { $count } fast download servers are now used. The previous list was kept as { $backup }.
 error-check = Could not look for updates: { $reason }
 
 ## history

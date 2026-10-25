@@ -11,6 +11,7 @@ cli-usage =
       check      Rechercher des mises à jour et montrer ce qui changerait
       doctor     Afficher un résumé de ce système pour les rapports de problème
       history    Afficher les états enregistrés du système
+      mirrors    Choisir des serveurs de téléchargement rapides
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
@@ -47,6 +48,8 @@ undo-limits = Les paramètres et les fichiers personnels ne sont pas modifiés. 
 undo-nothing = C’est déjà l’état actuel.
 undo-unknown = Il n’existe pas d’état enregistré n° { $id }. kura history liste les états enregistrés.
 confirm-undo = Revenir à cet état ? [o/N]
+mirrors-running = Test des serveurs de téléchargement proches…
+mirrors-done = { $count } serveurs de téléchargement rapides sont maintenant utilisés. L’ancienne liste a été conservée sous { $backup }.
 error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## history

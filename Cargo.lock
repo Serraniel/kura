@@ -795,6 +795,7 @@ dependencies = [
  "kura-alpm",
  "kura-core",
  "kura-i18n",
+ "kura-sbom",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

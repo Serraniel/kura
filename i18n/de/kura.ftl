@@ -10,6 +10,7 @@ cli-usage =
       check      Nach Updates suchen und zeigen, was sich ändern würde
       doctor     Übersicht über dieses System für Problemberichte anzeigen
       history    Gespeicherte Systemstände anzeigen
+      mirrors    Schnelle Download-Server auswählen
       orphans    Pakete auflisten, die nichts mehr braucht
       sbom       Liste aller installierten Software schreiben (CycloneDX)
       update     Alle Updates installieren (zeigt vorher eine Vorschau)
@@ -46,6 +47,8 @@ undo-limits = Einstellungen und persönliche Dateien werden nicht verändert. Da
 undo-nothing = Das ist bereits der aktuelle Stand.
 undo-unknown = Es gibt keinen gespeicherten Stand #{ $id }. kura history listet die gespeicherten Stände auf.
 confirm-undo = Zu diesem Stand zurückkehren? [j/N]
+mirrors-running = Download-Server in Ihrer Nähe werden getestet …
+mirrors-done = Jetzt werden { $count } schnelle Download-Server verwendet. Die bisherige Liste wurde als { $backup } aufbewahrt.
 error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
 
 ## history

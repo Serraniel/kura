@@ -61,6 +61,17 @@ fn run(l: &Localizer) -> Result<String, String> {
     match command.as_deref() {
         Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
         Some("check") => check(l),
+        Some("mirrors") => {
+            eprintln!("{}", l.msg("mirrors-running"));
+            let reply = kura_helper::rank_mirrors()
+                .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+            let text = kura_helper::text::reply(l, &reply);
+            if matches!(reply, Reply::Mirrors { .. }) {
+                Ok(text + "\n")
+            } else {
+                Err(text)
+            }
+        }
         Some("undo") => undo(l, names.first().map(String::as_str)),
         Some("update") => change(l, &Request::Update, "confirm-update"),
         Some("install") if !names.is_empty() => change(l, &Request::Install(names), "confirm-install"),
@@ -314,19 +325,7 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
                     render(l, &plan, Some(&outcome), &apps)
                 ));
             }
-            Reply::Blocked { problems } => {
-                let mut out = l.msg("check-blocked") + "\n";
-                for p in &problems {
-                    let _ = writeln!(out, "  {}", problem_text(l, p));
-                }
-                return Err(out);
-            }
-            Reply::NotAuthorized => return Err(l.msg("apply-not-authorized")),
-            Reply::Locked => return Err(l.msg("apply-locked")),
-            Reply::Busy => return Err(l.msg("apply-busy")),
-            Reply::Failed { message } => {
-                return Err(l.msg_args("apply-failed", &[("reason", message.into())]));
-            }
+            other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
 }

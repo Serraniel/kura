@@ -11,6 +11,7 @@ cli-usage =
       check      アップデートを確認し、変更内容を表示します
       doctor     問題報告用にこのシステムの概要を表示します
       history    保存されたシステムの状態を表示します
+      mirrors    速いダウンロードサーバーを選びます
       orphans    どこからも必要とされていないパッケージを表示します
       sbom       インストール済みソフトウェアの一覧を書き出します (CycloneDX)
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
@@ -43,6 +44,8 @@ undo-limits = 設定や個人のファイルは変更されません。次のア
 undo-nothing = これはすでに現在の状態です。
 undo-unknown = 保存された状態 #{ $id } はありません。kura history で保存された状態を確認できます。
 confirm-undo = この状態に戻しますか? [y/N]
+mirrors-running = 近くのダウンロードサーバーをテストしています…
+mirrors-done = 速いダウンロードサーバー { $count } 台を使うようになりました。以前の一覧は { $backup } として保存されています。
 error-check = アップデートを確認できませんでした: { $reason }
 
 ## history

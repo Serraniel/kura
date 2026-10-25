@@ -90,6 +90,10 @@ pub fn reply(l: &Localizer, reply: &Reply) -> String {
         Reply::Locked => l.msg("apply-locked"),
         Reply::Busy => l.msg("apply-busy"),
         Reply::Failed { message } => l.msg_args("apply-failed", &[("reason", message.clone().into())]),
+        Reply::Mirrors { count, backup } => l.msg_args(
+            "mirrors-done",
+            &[("count", (*count).into()), ("backup", backup.clone().into())],
+        ),
     }
 }
 
