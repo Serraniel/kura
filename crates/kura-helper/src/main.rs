@@ -84,7 +84,11 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>) -> Reply {
         let _ = std::fs::create_dir_all(dir);
     }
     let _ = std::fs::write(cause, cause_for(plan.kind));
-    let result = kura_alpm::apply::apply(&conf, plan, events);
+    let result = if matches!(plan.kind, kura_core::plan::PlanKind::Restore { .. }) {
+        kura_alpm::apply::apply_restore(&conf, plan, Path::new(JOURNAL), events)
+    } else {
+        kura_alpm::apply::apply(&conf, plan, events)
+    };
     let _ = std::fs::remove_file(cause);
     match result {
         Ok(()) => Reply::Done,

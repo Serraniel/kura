@@ -328,6 +328,108 @@ pub fn apply(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(
     cleanup(&mut handle, approved, events)
 }
 
+/// Goes back to an earlier generation. The plan is computed from the journal
+/// again and must match the approved one.
+///
+/// # Panics
+///
+/// Never: the generation exists because a plan to it was computed.
+pub fn apply_restore(
+    conf: &Config,
+    approved: &Plan,
+    journal: &std::path::Path,
+    events: &Sender<Event>,
+) -> Result<(), ApplyError> {
+    use crate::restore::{Source, plan, sources};
+    use kura_core::plan::PlanKind;
+
+    if !crate::is_root() {
+        return Err(ApplyError::NotRoot);
+    }
+    let PlanKind::Restore { generation } = approved.kind else {
+        return Err(ApplyError::Failed("not a restore plan".into()));
+    };
+    let history = crate::history::load(journal)?;
+    let fresh = plan(&history, generation)
+        .ok_or_else(|| ApplyError::Failed(format!("no generation {generation}")))?;
+    if core_steps(&fresh) != core_steps(approved) {
+        return Err(ApplyError::Changed(Box::new(fresh)));
+    }
+    let target = history
+        .generation(generation)
+        .expect("plan exists, so the generation does");
+    let found = sources(&conf.cache_dir, &fresh, &target).map_err(ApplyError::Blocked)?;
+
+    let mut handle = crate::handle(conf)?;
+    install_callbacks(&handle, approved, events);
+    let mut files = Vec::new();
+    for (name, source) in found {
+        match source {
+            Source::Cache(path) => {
+                files.push((path.to_string_lossy().into_owned(), handle.local_file_siglevel()));
+            }
+            Source::Archive(urls) => {
+                let _ = events.send(Event::Downloading {
+                    file: name.clone(),
+                    done: 0,
+                    total: 0,
+                });
+                let fetched = urls
+                    .iter()
+                    .find_map(|u| handle.fetch_pkgurl([u.as_str()].iter().copied()).ok());
+                let path = fetched
+                    .and_then(|list| list.iter().next().map(ToOwned::to_owned))
+                    .ok_or_else(|| {
+                        ApplyError::Blocked(vec![Problem::NotRestorable {
+                            name: name.clone(),
+                            version: String::new(),
+                        }])
+                    })?;
+                files.push((path, handle.remote_file_siglevel()));
+            }
+        }
+    }
+
+    with_trans(&mut handle, alpm::TransFlag::NONE, |h| {
+        for (path, level) in &files {
+            let pkg = h
+                .pkg_load(path.as_str(), true, *level)
+                .map_err(|e| ApplyError::Failed(format!("{path}: {e}")))?;
+            h.trans_add_pkg(pkg)
+                .map_err(|e| ApplyError::Failed(e.to_string()))?;
+        }
+        for step in &fresh.steps {
+            if let Step::Remove { name, .. } = step
+                && let Ok(pkg) = h.localdb().pkg(name.as_str())
+            {
+                h.trans_remove_pkg(pkg)?;
+            }
+        }
+        if h.trans_add().is_empty() && h.trans_remove().is_empty() {
+            return Ok(());
+        }
+        h.trans_prepare()
+            .map_err(|e| ApplyError::Blocked(crate::prepare::problems(&e)))?;
+        commit(h)
+    })?;
+
+    // Install reasons last, once every package is in place.
+    for step in &fresh.steps {
+        let reason = match step {
+            Step::MarkReason { reason, .. } | Step::Install { reason, .. } => *reason,
+            _ => continue,
+        };
+        if let Ok(pkg) = handle.localdb().pkg(step.package()) {
+            let reason = match reason {
+                kura_core::package::InstallReason::Explicit => alpm::PackageReason::Explicit,
+                kura_core::package::InstallReason::Dependency => alpm::PackageReason::Depend,
+            };
+            pkg.set_reason(reason)?;
+        }
+    }
+    Ok(())
+}
+
 /// Removes the orphans listed in the plan in a second transaction. Packages
 /// that became needed in the meantime are left alone.
 fn cleanup(handle: &mut Alpm, plan: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {

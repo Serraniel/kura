@@ -15,6 +15,7 @@ cli-usage =
       update     Alle Updates installieren (zeigt vorher eine Vorschau)
       install    Eine App installieren: kura install <Name>
       remove     Eine App entfernen und was nur sie brauchte: kura remove <Name>
+      undo       Zu einem früheren Stand zurückkehren: kura undo [Nummer]
       version    Version von kura anzeigen
 cli-unknown-command = Unbekannter Befehl: { $command }
 cli-missing-command = Kein Befehl angegeben.
@@ -39,6 +40,12 @@ problem-unsatisfied = { $target } benötigt { $dependency }, das nicht mehr verf
 problem-conflict = { $first } und { $second } können nicht gemeinsam installiert werden.
 problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
 problem-not-found = Es wurde kein Paket namens { $name } gefunden.
+problem-not-restorable = kura kann { $name } { $version } nicht zurückholen: Es stammt aus dem AUR oder wurde auf diesem Computer gebaut, und die Datei ist nicht mehr im Paket-Cache.
+undo-title = Zurück zum Stand #{ $id } von { $when }:
+undo-limits = Einstellungen und persönliche Dateien werden nicht verändert. Das nächste Update bringt die neueren Versionen zurück. Nutzen Sie das also, um ein Problem zu umgehen, bis eine Korrektur erscheint.
+undo-nothing = Das ist bereits der aktuelle Stand.
+undo-unknown = Es gibt keinen gespeicherten Stand #{ $id }. kura history listet die gespeicherten Stände auf.
+confirm-undo = Zu diesem Stand zurückkehren? [j/N]
 error-check = Es konnte nicht nach Updates gesucht werden: { $reason }
 
 ## history

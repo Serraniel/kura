@@ -55,5 +55,15 @@ if pacman -Q figlet 2>/dev/null; then
   exit 1
 fi
 
+# Going back: install figlet, then return to the state before it.
+printf 'y\n' | kura install figlet
+pacman -Q figlet
+printf 'y\n' | kura undo
+if pacman -Q figlet 2>/dev/null; then
+  echo "kura undo did not remove figlet" >&2
+  exit 1
+fi
+grep -q '"cause":"kura:restore"' /var/lib/kura/history.jsonl
+
 kura history
 echo "e2e passed"

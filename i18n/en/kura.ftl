@@ -15,6 +15,7 @@ cli-usage =
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
+      undo       Go back to an earlier state: kura undo [number]
       version    Show the version of kura
 cli-unknown-command = Unknown command: { $command }
 cli-missing-command = No command given.
@@ -39,6 +40,12 @@ problem-unsatisfied = { $target } needs { $dependency }, which is no longer avai
 problem-conflict = { $first } and { $second } cannot be installed together.
 problem-arch = Built for a different processor type: { $packages }
 problem-not-found = No package named { $name } was found.
+problem-not-restorable = kura cannot bring back { $name } { $version }: it came from the AUR or was built on this computer, and the file is no longer in the package cache.
+undo-title = Going back to state #{ $id } from { $when }:
+undo-limits = Settings and personal files are not changed. The next update brings the newer versions back, so use this to get around a problem until a fix is released.
+undo-nothing = This is already the current state.
+undo-unknown = There is no saved state #{ $id }. kura history lists the saved states.
+confirm-undo = Go back to this state? [y/N]
 error-check = Could not look for updates: { $reason }
 
 ## history
