@@ -147,6 +147,7 @@ gui-check-now = Jetzt nach Updates suchen
 gui-install = Installieren
 gui-install-news = Ich habe die Neuigkeiten gelesen. Installieren
 gui-read-news = Ankündigung lesen
+gui-go-back = Zu diesem Stand zurückkehren
 gui-cancel = Abbrechen
 gui-updates-intro = Das ist alles, was sich ändert. Es passiert nichts, bevor Sie auf Installieren klicken.
 gui-tray-mono = Einfarbiges Symbol im Systemabschnitt

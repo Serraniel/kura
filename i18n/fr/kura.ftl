@@ -160,6 +160,7 @@ gui-check-now = Rechercher des mises à jour maintenant
 gui-install = Installer
 gui-install-news = J’ai lu les actualités. Installer
 gui-read-news = Lire l’annonce
+gui-go-back = Revenir à cet état
 gui-cancel = Annuler
 gui-updates-intro = Voici tout ce qui va changer. Rien ne se passe avant que vous cliquiez sur Installer.
 gui-tray-mono = Icône monochrome dans la zone de notification

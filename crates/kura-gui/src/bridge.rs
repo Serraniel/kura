@@ -32,6 +32,8 @@ pub mod qobject {
         /// `[{"title": .., "link": ..}]`
         #[qproperty(QString, news_json, cxx_name = "newsJson")]
         #[qproperty(QString, summary_text, cxx_name = "summaryText")]
+        /// Heading of the preview page: an update or going back.
+        #[qproperty(QString, preview_title, cxx_name = "previewTitle")]
         #[qproperty(bool, can_install, cxx_name = "canInstall")]
         #[qproperty(QString, message)]
         /// `[{"id": .., "when": .., "text": ..}]`, newest first.
@@ -54,7 +56,12 @@ pub mod qobject {
         #[cxx_name = "prepareUpdate"]
         fn prepare_update(self: Pin<&mut Kura>);
 
-        /// Sends the previewed update to kura-helper.
+        /// Prepares going back to an earlier generation.
+        #[qinvokable]
+        #[cxx_name = "prepareRestore"]
+        fn prepare_restore(self: Pin<&mut Kura>, generation: i32);
+
+        /// Sends the previewed plan to kura-helper.
         #[qinvokable]
         #[cxx_name = "installUpdate"]
         fn install_update(self: Pin<&mut Kura>);
@@ -96,6 +103,7 @@ pub struct KuraRust {
     preview_json: QString,
     news_json: QString,
     summary_text: QString,
+    preview_title: QString,
     can_install: bool,
     message: QString,
     history_json: QString,
@@ -121,6 +129,7 @@ impl Default for KuraRust {
             preview_json: QString::from("[]"),
             news_json: QString::from("[]"),
             summary_text: QString::default(),
+            preview_title: QString::default(),
             can_install: false,
             message: QString::default(),
             history_json: QString::from("[]"),
@@ -340,6 +349,8 @@ impl qobject::Kura {
             return;
         }
         let running = self.localizer.msg("check-running");
+        let title = self.localizer.msg("nav-updates");
+        self.as_mut().set_preview_title(QString::from(&title));
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
         self.as_mut().set_message(QString::default());
@@ -367,6 +378,66 @@ impl qobject::Kura {
                 this.as_mut().set_busy(false);
             });
         });
+    }
+
+    fn prepare_restore(mut self: Pin<&mut Self>, generation: i32) {
+        if *self.busy() {
+            return;
+        }
+        let Ok(target) = u64::try_from(generation) else {
+            return;
+        };
+        let l = &self.localizer;
+        let journal = kura_alpm::history::load(Path::new(kura_alpm::history::JOURNAL));
+        let conf = kura_alpm::load_config();
+        let prepared = match (journal, conf) {
+            (Ok(journal), Ok(conf)) => {
+                let generation = journal.generation(target);
+                match (kura_alpm::restore::plan(&journal, target), generation) {
+                    (Some(plan), Some(generation)) if !plan.steps.is_empty() => {
+                        match kura_alpm::restore::sources(&conf.cache_dir, &plan, &generation) {
+                            Ok(_) => {
+                                let apps = kura_alpm::apps(&conf).unwrap_or_default();
+                                let when = present::when(l, generation.created, kura_alpm::background::now());
+                                Ok((
+                                    plan.clone(),
+                                    preview_groups(l, &plan, &apps).to_string(),
+                                    l.msg_args("undo-title", &[("id", target.into()), ("when", when.into())]),
+                                ))
+                            }
+                            Err(problems) => Err(problems
+                                .iter()
+                                .map(|p| kura_helper::text::problem(l, p))
+                                .collect::<Vec<_>>()
+                                .join("\n")),
+                        }
+                    }
+                    (Some(_), Some(_)) => Err(l.msg("undo-nothing")),
+                    _ => Err(l.msg_args("undo-unknown", &[("id", target.into())])),
+                }
+            }
+            (Err(e), _) | (_, Err(e)) => {
+                Err(l.msg_args("error-database", &[("reason", e.to_string().into())]))
+            }
+        };
+        let limits = l.msg("undo-limits");
+        match prepared {
+            Ok((plan, preview, title)) => {
+                self.as_mut().set_preview_title(QString::from(&title));
+                self.as_mut().set_preview_json(QString::from(&preview));
+                self.as_mut().set_news_json(QString::from("[]"));
+                self.as_mut().set_summary_text(QString::from(&limits));
+                self.as_mut().set_progress_text(QString::default());
+                self.as_mut().set_message(QString::default());
+                self.as_mut().set_can_install(true);
+                self.as_mut().rust_mut().pending = Some(plan);
+            }
+            Err(text) => {
+                self.as_mut().set_preview_json(QString::from("[]"));
+                self.as_mut().set_can_install(false);
+                self.as_mut().set_message(QString::from(&text));
+            }
+        }
     }
 
     fn install_update(mut self: Pin<&mut Self>) {

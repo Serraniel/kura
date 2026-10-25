@@ -143,7 +143,7 @@ Kirigami.ApplicationWindow {
         id: updatesPage
 
         Kirigami.ScrollablePage {
-            title: kura.tr("nav-updates")
+            title: kura.previewTitle.length > 0 ? kura.previewTitle : kura.tr("nav-updates")
 
             property var groups: JSON.parse(kura.previewJson)
             property var news: JSON.parse(kura.newsJson)
@@ -157,7 +157,8 @@ Kirigami.ApplicationWindow {
                         onClicked: root.show(overviewPage)
                     }
                     Controls.Button {
-                        text: news.length > 0 ? kura.tr("gui-install-news") : kura.tr("gui-install")
+                        readonly property bool restoring: kura.previewTitle !== kura.tr("nav-updates")
+                        text: restoring ? kura.tr("gui-go-back") : news.length > 0 ? kura.tr("gui-install-news") : kura.tr("gui-install")
                         icon.name: "run-install"
                         highlighted: true
                         onClicked: kura.installUpdate()
@@ -276,6 +277,12 @@ Kirigami.ApplicationWindow {
                         Controls.Label {
                             text: modelData.when
                             color: Kirigami.Theme.disabledTextColor
+                        }
+                        Controls.Button {
+                            visible: index > 0
+                            text: kura.tr("gui-go-back")
+                            icon.name: "edit-undo"
+                            onClicked: { root.show(updatesPage); kura.prepareRestore(modelData.id) }
                         }
                     }
                 }

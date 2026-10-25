@@ -132,6 +132,7 @@ gui-check-now = 今すぐアップデートを確認
 gui-install = インストール
 gui-install-news = お知らせを読みました。インストール
 gui-read-news = お知らせを読む
+gui-go-back = この状態に戻す
 gui-cancel = キャンセル
 gui-updates-intro = 変更されるのは以下のすべてです。「インストール」を押すまで何も起こりません。
 gui-tray-mono = トレイアイコンを単色にする

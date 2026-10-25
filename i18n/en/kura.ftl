@@ -147,6 +147,7 @@ gui-check-now = Look for updates now
 gui-install = Install
 gui-install-news = I have read the news. Install
 gui-read-news = Read the announcement
+gui-go-back = Go back to this state
 gui-cancel = Cancel
 gui-updates-intro = This is everything that will change. Nothing happens until you press Install.
 gui-tray-mono = Monochrome tray icon
