@@ -43,3 +43,12 @@ sbom-written = Liste des logiciels enregistrée dans { $path }.
 
 error-database = Impossible de lire la base de données des paquets : { $reason }
 error-write = Impossible d’écrire { $path } : { $reason }
+
+## Window
+
+nav-overview = Vue d’ensemble
+nav-history = Historique
+nav-settings = Paramètres
+overview-subtitle = Un bref aperçu de cet ordinateur.
+overview-refresh = Actualiser
+prototype-note = Ceci est un premier prototype. Il lit uniquement des informations et ne modifie rien.

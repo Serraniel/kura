@@ -42,3 +42,12 @@ sbom-written = Software list written to { $path }.
 
 error-database = Could not read the package database: { $reason }
 error-write = Could not write { $path }: { $reason }
+
+## Window
+
+nav-overview = Overview
+nav-history = History
+nav-settings = Settings
+overview-subtitle = A short overview of this computer.
+overview-refresh = Refresh
+prototype-note = This is an early prototype. It only reads information and changes nothing.
