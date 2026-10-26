@@ -11,6 +11,7 @@ pub mod actions;
 pub mod aur;
 pub mod report;
 pub mod text;
+pub mod trial;
 
 use std::sync::mpsc;
 use std::time::Duration;
@@ -45,6 +46,10 @@ pub enum Reply {
     Busy,
     Failed {
         message: String,
+    },
+    /// The update failed in a throwaway snapshot; nothing was changed.
+    TrialFailed {
+        reason: String,
     },
     /// New download servers are in use; the old list was kept as `backup`.
     Mirrors {

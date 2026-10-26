@@ -50,6 +50,7 @@ pub mod qobject {
         #[qproperty(bool, failed)]
         #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
         #[qproperty(bool, auto_security, cxx_name = "autoSecurity")]
+        #[qproperty(bool, trial_runs, cxx_name = "trialRuns")]
         // Bundles as JSON: [{"id", "name", "description"}].
         #[qproperty(QString, bundles_json, cxx_name = "bundlesJson")]
         // Repository profiles as JSON: [{"id", "text", "active"}].
@@ -128,6 +129,10 @@ pub mod qobject {
         #[cxx_name = "changeAutoSecurity"]
         fn change_auto_security(self: Pin<&mut Kura>, on: bool);
 
+        #[qinvokable]
+        #[cxx_name = "changeTrialRuns"]
+        fn change_trial_runs(self: Pin<&mut Kura>, on: bool);
+
         // Previews installing a bundle.
         #[qinvokable]
         #[cxx_name = "prepareBundle"]
@@ -195,6 +200,7 @@ pub struct KuraRust {
     failed: bool,
     aur_wait: i32,
     auto_security: bool,
+    trial_runs: bool,
     profiles_json: QString,
     bundles_json: QString,
     localizer: Localizer,
@@ -234,6 +240,7 @@ impl Default for KuraRust {
             failed: false,
             aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
             auto_security: kura_alpm::aur::settings().auto_security,
+            trial_runs: kura_alpm::aur::settings().trial_runs,
             profiles_json: QString::from(&profiles_value(&Localizer::from_env()).to_string()),
             bundles_json: QString::from(&bundles_value(&Localizer::from_env()).to_string()),
             localizer: Localizer::from_env(),
@@ -927,6 +934,12 @@ impl qobject::Kura {
         self.save_settings(s);
     }
 
+    fn change_trial_runs(self: Pin<&mut Self>, on: bool) {
+        let mut s = kura_alpm::aur::settings();
+        s.trial_runs = on;
+        self.save_settings(s);
+    }
+
     fn change_auto_security(self: Pin<&mut Self>, on: bool) {
         let mut s = kura_alpm::aur::settings();
         s.auto_security = on;
@@ -953,6 +966,7 @@ impl qobject::Kura {
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_aur_enabled(saved.aur);
                 this.as_mut().set_auto_security(saved.auto_security);
+                this.as_mut().set_trial_runs(saved.trial_runs);
                 this.as_mut()
                     .set_aur_wait(i32::try_from(saved.aur_cooling_days).unwrap_or(0));
                 this.as_mut().set_message(QString::from(&text));

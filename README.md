@@ -34,7 +34,7 @@ Not yet released. Developers can build the `kura-git` package from
 | Command | What it does |
 |---|---|
 | `kura check` | Shows which updates are available and what would change. Changes nothing. |
-| `kura update` | Shows the preview and Arch news that concern it, asks, then installs everything. AUR updates follow once they are a few days old (3 by default), so problems in new versions can show up first. AUR apps that a library update broke are built again. |
+| `kura update` | Shows the preview and Arch news that concern it, asks, then installs everything. On btrfs it first tries the update in a throwaway snapshot and stops if it fails there. AUR updates follow once they are a few days old (3 by default), so problems in new versions can show up first. AUR apps that a library update broke are built again. |
 | `kura install <name>` / `kura remove <name>` | The same for single apps. Apps only the AUR has are built on this computer in a restricted environment, several at once. |
 | `kura search <word>` | Finds apps in the repositories and the AUR. AUR results show votes and warnings. |
 | `kura history` | Lists the saved states of the system. |
@@ -48,7 +48,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura bundles [add <name>]` | Ready-made sets of apps with the settings they need, such as gaming with Steam (turns on multilib, adds you to the gamemode group) or HDR. |
 | `kura kernels [add\|remove <name>]` | Lists kernels with what they are good for, adds one next to the others (with headers when DKMS needs them) and checks that DKMS modules were built. The new kernel becomes the default where kura can set it (systemd-boot, or GRUB with `GRUB_DEFAULT=saved`); once it has started, kura offers to remove the old one. The running and the last kernel are never removed. |
 | `kura profiles [add\|remove <name>]` | Adds or takes away an extra repository: Chaotic-AUR, or CachyOS with packages built for newer processors. Shows the download a full switch needs and lets you switch now or with the next updates; taking it away switches every package back. |
-| `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`, `auto-security on`/`off`. With `auto-security` on, the daily check installs updates that fix a known security problem, but only when the test run is clean and no Arch news concerns them. |
+| `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`, `auto-security on`/`off`, `trial on`/`off`. With `auto-security` on, the daily check installs updates that fix a known security problem, but only when the test run is clean and no Arch news concerns them. |
 | `kura snapshots [setup]` | Shows whether snapshots are taken before updates; `setup` adds what is missing. |
 
 The window (`kura-gui`) shows the same status, update preview, history and

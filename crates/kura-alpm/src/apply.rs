@@ -44,6 +44,8 @@ pub enum Event {
     UpdatingKeyring,
     /// A change that is not a package change.
     Configuring { action: kura_core::action::Action },
+    /// The update runs in a throwaway snapshot first.
+    Trial,
     /// An AUR package base is being built.
     Building {
         base: String,
@@ -66,6 +68,8 @@ pub enum Phase {
 pub enum ApplyError {
     #[error("kura must run as root to change the system")]
     NotRoot,
+    #[error("the update failed in a test run; nothing was changed: {0}")]
+    TrialFailed(String),
     #[error("another program is installing software right now")]
     Locked,
     #[error("the change is different from the preview")]

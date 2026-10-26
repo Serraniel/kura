@@ -104,6 +104,7 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>, caller: Option<&str>) -> Reply
         PlanKind::Profile => kura_helper::actions::apply_profile(&conf, plan, events),
         PlanKind::Kernel => kura_helper::actions::apply_kernel(&conf, plan, events),
         PlanKind::Bundle => kura_helper::actions::apply_bundle(&conf, plan, events, caller),
+        PlanKind::SystemUpdate | PlanKind::Repair => trial_then_apply(&conf, plan, events),
         _ => kura_alpm::apply::apply(&conf, plan, events),
     };
     let _ = std::fs::remove_file(cause);
@@ -112,6 +113,7 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>, caller: Option<&str>) -> Reply
         Err(ApplyError::Changed(plan)) => Reply::Changed { plan: *plan },
         Err(ApplyError::Blocked(problems)) => Reply::Blocked { problems },
         Err(ApplyError::Locked) => Reply::Locked,
+        Err(ApplyError::TrialFailed(reason)) => Reply::TrialFailed { reason },
         Err(e) => Reply::Failed {
             message: e.to_string(),
         },
@@ -361,6 +363,24 @@ fn check() -> Result<(), String> {
     Ok(())
 }
 
+/// Updates run in a throwaway snapshot first when the setting is on. Only
+/// a transaction that fails there stops the real one.
+fn trial_then_apply(
+    conf: &kura_alpm::Config,
+    plan: &Plan,
+    events: &mpsc::Sender<Event>,
+) -> Result<(), ApplyError> {
+    if kura_alpm::aur::settings().trial_runs {
+        let _ = events.send(Event::Trial);
+        match kura_helper::trial::run(plan) {
+            kura_helper::trial::Outcome::Passed => {}
+            kura_helper::trial::Outcome::Failed(reason) => return Err(ApplyError::TrialFailed(reason)),
+            kura_helper::trial::Outcome::Skipped(why) => eprintln!("kura: no trial run: {why}"),
+        }
+    }
+    kura_alpm::apply::apply(conf, plan, events)
+}
+
 /// Installs the simulated update without asking, as the user allowed for
 /// security fixes. The plan is derived again like any other.
 fn install_security_updates(conf: &kura_alpm::Config, plan: &Plan) -> Result<(), String> {
@@ -391,6 +411,10 @@ fn main() -> ExitCode {
         Some("serve") => serve(),
         Some("record") => record(),
         Some("check") => check(),
+        // Runs inside the trial container; see `kura_helper::trial`.
+        Some("trial") => {
+            return ExitCode::from(u8::try_from(kura_helper::trial::inside()).unwrap_or(1));
+        }
         // Runs inside the build sandbox as a throwaway user; see `kura_helper::aur`.
         Some("build") => {
             let args: Vec<String> = std::env::args().skip(2).collect();
