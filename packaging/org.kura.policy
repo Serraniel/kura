@@ -129,4 +129,19 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.profiles">
+    <description>Add or remove software repositories</description>
+    <description xml:lang="de">Paketquellen hinzufügen oder entfernen</description>
+    <description xml:lang="fr">Ajouter ou retirer des dépôts de logiciels</description>
+    <description xml:lang="ja">ソフトウェアリポジトリの追加と削除</description>
+    <message>Authentication is required to add or remove software repositories.</message>
+    <message xml:lang="de">Zum Hinzufügen oder Entfernen von Paketquellen ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour ajouter ou retirer des dépôts de logiciels.</message>
+    <message xml:lang="ja">ソフトウェアリポジトリを追加または削除するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

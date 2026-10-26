@@ -31,6 +31,8 @@ pub enum PlanKind {
     Snapshots,
     /// Build packages from the AUR and install them.
     AurInstall,
+    /// Add or take away a repository profile.
+    Profile,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

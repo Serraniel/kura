@@ -77,6 +77,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("update") => update(l),
         Some("settings") => settings(l, &names),
         Some("report") => Ok(report(l, &names.join(" "))),
+        Some("profiles") => profiles(l, &names),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => kura_helper::report::history(l),
@@ -520,6 +521,59 @@ fn report(l: &Localizer, what: &str) -> String {
         .stderr(std::process::Stdio::null())
         .spawn();
     l.msg_args("report-opened", &[("url", url.into())]) + "\n"
+}
+
+/// Lists repository profiles, or adds or takes one away.
+fn profiles(l: &Localizer, args: &[String]) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let (add, id) = match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] => {
+            let mut out = l.msg("profiles-title") + "\n";
+            for p in kura_core::profiles::ALL {
+                let state = if kura_alpm::profiles::is_active(p) {
+                    l.msg("profile-on")
+                } else {
+                    l.msg("profile-off")
+                };
+                let _ = writeln!(
+                    out,
+                    "\n  {} ({state})\n  {}",
+                    p.id,
+                    l.msg(&format!("profile-{}-text", p.id))
+                );
+            }
+            return Ok(out);
+        }
+        ["add", id] => (true, *id),
+        ["remove", id] => (false, *id),
+        _ => return Err(l.msg("profiles-usage") + "\n"),
+    };
+    let profile = kura_core::profiles::find(id).ok_or_else(|| l.msg("profiles-usage") + "\n")?;
+    if add == kura_alpm::profiles::is_active(profile) {
+        let id = if add { "profile-already" } else { "profile-missing" };
+        return Ok(l.msg_args(id, &[("name", profile.id.into())]) + "\n");
+    }
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let plan = kura_alpm::profiles::prepare(&conf, profile).map_err(fail)?;
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    say(&format!(
+        "{}\n{}\n{}",
+        l.msg("preview-title"),
+        render(l, &plan, None, &apps),
+        l.msg(&format!("profile-{}-text", profile.id))
+    ));
+    let question = if add {
+        "confirm-profile-add"
+    } else {
+        "confirm-profile-remove"
+    };
+    let outcome = Outcome {
+        plan: Ok(plan.clone()),
+        available: Vec::new(),
+        download_size: 0,
+        installed_delta: 0,
+    };
+    confirm_and_apply(l, plan, &outcome, &apps, question)
 }
 
 /// Shows or changes the settings for all users.

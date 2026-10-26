@@ -189,6 +189,14 @@ has a tested way back to plain Arch. kura may suggest a profile when the
 hardware fits (for example a CPU supporting x86-64-v3), always with an honest
 statement of the benefit and a trust warning.
 
+- Profiles are built into kura (`kura_core::profiles`), signing key
+  fingerprints and bootstrap addresses included. Data files never name keys
+  or addresses.
+- Adding or removing a profile always asks for the password (`auth_admin`
+  without "keep"), because it decides whom the system trusts.
+- `pacman.conf` is changed section by section and copied first; taking a
+  profile away restores the file exactly.
+
 ## Command line
 
 `kura` has a CLI with verbs from the first release: `update`, `install`,

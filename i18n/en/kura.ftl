@@ -12,6 +12,7 @@ cli-usage =
       history    Show saved states of this system
       mirrors    Choose fast download servers
       orphans    List packages that nothing needs any more
+      profiles   Add or remove extra repositories: kura profiles [add|remove <name>]
       sbom       Write a list of all installed software (CycloneDX)
       search     Search apps in the repositories and the AUR: kura search <word>
       update     Install all updates (shows a preview first)
@@ -224,6 +225,20 @@ snapshots-missing = Missing:
 snapshots-step-install = Install { $package }
 snapshots-step-config = Create a snapper configuration for /
 snapshots-step-enable = Turn on { $unit }
+action-trust-key = Trust the signing key { $key }
+action-forget-key = Stop trusting the signing key { $key }
+action-install-from = Download and install { $files }
+action-add-repo = Add the repository { $name }
+action-remove-repo = Remove the repository { $name }
+profiles-title = Extra repositories kura can add and take away again:
+profile-on = added
+profile-off = not added
+profiles-usage = Usage: kura profiles [add|remove <name>]
+profile-already = { $name } is already added.
+profile-missing = { $name } is not added.
+profile-chaotic-aur-text = Ready-built packages for many apps from the AUR, so they install in seconds instead of being built on this computer. It is run by volunteers, not by Arch Linux: adding it means trusting them with your system.
+confirm-profile-add = Add this repository? [y/N]
+confirm-profile-remove = Remove this repository? Apps you installed from it stay. [y/N]
 snapshots-setup-hint = To add what is missing: kura snapshots setup
 snapshots-nothing = Nothing to set up.
 preview-actions = Settings that change:

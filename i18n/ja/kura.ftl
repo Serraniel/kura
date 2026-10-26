@@ -13,6 +13,7 @@ cli-usage =
       history    保存されたシステムの状態を表示します
       mirrors    速いダウンロードサーバーを選びます
       orphans    どこからも必要とされていないパッケージを表示します
+      profiles   追加のリポジトリを追加・削除します: kura profiles [add|remove <名前>]
       sbom       インストール済みソフトウェアの一覧を書き出します (CycloneDX)
       search     リポジトリと AUR でアプリを検索します: kura search <単語>
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
@@ -195,6 +196,20 @@ snapshots-missing = 不足しているもの:
 snapshots-step-install = { $package } をインストール
 snapshots-step-config = / の snapper 設定を作成
 snapshots-step-enable = { $unit } を有効化
+action-trust-key = 署名鍵 { $key } を信頼する
+action-forget-key = 署名鍵 { $key } の信頼を取り消す
+action-install-from = { $files } をダウンロードしてインストール
+action-add-repo = リポジトリ { $name } を追加
+action-remove-repo = リポジトリ { $name } を削除
+profiles-title = kura が追加・削除できる追加のリポジトリ:
+profile-on = 追加済み
+profile-off = 未追加
+profiles-usage = 使い方: kura profiles [add|remove <名前>]
+profile-already = { $name } はすでに追加されています。
+profile-missing = { $name } は追加されていません。
+profile-chaotic-aur-text = AUR の多くのアプリのビルド済みパッケージです。このコンピューターでビルドせずに数秒でインストールできます。運営は Arch Linux ではなくボランティアです。追加すると、システムを彼らに任せることになります。
+confirm-profile-add = このリポジトリを追加しますか? [y/N]
+confirm-profile-remove = このリポジトリを削除しますか? そこからインストールしたアプリは残ります。[y/N]
 snapshots-setup-hint = 不足分を追加するには: kura snapshots setup
 snapshots-nothing = 設定するものはありません。
 preview-actions = 変更される設定:

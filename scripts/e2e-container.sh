@@ -84,6 +84,19 @@ grep -q '"checked"' /var/lib/kura/status.json
 kura history
 echo "e2e passed"
 
+# A repository profile comes and goes, leaving pacman.conf as it was.
+# Real installs create pacman's local signing key; the Docker image has none.
+pacman-key --init
+cp /etc/pacman.conf /tmp/pacman.conf.before
+printf 'y\n' | kura profiles add chaotic-aur
+pacman-conf --repo-list | grep -qx chaotic-aur
+pacman -Q chaotic-keyring chaotic-mirrorlist
+pacman-key --list-keys EF925EA60F33D0CB85C44AD13056513887B78AEB
+printf 'y\n' | kura profiles remove chaotic-aur
+cmp /etc/pacman.conf /tmp/pacman.conf.before
+if pacman -Q chaotic-keyring; then exit 1; fi
+if pacman-key --list-keys EF925EA60F33D0CB85C44AD13056513887B78AEB; then exit 1; fi
+
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"
 

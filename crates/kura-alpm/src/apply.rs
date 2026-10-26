@@ -153,7 +153,7 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
         )),
         // Restores and snapshot setups have their own way in; see
         // `apply_restore` and `kura_alpm::snapshots`.
-        PlanKind::Restore { .. } | PlanKind::Snapshots => None,
+        PlanKind::Restore { .. } | PlanKind::Snapshots | PlanKind::Profile => None,
         // The repository part only; AUR packages are built and installed afterwards.
         PlanKind::AurInstall => Some(Request::Dependencies(
             plan.steps
@@ -534,6 +534,33 @@ fn cleanup(handle: &mut Alpm, plan: &Plan, events: &Sender<Event>) -> Result<(),
     })();
     handle.trans_release()?;
     result
+}
+
+/// Installs packages from addresses, such as a repository's keyring
+/// before the repository exists. Signatures follow `RemoteFileSigLevel`.
+pub fn install_urls(conf: &Config, urls: &[String], events: &Sender<Event>) -> Result<(), ApplyError> {
+    if !crate::is_root() {
+        return Err(ApplyError::NotRoot);
+    }
+    let mut handle = crate::handle(conf)?;
+    install_callbacks(&handle, &Plan::new(kura_core::plan::PlanKind::Install), events);
+    let fetched = handle
+        .fetch_pkgurl(urls.iter().map(String::as_str))
+        .map_err(|e| ApplyError::Failed(format!("download: {e}")))?;
+    let files: Vec<String> = fetched.iter().map(ToOwned::to_owned).collect();
+    with_trans(&mut handle, alpm::TransFlag::NONE, |h| {
+        let level = h.remote_file_siglevel();
+        for path in &files {
+            let pkg = h
+                .pkg_load(path.as_str(), true, level)
+                .map_err(|e| ApplyError::Failed(format!("{path}: {e}")))?;
+            h.trans_add_pkg(pkg)
+                .map_err(|e| ApplyError::Failed(e.to_string()))?;
+        }
+        h.trans_prepare()
+            .map_err(|e| ApplyError::Blocked(crate::prepare::problems(&e)))?;
+        commit(h)
+    })
 }
 
 /// Installs package files kura-helper built itself, then sets each

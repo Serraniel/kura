@@ -13,6 +13,7 @@ cli-usage =
       history    Afficher les états enregistrés du système
       mirrors    Choisir des serveurs de téléchargement rapides
       orphans    Lister les paquets dont plus rien n’a besoin
+      profiles   Ajouter ou retirer des dépôts supplémentaires : kura profiles [add|remove <nom>]
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
       search     Chercher des applications dans les dépôts et l'AUR : kura search <mot>
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
@@ -237,6 +238,20 @@ snapshots-missing = Il manque :
 snapshots-step-install = Installer { $package }
 snapshots-step-config = Créer une configuration snapper pour /
 snapshots-step-enable = Activer { $unit }
+action-trust-key = Faire confiance à la clé de signature { $key }
+action-forget-key = Ne plus faire confiance à la clé de signature { $key }
+action-install-from = Télécharger et installer { $files }
+action-add-repo = Ajouter le dépôt { $name }
+action-remove-repo = Retirer le dépôt { $name }
+profiles-title = Dépôts supplémentaires que kura peut ajouter et retirer :
+profile-on = ajouté
+profile-off = non ajouté
+profiles-usage = Utilisation : kura profiles [add|remove <nom>]
+profile-already = { $name } est déjà ajouté.
+profile-missing = { $name } n'est pas ajouté.
+profile-chaotic-aur-text = Des paquets déjà compilés pour de nombreuses applications de l'AUR, qui s'installent en quelques secondes au lieu d'être compilés sur cet ordinateur. Il est géré par des bénévoles, pas par Arch Linux : l'ajouter revient à leur confier votre système.
+confirm-profile-add = Ajouter ce dépôt ? [o/N]
+confirm-profile-remove = Retirer ce dépôt ? Les applications installées depuis celui-ci restent. [o/N]
 snapshots-setup-hint = Pour ajouter ce qui manque : kura snapshots setup
 snapshots-nothing = Rien à configurer.
 preview-actions = Réglages modifiés :

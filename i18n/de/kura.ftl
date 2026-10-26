@@ -12,6 +12,7 @@ cli-usage =
       history    Gespeicherte Systemstände anzeigen
       mirrors    Schnelle Download-Server auswählen
       orphans    Pakete auflisten, die nichts mehr braucht
+      profiles   Zusätzliche Paketquellen hinzufügen oder entfernen: kura profiles [add|remove <Name>]
       sbom       Liste aller installierten Software schreiben (CycloneDX)
       search     Apps in den Paketquellen und im AUR suchen: kura search <Wort>
       update     Alle Updates installieren (zeigt vorher eine Vorschau)
@@ -224,6 +225,20 @@ snapshots-missing = Es fehlt:
 snapshots-step-install = { $package } installieren
 snapshots-step-config = snapper-Konfiguration für / anlegen
 snapshots-step-enable = { $unit } einschalten
+action-trust-key = Dem Signaturschlüssel { $key } vertrauen
+action-forget-key = Dem Signaturschlüssel { $key } nicht mehr vertrauen
+action-install-from = { $files } herunterladen und installieren
+action-add-repo = Paketquelle { $name } hinzufügen
+action-remove-repo = Paketquelle { $name } entfernen
+profiles-title = Zusätzliche Paketquellen, die kura hinzufügen und wieder entfernen kann:
+profile-on = hinzugefügt
+profile-off = nicht hinzugefügt
+profiles-usage = Aufruf: kura profiles [add|remove <Name>]
+profile-already = { $name } ist bereits hinzugefügt.
+profile-missing = { $name } ist nicht hinzugefügt.
+profile-chaotic-aur-text = Fertig gebaute Pakete für viele Apps aus dem AUR, sodass sie in Sekunden installiert sind, statt auf diesem Computer gebaut zu werden. Sie wird von Freiwilligen betrieben, nicht von Arch Linux: Wer sie hinzufügt, vertraut ihnen sein System an.
+confirm-profile-add = Diese Paketquelle hinzufügen? [j/N]
+confirm-profile-remove = Diese Paketquelle entfernen? Apps, die Sie daraus installiert haben, bleiben. [j/N]
 snapshots-setup-hint = Um zu ergänzen, was fehlt: kura snapshots setup
 snapshots-nothing = Es gibt nichts einzurichten.
 preview-actions = Diese Einstellungen ändern sich:
