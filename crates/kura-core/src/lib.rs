@@ -6,6 +6,7 @@
 
 pub mod action;
 pub mod aur;
+pub mod drivers;
 pub mod elf;
 pub mod generation;
 pub mod hardware;

@@ -159,6 +159,11 @@ All curated data lives in the `kura-bundles` repository: app bundles, flows,
 hardware rules, language-pack families, provider preferences, repository
 profiles. The index is signed and kura verifies it.
 
+Until then (decided 2026-10-26), kura does not download this data: it ships
+inside the kura package, and built-in defaults in `kura-core` (driver rules,
+language-pack families) cover the first cases. Signing a remote index comes
+later.
+
 - Configuration is declarative only (enable a service, add a user to a group,
   write a file from a template). No arbitrary scripts.
 - Every action has a system or user scope, can be previewed, and can be undone.
