@@ -275,7 +275,7 @@ const MIRRORS_RANKED: &str = "/var/lib/kura/mirrors-ranked";
 /// Run by kura-check.timer: looks for updates, downloads them and writes the status.
 fn check() -> Result<(), String> {
     use kura_alpm::background::{
-        CHECK_DB, STATUS, check, fetch_advisories, fetch_news, news_since, now, write_status,
+        CHECK_DB, STATUS, check, fetch_advisories, fetch_news, news_since, now, read_status, write_status,
     };
     let stale = std::fs::metadata(MIRRORS_RANKED)
         .and_then(|m| m.modified())
@@ -289,17 +289,36 @@ fn check() -> Result<(), String> {
     let news = fetch_news();
     let since = news_since(Path::new(JOURNAL), now());
     let advisories = fetch_advisories();
-    let status = check(
-        &conf,
-        Path::new(CHECK_DB),
-        true,
-        news.as_deref(),
-        since,
-        advisories.as_deref(),
-    )
-    .map_err(|e| e.to_string())?;
-    let mut status = status;
+    let run_check = || {
+        check(
+            &conf,
+            Path::new(CHECK_DB),
+            true,
+            news.as_deref(),
+            since,
+            advisories.as_deref(),
+        )
+        .map_err(|e| e.to_string())
+    };
+    let (mut status, plan) = run_check()?;
+    let previous = read_status(Path::new(STATUS));
+    status.auto_installed = previous.auto_installed;
+    status.auto_fixed = previous.auto_fixed;
     let settings = kura_alpm::aur::settings();
+    if let Some(plan) = plan {
+        let fixes = kura_core::security::fixed_by(&status.security, &plan).len();
+        if kura_core::security::auto_install(settings.auto_security, &status, fixes) {
+            match install_security_updates(&conf, &plan) {
+                Ok(()) => {
+                    // Check again so the status shows the system as it is now.
+                    status = run_check()?.0;
+                    status.auto_installed = now();
+                    status.auto_fixed = fixes;
+                }
+                Err(e) => eprintln!("kura: security updates not installed: {e}"),
+            }
+        }
+    }
     if settings.aur {
         match kura_alpm::aur::updates(&conf, &settings, now(), true) {
             Ok(updates) => {
@@ -319,6 +338,20 @@ fn check() -> Result<(), String> {
         status.security.len()
     );
     Ok(())
+}
+
+/// Installs the simulated update without asking, as the user allowed for
+/// security fixes. The plan is derived again like any other.
+fn install_security_updates(conf: &kura_alpm::Config, plan: &Plan) -> Result<(), String> {
+    let cause = Path::new(CAUSE);
+    if let Some(dir) = cause.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(cause, "kura:auto-security");
+    let (events, _ignored) = mpsc::channel();
+    let result = kura_alpm::apply::apply(conf, plan, &events).map_err(|e| e.to_string());
+    let _ = std::fs::remove_file(cause);
+    result
 }
 
 fn record() -> Result<(), String> {

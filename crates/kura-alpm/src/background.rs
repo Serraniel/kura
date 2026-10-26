@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use alpm::TransFlag;
 use kura_core::news::Item;
+use kura_core::plan::Plan;
 use kura_core::status::Status;
 
 use crate::prepare::{Request, available_upgrades, build, open};
@@ -102,7 +103,7 @@ pub fn check(
     news: Option<&[Item]>,
     since: i64,
     advisories: Option<&[kura_core::security::Advisory]>,
-) -> Result<Status, Error> {
+) -> Result<(Status, Option<Plan>), Error> {
     let mut handle = open(conf, Some(workdir))?;
     handle.syncdbs_mut().update(false)?;
     let available = available_upgrades(&handle);
@@ -118,6 +119,7 @@ pub fn check(
         Ok(b) => b.plan.is_err(),
         Err(_) => true,
     };
+    let plan = built.as_ref().ok().and_then(|b| b.plan.clone().ok());
     if download && !blocked && !available.is_empty() {
         downloaded = handle.trans_commit().is_ok();
     }
@@ -136,7 +138,7 @@ pub fn check(
         Some(list) => kura_core::security::scan(list, &crate::installed(conf)?),
         None => Vec::new(),
     };
-    Ok(Status {
+    let status = Status {
         checked: now(),
         updates: available.len(),
         downloaded,
@@ -144,7 +146,8 @@ pub fn check(
         news,
         security,
         ..Status::default()
-    })
+    };
+    Ok((status, plan))
 }
 
 /// Writes the status atomically so readers never see half a file.
@@ -207,7 +210,7 @@ mod tests {
     fn checks_in_a_container() {
         let conf = crate::load_config().unwrap();
         let dir = std::env::temp_dir().join(format!("kura-bg-{}", std::process::id()));
-        let status = check(&conf, &dir, true, None, 0, fetch_advisories().as_deref()).unwrap();
+        let (status, _) = check(&conf, &dir, true, None, 0, fetch_advisories().as_deref()).unwrap();
         assert!(status.checked > 0);
         assert!(!status.blocked);
         let _ = fs::remove_dir_all(dir);

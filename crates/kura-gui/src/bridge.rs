@@ -49,6 +49,7 @@ pub mod qobject {
         // The message is about a failure; the window offers a problem report.
         #[qproperty(bool, failed)]
         #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
+        #[qproperty(bool, auto_security, cxx_name = "autoSecurity")]
         type Kura = super::KuraRust;
     }
 
@@ -119,6 +120,10 @@ pub mod qobject {
         #[cxx_name = "changeAurWait"]
         fn change_aur_wait(self: Pin<&mut Kura>, days: i32);
 
+        #[qinvokable]
+        #[cxx_name = "changeAutoSecurity"]
+        fn change_auto_security(self: Pin<&mut Kura>, on: bool);
+
         // The anonymised problem report as JSON: {"text", "url"}.
         #[qinvokable]
         #[cxx_name = "problemReport"]
@@ -170,6 +175,7 @@ pub struct KuraRust {
     aur_enabled: bool,
     failed: bool,
     aur_wait: i32,
+    auto_security: bool,
     localizer: Localizer,
     pending: Option<Plan>,
 }
@@ -206,6 +212,7 @@ impl Default for KuraRust {
             aur_enabled: kura_alpm::aur::settings().aur,
             failed: false,
             aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
+            auto_security: kura_alpm::aur::settings().auto_security,
             localizer: Localizer::from_env(),
             pending: None,
         }
@@ -665,6 +672,12 @@ impl qobject::Kura {
         self.save_settings(s);
     }
 
+    fn change_auto_security(self: Pin<&mut Self>, on: bool) {
+        let mut s = kura_alpm::aur::settings();
+        s.auto_security = on;
+        self.save_settings(s);
+    }
+
     fn change_aur_wait(self: Pin<&mut Self>, days: i32) {
         let mut s = kura_alpm::aur::settings();
         s.aur_cooling_days = u32::try_from(days).unwrap_or(0);
@@ -684,6 +697,7 @@ impl qobject::Kura {
             let saved = kura_alpm::aur::settings();
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_aur_enabled(saved.aur);
+                this.as_mut().set_auto_security(saved.auto_security);
                 this.as_mut()
                     .set_aur_wait(i32::try_from(saved.aur_cooling_days).unwrap_or(0));
                 this.as_mut().set_message(QString::from(&text));

@@ -80,6 +80,7 @@ history-downgraded = { $count } went back to an older version
 history-removed = { $count } removed
 history-start = Starting point: { $count } packages
 history-outside = (changed outside kura)
+history-auto-security = (security fixes, installed automatically)
 list-separator = {", "}
 
 ## Applying changes
@@ -124,6 +125,11 @@ tray-open-hint = Click to open kura.
 notify-updates-body = Open kura to see what changes before installing.
 notify-attention-body = Open kura to see what to do. Nothing has been changed.
 notify-open = Open kura
+notify-auto-security-title = Security updates were installed
+notify-auto-security-body = { $count ->
+    [one] They fix a known security problem.
+   *[other] They fix { $count } known security problems.
+} You can see every change in kura's history and go back there.
 
 ## Security
 
@@ -267,7 +273,9 @@ settings-days = { $days ->
    *[other] { $days } days
 }
 settings-saved = Saved.
-settings-usage = Usage: kura settings [aur on|off] [aur-wait <0–14>]
+settings-auto-security = Install security fixes automatically
+gui-auto-security-hint = When an update fixes a known security problem, kura installs it without asking, but only if the test run found no problem and no Arch news concerns it. You get a message afterwards and can go back in History.
+settings-usage = Usage: kura settings [aur on|off] [aur-wait <0–14>] [auto-security on|off]
 report-intro = This report contains no user name, computer name or home folder. Please read it before you share it:
 confirm-report = Open it as a prefilled problem report on GitHub in your browser? [y/N]
 report-opened = If no browser opened, copy this address: { $url }

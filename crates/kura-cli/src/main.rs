@@ -514,15 +514,19 @@ fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         [] => {
             return Ok(format!(
-                "{}: {}\n{}: {}\n",
+                "{}: {}\n{}: {}\n{}: {}\n",
                 l.msg("settings-aur"),
                 on_off(s.aur),
                 l.msg("settings-aur-wait"),
-                l.msg_args("settings-days", &[("days", s.aur_cooling_days.into())])
+                l.msg_args("settings-days", &[("days", s.aur_cooling_days.into())]),
+                l.msg("settings-auto-security"),
+                on_off(s.auto_security)
             ));
         }
         ["aur", "on"] => s.aur = true,
         ["aur", "off"] => s.aur = false,
+        ["auto-security", "on"] => s.auto_security = true,
+        ["auto-security", "off"] => s.auto_security = false,
         ["aur-wait", days] => {
             s.aur_cooling_days = days
                 .parse::<u32>()

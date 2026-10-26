@@ -45,7 +45,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura sbom` | Writes a list of all installed software (CycloneDX). |
 | `kura doctor` | A short system summary for problem reports. |
 | `kura report [what happened]` | Shows a problem report without user name, computer name or home folder, and opens it as a prefilled GitHub issue if you want. kura sends nothing itself. |
-| `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`. |
+| `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`, `auto-security on`/`off`. With `auto-security` on, the daily check installs updates that fix a known security problem, but only when the test run is clean and no Arch news concerns them. |
 | `kura snapshots [setup]` | Shows whether snapshots are taken before updates; `setup` adds what is missing. |
 
 The window (`kura-gui`) shows the same status, update preview, history and

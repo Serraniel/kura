@@ -539,6 +539,21 @@ Kirigami.ApplicationWindow {
                     Kirigami.FormData.isSection: true
                 }
                 Controls.Switch {
+                    Kirigami.FormData.label: kura.tr("settings-auto-security") + ":"
+                    checked: kura.autoSecurity
+                    onToggled: kura.changeAutoSecurity(checked)
+                }
+                Controls.Label {
+                    text: kura.tr("gui-auto-security-hint")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                }
+                Controls.Switch {
                     Kirigami.FormData.label: kura.tr("gui-aur") + ":"
                     checked: kura.aurEnabled
                     onToggled: kura.changeAur(checked)

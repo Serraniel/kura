@@ -69,6 +69,7 @@ history-downgraded = 以前のバージョンに戻したもの { $count } 件
 history-removed = 削除 { $count } 件
 history-start = 起点: { $count } 個のパッケージ
 history-outside = (kura 以外で変更)
+history-auto-security = (セキュリティ修正、自動インストール)
 list-separator = {"、"}
 
 ## Applying changes
@@ -109,6 +110,8 @@ tray-open-hint = クリックすると kura を開きます。
 notify-updates-body = インストールする前に、kura を開いて変更内容を確認してください。
 notify-attention-body = kura を開いて対応方法を確認してください。何も変更されていません。
 notify-open = kura を開く
+notify-auto-security-title = セキュリティアップデートをインストールしました
+notify-auto-security-body = 既知のセキュリティ問題 { $count } 件を修正します。すべての変更は kura の履歴で確認でき、そこから元に戻せます。
 
 ## Security
 
@@ -228,7 +231,9 @@ settings-on = オン
 settings-off = オフ
 settings-days = { $days } 日
 settings-saved = 保存しました。
-settings-usage = 使い方: kura settings [aur on|off] [aur-wait <0–14>]
+settings-auto-security = セキュリティ修正を自動でインストール
+gui-auto-security-hint = アップデートが既知のセキュリティ問題を修正する場合、試験実行で問題がなく、関係する Arch のお知らせもなければ、kura は確認なしでインストールします。その後お知らせが表示され、履歴から元に戻せます。
+settings-usage = 使い方: kura settings [aur on|off] [aur-wait <0–14>] [auto-security on|off]
 report-intro = このレポートにはユーザー名、コンピューター名、ホームフォルダーは含まれていません。共有する前に内容を確認してください:
 confirm-report = 入力済みの問題レポートとして GitHub をブラウザーで開きますか? [y/N]
 report-opened = ブラウザーが開かない場合は、このアドレスをコピーしてください: { $url }
