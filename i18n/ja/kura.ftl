@@ -19,6 +19,7 @@ cli-usage =
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
       security   インストール済みソフトウェアの既知のセキュリティ問題を表示します
+      settings   設定を表示・変更します: kura settings aur on|off、kura settings aur-wait <日数>
       snapshots  スナップショットの状態を表示します。kura snapshots setup で不足分を追加します
       undo       以前の状態に戻します: kura undo [番号]
       version    kura のバージョンを表示します
@@ -211,6 +212,19 @@ aur-mixed = 一部は AUR から提供されています。それらは別にイ
 aur-build-list = AUR からこのコンピューターでビルドするもの:
 aur-notice = AUR のパッケージは他のユーザーが共有しているもので、Arch Linux による確認は受けていません。kura は分離された制限付きの環境でビルドします。
 confirm-aur = これをビルドしてインストールしますか? [y/N]
+aur-off = { $names } はリポジトリにありません。また、AUR はオフになっています。オンにするには: kura settings aur on
+aur-check-failed = AUR のアップデートを確認できませんでした: { $reason }
+check-aur = AUR から: { $ready } 件準備完了、{ $waiting } 件待機中
+aur-updates-title = AUR からのアップデート:
+aur-waiting = 新しいバージョンの問題が先に見つかるよう、{ $count } 件の AUR アップデートは公開から { $days } 日経つまで待機します: { $names }
+confirm-aur-update = これらのアップデートをビルドしてインストールしますか? [y/N]
+settings-aur = AUR
+settings-aur-wait = AUR アップデートまでの待機期間
+settings-on = オン
+settings-off = オフ
+settings-days = { $days } 日
+settings-saved = 保存しました。
+settings-usage = 使い方: kura settings [aur on|off] [aur-wait <0–14>]
 gui-installed = インストール済み
 gui-remove = 削除
 gui-install-title = { $name } をインストール

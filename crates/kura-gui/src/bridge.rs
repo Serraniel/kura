@@ -202,16 +202,6 @@ fn read_settings() -> Value {
         .unwrap_or_else(|| json!({}))
 }
 
-fn check_dir() -> PathBuf {
-    std::env::var_os("XDG_CACHE_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| Path::new(&h).join(".cache")))
-        .unwrap_or_else(std::env::temp_dir)
-        .join("kura")
-        .join("checkdb")
-}
-
 /// The preview groups as JSON, in the order the window shows them.
 fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value {
     let is_app = |p: &str| apps.contains(p);
@@ -266,7 +256,7 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     let conf = kura_alpm::load_config().map_err(fail)?;
     let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
         &conf,
-        Some(&check_dir()),
+        Some(&kura_alpm::background::check_dir()),
         request,
         !matches!(request, Request::Remove(_)),
         &user_locales(),
@@ -359,7 +349,7 @@ fn prepare_snapshots_preview() -> Result<Prepared, String> {
     let l = Localizer::from_env();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let conf = kura_alpm::load_config().map_err(fail)?;
-    let outcome = kura_alpm::snapshots::prepare(&conf, Some(&check_dir()), true)
+    let outcome = kura_alpm::snapshots::prepare(&conf, Some(&kura_alpm::background::check_dir()), true)
         .map_err(fail)?
         .ok_or_else(|| l.msg("snapshots-nothing"))?;
     let plan = match &outcome.plan {

@@ -90,6 +90,9 @@ pub trait Helper {
     /// Chooses fast, up-to-date download servers and returns a [`Reply`] (JSON).
     fn rank_mirrors(&self) -> zbus::Result<String>;
 
+    /// Saves the system-wide settings (JSON) and returns a [`Reply`] (JSON).
+    fn set_settings(&self, settings: &str) -> zbus::Result<String>;
+
     /// Progress of the running plan, as a JSON [`Event`].
     #[zbus(signal)]
     fn progress(&self, event: String) -> zbus::Result<()>;
@@ -159,6 +162,14 @@ pub fn rank_mirrors() -> Result<Reply, ClientError> {
         .method_timeout(Duration::from_secs(600))
         .build()?;
     let text = HelperProxyBlocking::new(&conn)?.rank_mirrors()?;
+    serde_json::from_str(&text).map_err(|e| ClientError::Protocol(e.to_string()))
+}
+
+/// Asks the helper to save the system-wide settings.
+pub fn set_settings(settings: &kura_core::settings::Settings) -> Result<Reply, ClientError> {
+    let conn = zbus::blocking::connection::Builder::system()?.build()?;
+    let json = serde_json::to_string(settings).map_err(|e| ClientError::Protocol(e.to_string()))?;
+    let text = HelperProxyBlocking::new(&conn)?.set_settings(&json)?;
     serde_json::from_str(&text).map_err(|e| ClientError::Protocol(e.to_string()))
 }
 

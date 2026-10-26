@@ -303,6 +303,7 @@ mod tests {
             blocked,
             news: news.iter().map(|s| (*s).to_owned()).collect(),
             security: vec![],
+            ..Status::default()
         }
     }
 

@@ -44,3 +44,21 @@ pacman -Q neofetch
 
 # Nothing from the build sandbox stays readable to other users.
 test "$(stat -c %a /var/lib/private)" = 700
+
+# Settings: the AUR can be turned off, and installs then stop with a hint.
+kura settings aur off
+kura settings | grep -q "AUR: off"
+if kura install yay-bin; then exit 1; fi
+kura settings aur on
+kura settings aur-wait 0
+kura settings | grep -q "0 days"
+
+# An AUR update: make the installed pfetch look older, then update.
+db=$(echo /var/lib/pacman/local/pfetch-*)
+version=$(sed -n '/^%VERSION%$/{n;p}' "$db/desc")
+sed -i "/^%VERSION%$/{n;s/.*/0.1-1/}" "$db/desc"
+mv "$db" /var/lib/pacman/local/pfetch-0.1-1
+kura check | grep -q "From the AUR: 1 ready"
+printf 'y\ny\n' | kura update
+test "$(pacman -Q pfetch)" = "pfetch $version"
+pacman -Qi pfetch | grep -q "Explicitly installed"

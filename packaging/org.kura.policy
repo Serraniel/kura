@@ -114,4 +114,19 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.settings">
+    <description>Change kura's settings for all users</description>
+    <description xml:lang="de">Einstellungen von kura für alle Benutzer ändern</description>
+    <description xml:lang="fr">Modifier les réglages de kura pour tous les utilisateurs</description>
+    <description xml:lang="ja">すべてのユーザーの kura の設定を変更</description>
+    <message>Authentication is required to change kura's settings.</message>
+    <message xml:lang="de">Zum Ändern der Einstellungen von kura ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour modifier les réglages de kura.</message>
+    <message xml:lang="ja">kura の設定を変更するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

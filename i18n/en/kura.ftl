@@ -18,6 +18,7 @@ cli-usage =
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
       security   Show known security problems of installed software
+      settings   Show or change settings: kura settings aur on|off, kura settings aur-wait <days>
       snapshots  Show snapshot status; kura snapshots setup adds what is missing
       undo       Go back to an earlier state: kura undo [number]
       version    Show the version of kura
@@ -241,6 +242,28 @@ aur-mixed = Some of these come from the AUR. Install those separately: kura inst
 aur-build-list = Built on this computer from the AUR:
 aur-notice = AUR packages are shared by other users and are not checked by Arch Linux. kura builds them in a separate, restricted environment.
 confirm-aur = Build and install this? [y/N]
+aur-off = { $names } is not in the repositories, and the AUR is turned off. To turn it on: kura settings aur on
+aur-check-failed = AUR updates could not be checked: { $reason }
+check-aur = From the AUR: { $ready } ready, { $waiting } still waiting
+aur-updates-title = Updates from the AUR:
+aur-waiting = { $count ->
+    [one] One AUR update waits
+   *[other] { $count } AUR updates wait
+} until { $count ->
+    [one] it is
+   *[other] they are
+} { $days } days old, so problems in new versions can show up first: { $names }
+confirm-aur-update = Build and install these updates? [y/N]
+settings-aur = AUR
+settings-aur-wait = Wait before AUR updates
+settings-on = on
+settings-off = off
+settings-days = { $days ->
+    [one] { $days } day
+   *[other] { $days } days
+}
+settings-saved = Saved.
+settings-usage = Usage: kura settings [aur on|off] [aur-wait <0–14>]
 gui-installed = Installed
 gui-remove = Remove
 gui-install-title = Install { $name }

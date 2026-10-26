@@ -25,6 +25,17 @@ pub struct Status {
     /// Known vulnerabilities in installed packages.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub security: Vec<Finding>,
+    /// AUR updates past their cooling period.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub aur_updates: usize,
+    /// AUR updates still in their cooling period.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub aur_waiting: usize,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde passes a reference
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 /// What the tray and the overview show, most important first.
@@ -48,7 +59,7 @@ impl Status {
             State::Security
         } else if self.blocked || !self.news.is_empty() {
             State::NeedsAttention
-        } else if self.updates > 0 {
+        } else if self.updates > 0 || self.aur_updates > 0 {
             State::UpdatesReady
         } else {
             State::UpToDate
@@ -68,6 +79,11 @@ mod tests {
             ..Status::default()
         };
         assert_eq!(s.state(), State::UpToDate);
+        s.aur_waiting = 2;
+        assert_eq!(s.state(), State::UpToDate);
+        s.aur_updates = 1;
+        assert_eq!(s.state(), State::UpdatesReady);
+        s.aur_updates = 0;
         s.updates = 3;
         assert_eq!(s.state(), State::UpdatesReady);
         s.news.push("linux needs a manual step".into());

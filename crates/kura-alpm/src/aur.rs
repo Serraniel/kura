@@ -7,14 +7,24 @@
 use std::path::Path;
 use std::process::Command;
 
-use kura_core::aur::{self, Info, Resolution, Satisfied};
+use std::collections::BTreeMap;
+
+use kura_core::aur::{self, Info, Maintainer, Resolution, Satisfied, Update};
 use kura_core::package::InstallReason;
 use kura_core::plan::{AurBuild, Plan, PlanKind, Step};
+use kura_core::settings::Settings;
 
 use crate::Config;
 use crate::prepare::{Outcome, Problem, Request};
 
 pub const BASE_URL: &str = "https://aur.archlinux.org";
+/// When kura first saw each AUR package's current maintainer.
+pub const MAINTAINERS: &str = "/var/lib/kura/aur-maintainers.json";
+
+/// The system-wide settings; defaults when the file is missing.
+pub fn settings() -> Settings {
+    Settings::parse(&std::fs::read_to_string(kura_core::settings::PATH).unwrap_or_default())
+}
 
 /// Names per info request; the AUR accepts long lists, this keeps requests small.
 const BATCH: usize = 100;
@@ -199,15 +209,23 @@ pub fn prepare_install(
         crate::prepare::prepare(conf, workdir, &Request::Dependencies(deps), refresh, &[])?
     };
     if let Ok(plan) = &mut outcome.plan {
+        let installed = crate::installed(conf)?;
         for b in &builds {
             for name in &b.packages {
-                plan.steps.push(Step::Install {
-                    name: name.clone(),
-                    version: b.version.clone(),
-                    reason: if targets.contains(name) {
-                        InstallReason::Explicit
-                    } else {
-                        InstallReason::Dependency
+                plan.steps.push(match installed.get(name) {
+                    Some(old) => Step::Upgrade {
+                        name: name.clone(),
+                        from: old.version.clone(),
+                        to: b.version.clone(),
+                    },
+                    None => Step::Install {
+                        name: name.clone(),
+                        version: b.version.clone(),
+                        reason: if targets.contains(name) {
+                            InstallReason::Explicit
+                        } else {
+                            InstallReason::Dependency
+                        },
                     },
                 });
             }
@@ -215,4 +233,39 @@ pub fn prepare_install(
         plan.builds = builds;
     }
     Ok(outcome)
+}
+
+/// Installed packages that no repository has, with their versions.
+fn foreign(conf: &Config) -> Result<Vec<(String, String)>, crate::Error> {
+    Ok(crate::installed(conf)?
+        .iter()
+        .filter(|p| p.repo.is_none())
+        .map(|p| (p.name.clone(), p.version.clone()))
+        .collect())
+}
+
+/// AUR updates for installed packages, with their cooling period.
+/// With `remember`, maintainer changes are saved (root only).
+pub fn updates(conf: &Config, settings: &Settings, now: i64, remember: bool) -> Result<Vec<Update>, String> {
+    let installed = foreign(conf).map_err(|e| e.to_string())?;
+    if installed.is_empty() {
+        return Ok(Vec::new());
+    }
+    let names: Vec<String> = installed.iter().map(|(n, _)| n.clone()).collect();
+    let infos = info(&names)?;
+    let known: BTreeMap<String, Maintainer> = std::fs::read_to_string(MAINTAINERS)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    let tracked = aur::track_maintainers(&known, &infos, now);
+    if remember && let Ok(json) = serde_json::to_string(&tracked) {
+        let _ = std::fs::write(MAINTAINERS, json);
+    }
+    Ok(aur::updates(
+        &installed,
+        &infos,
+        now,
+        settings.aur_cooling_days,
+        |n| tracked.get(n).map(|m| m.since),
+    ))
 }

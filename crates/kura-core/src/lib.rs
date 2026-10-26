@@ -17,6 +17,7 @@ pub mod news;
 pub mod package;
 pub mod plan;
 pub mod security;
+pub mod settings;
 pub mod snapshots;
 pub mod solver;
 pub mod status;
