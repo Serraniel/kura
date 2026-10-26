@@ -45,7 +45,9 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura doctor` | A short system summary for problem reports. |
 
 The window (`kura-gui`) shows the same status, update preview, history and
-settings. A tray icon (`kura-agent`) tells you when updates are ready or
+settings. It also lets you search for apps and install or remove them, warns
+about security problems and has a system health page: hardware, disk space,
+kernels, snapshots and suggestions. A tray icon (`kura-agent`) tells you when updates are ready or
 something needs attention. A daily background check downloads updates
 without installing them.
 
