@@ -50,6 +50,8 @@ pub mod qobject {
         #[qproperty(bool, failed)]
         #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
         #[qproperty(bool, auto_security, cxx_name = "autoSecurity")]
+        // Repository profiles as JSON: [{"id", "text", "active"}].
+        #[qproperty(QString, profiles_json, cxx_name = "profilesJson")]
         type Kura = super::KuraRust;
     }
 
@@ -124,6 +126,11 @@ pub mod qobject {
         #[cxx_name = "changeAutoSecurity"]
         fn change_auto_security(self: Pin<&mut Kura>, on: bool);
 
+        // Previews adding or taking away a repository profile.
+        #[qinvokable]
+        #[cxx_name = "prepareProfile"]
+        fn prepare_profile(self: Pin<&mut Kura>, id: &QString);
+
         // The anonymised problem report as JSON: {"text", "url"}.
         #[qinvokable]
         #[cxx_name = "problemReport"]
@@ -176,6 +183,7 @@ pub struct KuraRust {
     failed: bool,
     aur_wait: i32,
     auto_security: bool,
+    profiles_json: QString,
     localizer: Localizer,
     pending: Option<Plan>,
 }
@@ -213,6 +221,7 @@ impl Default for KuraRust {
             failed: false,
             aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
             auto_security: kura_alpm::aur::settings().auto_security,
+            profiles_json: QString::from(&profiles_value(&Localizer::from_env()).to_string()),
             localizer: Localizer::from_env(),
             pending: None,
         }
@@ -490,6 +499,38 @@ fn prepare_aur_preview(names: &[String]) -> Result<Prepared, String> {
     })
 }
 
+/// The repository profiles for the settings page.
+fn profiles_value(l: &Localizer) -> Value {
+    Value::Array(
+        kura_core::profiles::ALL
+            .iter()
+            .map(|p| {
+                json!({
+                    "id": p.id,
+                    "text": l.msg(&format!("profile-{}-text", p.id)),
+                    "active": kura_alpm::profiles::is_active(p),
+                })
+            })
+            .collect(),
+    )
+}
+
+/// Runs in a background thread: what adding or taking away a profile changes.
+fn prepare_profile_preview(profile: &'static kura_core::profiles::Profile) -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let plan = kura_alpm::profiles::prepare(&conf, profile).map_err(fail)?;
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    Ok(Prepared {
+        preview: preview_groups(&l, &plan, &apps).to_string(),
+        news: "[]".into(),
+        summary: String::new(),
+        headline: l.msg(&format!("profile-{}-text", profile.id)),
+        plan,
+    })
+}
+
 /// Runs in a background thread: what setting up snapshots would change.
 fn prepare_snapshots_preview() -> Result<Prepared, String> {
     let l = Localizer::from_env();
@@ -630,6 +671,20 @@ impl qobject::Kura {
             &title,
             &label,
         );
+    }
+
+    fn prepare_profile(self: Pin<&mut Self>, id: &QString) {
+        let Some(profile) = kura_core::profiles::find(&id.to_string()) else {
+            return;
+        };
+        let (title, label) = if kura_alpm::profiles::is_active(profile) {
+            ("gui-profile-remove", "gui-remove")
+        } else {
+            ("gui-profile-add", "gui-add")
+        };
+        let title = self.localizer.msg_args(title, &[("name", profile.id.into())]);
+        let label = self.localizer.msg(label);
+        self.start_preview(move || prepare_profile_preview(profile), &title, &label);
     }
 
     fn prepare_snapshots(self: Pin<&mut Self>) {
@@ -865,6 +920,8 @@ impl qobject::Kura {
                 this.as_mut().set_progress_text(QString::default());
                 this.as_mut().set_preview_json(QString::from("[]"));
                 // A changed system needs a fresh preview before anything else.
+                let profiles = profiles_value(&this.localizer).to_string();
+                this.as_mut().set_profiles_json(QString::from(&profiles));
                 if fresh.is_some() {
                     this.as_mut().prepare_update();
                 } else {

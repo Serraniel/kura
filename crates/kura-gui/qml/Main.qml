@@ -552,6 +552,29 @@ Kirigami.ApplicationWindow {
 
                 Kirigami.Separator {
                     Kirigami.FormData.isSection: true
+                    Kirigami.FormData.label: kura.tr("gui-profiles")
+                }
+                Repeater {
+                    model: JSON.parse(kura.profilesJson)
+                    ColumnLayout {
+                        Kirigami.FormData.label: modelData.id + ":"
+                        Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                        Controls.Label {
+                            text: modelData.text
+                            color: Kirigami.Theme.disabledTextColor
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
+                        Controls.Button {
+                            text: modelData.active ? kura.tr("gui-remove") : kura.tr("gui-add")
+                            enabled: !kura.busy
+                            onClicked: { root.show(updatesPage); kura.prepareProfile(modelData.id) }
+                        }
+                    }
+                }
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
                 }
                 Controls.Switch {
                     Kirigami.FormData.label: kura.tr("gui-aur") + ":"
