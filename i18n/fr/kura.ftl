@@ -39,6 +39,7 @@ check-group-cleanup = Plus nécessaires ({ $count })
 check-sizes = Téléchargement : { $download } · Espace disque : { $delta }
 check-preview-only = Rien n’a été modifié. L’installation des mises à jour arrivera dans une version ultérieure de kura.
 check-blocked = La mise à jour ne peut pas être préparée :
+change-blocked = La modification ne peut pas être préparée :
 problem-unsatisfied = { $target } a besoin de { $dependency }, qui n’est plus disponible.
 problem-conflict = { $first } et { $second } ne peuvent pas être installés ensemble.
 problem-arch = Conçu pour un autre type de processeur : { $packages }
@@ -198,6 +199,37 @@ gui-updates-intro = Voici tout ce qui va changer. Rien ne se passe avant que vou
 gui-tray-mono = Icône monochrome dans la zone de notification
 gui-tray-mono-hint = S’accorde avec les autres icônes du tableau de bord.
 gui-last-check = Dernière vérification : { $when }.
+nav-health = État du système
+nav-software = Logiciels
+health-cpu = Processeur
+health-gpu = Carte graphique
+health-memory = Mémoire
+health-disk = Stockage
+health-disk-used = { $used } utilisés sur { $total }
+health-cache = Anciens fichiers de mise à jour : { $size }
+health-kernels = Noyaux
+health-kernel-running = en cours d’utilisation
+health-suggestions = Suggestions
+suggest-backup-kernel = Installer un noyau de secours
+suggest-backup-kernel-text = Si une mise à jour empêche un jour l’ordinateur de démarrer, le noyau de secours peut être choisi dans le menu de démarrage.
+suggest-snapshots = Activer les instantanés automatiques
+suggest-snapshots-text = Votre disque prend en charge les instantanés. Leur configuration arrivera dans une version ultérieure de kura.
+suggest-mirrors = Choisir des serveurs de téléchargement plus rapides
+suggest-mirrors-text = kura teste les serveurs proches et utilise les plus rapides.
+suggest-cleanup =
+    { $count ->
+        [one] Un paquet n’est plus nécessaire
+       *[other] { $count } paquets ne sont plus nécessaires
+    }
+suggest-cleanup-text = Ils seront supprimés lors de la prochaine mise à jour.
+search-placeholder = Rechercher des applications, par exemple « photo » ou « musique »
+search-none = Aucune application trouvée. Essayez un autre mot.
+gui-installed = Installé
+gui-remove = Supprimer
+gui-install-title = Installer { $name }
+gui-remove-title = Supprimer { $name }
+gui-setup = Configurer
+gui-details = Détails
 nav-history = Historique
 nav-settings = Paramètres
 overview-subtitle = Un bref aperçu de cet ordinateur.

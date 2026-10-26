@@ -15,6 +15,7 @@ use std::fs;
 use std::path::Path;
 
 use alpm::{Alpm, PrepareData, TransFlag};
+use kura_core::locale::Locale;
 use kura_core::package::InstallReason;
 use kura_core::plan::{Context, Plan, PlanKind, RemovalReason, Step};
 
@@ -136,11 +137,17 @@ pub(crate) fn open(conf: &Config, workdir: Option<&Path>) -> Result<Alpm, Error>
 }
 
 /// Prepares a request: optionally refreshes the databases, then builds the plan.
+///
+/// `locales` are the user's languages: installs get matching language packs,
+/// and where several packages could satisfy a dependency, the one for the
+/// user's language is chosen. The helper passes none, because an approved
+/// plan already names every package.
 pub fn prepare(
     conf: &Config,
     workdir: Option<&Path>,
     request: &Request,
     refresh: bool,
+    locales: &[Locale],
 ) -> Result<Outcome, Error> {
     let mut handle = open(conf, workdir)?;
     if refresh {
@@ -148,8 +155,20 @@ pub fn prepare(
         handle.syncdbs_mut().update(false)?;
     }
     let available = available_upgrades(&handle);
-    handle.trans_init(flags(request))?;
-    let built = build(&mut handle, request, &available);
+    let request = with_language_packs(&handle, request, locales);
+    let chosen = locales.to_vec();
+    handle.set_question_cb(chosen, |q, locales: &mut Vec<Locale>| {
+        if let alpm::Question::SelectProvider(mut s) = q.question() {
+            let names: Vec<&str> = s.providers().iter().map(|p| p.name()).collect();
+            if let Some(pick) = kura_core::langpacks::pick_provider(&names, locales)
+                && let Some(i) = names.iter().position(|n| *n == pick)
+            {
+                s.set_index(i32::try_from(i).unwrap_or(0));
+            }
+        }
+    });
+    handle.trans_init(flags(&request))?;
+    let built = build(&mut handle, &request, &available);
     handle.trans_release()?;
     let built = built?;
     Ok(Outcome {
@@ -168,8 +187,9 @@ pub fn prepare_with_repair(
     workdir: Option<&Path>,
     request: &Request,
     refresh: bool,
+    locales: &[Locale],
 ) -> Result<(Outcome, Option<kura_core::solver::Repair>), Error> {
-    let outcome = prepare(conf, workdir, request, refresh)?;
+    let outcome = prepare(conf, workdir, request, refresh, locales)?;
     let Err(problems) = &outcome.plan else {
         return Ok((outcome, None));
     };
@@ -196,12 +216,70 @@ pub fn prepare_with_repair(
         return Ok((outcome, None));
     };
     // L1 simulation of the proposal; if it does not work, the original problem stands.
-    let repaired = prepare(conf, workdir, &Request::Repair(repair.remove.clone()), false)?;
+    let repaired = prepare(
+        conf,
+        workdir,
+        &Request::Repair(repair.remove.clone()),
+        false,
+        locales,
+    )?;
     if repaired.plan.is_ok() {
         Ok((repaired, Some(repair)))
     } else {
         Ok((outcome, None))
     }
+}
+
+/// Adds the language pack for each requested package that has one in the
+/// repositories and is not installed yet.
+fn with_language_packs(handle: &Alpm, request: &Request, locales: &[Locale]) -> Request {
+    let Request::Install(names) = request else {
+        return request.clone();
+    };
+    let exists =
+        |n: &str| handle.localdb().pkg(n).is_err() && handle.syncdbs().iter().any(|db| db.pkg(n).is_ok());
+    let mut all = names.clone();
+    for name in names {
+        if let Some(pack) = kura_core::langpacks::for_package(name, locales, exists)
+            && !all.contains(&pack)
+        {
+            all.push(pack);
+        }
+    }
+    Request::Install(all)
+}
+
+/// Marks `names` for removal. Returns the problem if one is not installed.
+fn add_removals<'a>(
+    handle: &Alpm,
+    names: &'a [String],
+    explicit: &mut BTreeSet<&'a str>,
+) -> Result<Option<Problem>, Error> {
+    for name in names {
+        let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
+            return Ok(Some(Problem::NotFound { name: name.clone() }));
+        };
+        handle.trans_remove_pkg(pkg)?;
+        explicit.insert(name);
+    }
+    Ok(None)
+}
+
+/// Installed language packs that depend on one of `names`.
+fn packs_of<'h>(handle: &'h Alpm, names: &[String]) -> Vec<&'h alpm::Package> {
+    handle
+        .localdb()
+        .pkgs()
+        .into_iter()
+        .filter(|p| !names.iter().any(|n| n == p.name()))
+        .filter(|p| {
+            p.depends().into_iter().any(|d| {
+                names
+                    .iter()
+                    .any(|n| n == d.name() && kura_core::langpacks::is_pack_of(n, p.name()))
+            })
+        })
+        .collect()
 }
 
 pub(crate) fn flags(request: &Request) -> TransFlag {
@@ -260,21 +338,17 @@ pub(crate) fn build(
         }
         Request::Repair(names) => {
             handle.sync_sysupgrade(false)?;
-            for name in names {
-                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
-                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
-                };
-                handle.trans_remove_pkg(pkg)?;
-                explicit.insert(name);
+            if let Some(problem) = add_removals(handle, names, &mut explicit)? {
+                return Ok(blocked(vec![problem]));
             }
         }
         Request::Remove(names) => {
-            for name in names {
-                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
-                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
-                };
+            if let Some(problem) = add_removals(handle, names, &mut explicit)? {
+                return Ok(blocked(vec![problem]));
+            }
+            // Language packs that need a removed package go with it.
+            for pkg in packs_of(handle, names) {
                 handle.trans_remove_pkg(pkg)?;
-                explicit.insert(name);
             }
         }
     }

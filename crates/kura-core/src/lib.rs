@@ -5,7 +5,10 @@
 //! can be tested without root or a pacman database.
 
 pub mod generation;
+pub mod hardware;
+pub mod health;
 pub mod history;
+pub mod langpacks;
 pub mod locale;
 pub mod mirrors;
 pub mod news;

@@ -134,9 +134,14 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let config = kura_alpm::load_config().map_err(fail)?;
     let refresh = !matches!(request, Request::Remove(_));
-    let (outcome, repair) =
-        kura_alpm::prepare::prepare_with_repair(&config, Some(&check_dir()), request, refresh)
-            .map_err(fail)?;
+    let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
+        &config,
+        Some(&check_dir()),
+        request,
+        refresh,
+        &user_locales(),
+    )
+    .map_err(fail)?;
     if let Some(repair) = &repair {
         say(&format!(
             "{}\n{}\n",
@@ -146,7 +151,12 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     }
     let mut plan = match &outcome.plan {
         Err(problems) => {
-            let mut out = l.msg("check-blocked") + "\n";
+            let id = if matches!(request, Request::Update) {
+                "check-blocked"
+            } else {
+                "change-blocked"
+            };
+            let mut out = l.msg(id) + "\n";
             for p in problems {
                 let _ = writeln!(out, "  {}", problem_text(l, p));
             }
@@ -256,14 +266,14 @@ fn confirm(l: &Localizer, question_id: &str) -> bool {
     !answer.is_empty() && (answer.starts_with(&l.msg("confirm-yes")) || answer.starts_with('y'))
 }
 
-/// Prints progress events, one line per package and phase.
+/// Prints progress events, each line once. Parallel downloads report the
+/// same file many times.
 fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
-    let mut last = String::new();
+    let mut seen = BTreeSet::new();
     move |event| {
         let line = kura_helper::text::event(l, &event);
-        if line != last {
+        if seen.insert(line.clone()) {
             say(&line);
-            last = line;
         }
     }
 }
@@ -409,7 +419,7 @@ fn undo(l: &Localizer, arg: Option<&str>) -> Result<String, String> {
     let config = kura_alpm::load_config().map_err(fail)?;
     let generation = journal.generation(target).ok_or_else(unknown)?;
     if let Err(problems) = kura_alpm::restore::sources(&config.cache_dir, &plan, &generation) {
-        let mut out = l.msg("check-blocked") + "\n";
+        let mut out = l.msg("change-blocked") + "\n";
         for p in &problems {
             let _ = writeln!(out, "  {}", problem_text(l, p));
         }
@@ -538,4 +548,9 @@ fn sbom(l: &Localizer, output: Option<&str>) -> Result<String, String> {
             Ok(l.msg_args("sbom-written", &[("path", path.to_owned().into())]) + "\n")
         }
     }
+}
+
+/// The user's languages, most preferred first.
+fn user_locales() -> Vec<kura_core::locale::Locale> {
+    kura_core::locale::Locale::from_env_vars(|k| std::env::var(k).ok())
 }
