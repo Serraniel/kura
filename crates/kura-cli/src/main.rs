@@ -85,6 +85,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("history") => kura_helper::report::history(l),
         Some("doctor") => kura_helper::report::summary(l),
         Some("search") if !names.is_empty() => search(l, &names.join(" ")),
+        Some("info") if names.len() == 1 => info(l, &names[0]),
         Some("snapshots") => match names.first().map(String::as_str) {
             None => snapshots(l, false),
             Some("setup") => snapshots(l, true),
@@ -860,6 +861,66 @@ fn reinstall(l: &Localizer, names: Vec<String>) -> Result<String, String> {
         Reply::Done => Ok(l.msg("apply-done") + "\n"),
         other => Err(kura_helper::text::reply(l, &other)),
     }
+}
+
+/// Details about one package: from the repositories, or from the AUR with
+/// everything that helps decide whether to trust it.
+fn info(l: &Localizer, name: &str) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let set = load(l)?;
+    let installed = set.get(name).map(|p| p.version.clone());
+    let mut rows: Vec<(String, String)> = Vec::new();
+    if let Some(hit) = kura_alpm::system::search(&conf, name, 50)
+        .map_err(fail)?
+        .into_iter()
+        .find(|h| h.name == name)
+    {
+        rows.push((l.msg("info-source"), hit.repo.clone()));
+        rows.push((l.msg("info-version"), hit.version.clone()));
+        rows.push((l.msg("info-description"), hit.description.clone()));
+    } else if kura_alpm::aur::settings().aur {
+        let found = kura_alpm::aur::info(&[name.to_owned()])
+            .map_err(|reason| l.msg_args("search-aur-failed", &[("reason", reason.into())]))?;
+        let Some(i) = found.into_iter().next() else {
+            return Err(l.msg_args("problem-not-found", &[("name", name.into())]) + "\n");
+        };
+        let now = kura_alpm::background::now();
+        let day = |t: i64| kura_i18n::present::when(l, t, now);
+        rows.push((l.msg("info-source"), "AUR".into()));
+        rows.push((l.msg("info-version"), i.version.clone()));
+        rows.push((
+            l.msg("info-description"),
+            i.description.clone().unwrap_or_default(),
+        ));
+        rows.push((l.msg("info-signals"), kura_i18n::present::aur_signals(l, &i, now)));
+        rows.push((l.msg("info-popularity"), format!("{:.2}", i.popularity)));
+        rows.push((
+            l.msg("info-maintainer"),
+            i.maintainer.clone().unwrap_or_else(|| l.msg("aur-orphaned")),
+        ));
+        rows.push((l.msg("info-first"), day(i.first_submitted)));
+        rows.push((l.msg("info-changed"), day(i.last_modified)));
+        if let Some(url) = &i.url {
+            rows.push((l.msg("info-website"), url.clone()));
+        }
+        rows.push((
+            l.msg("info-files"),
+            format!("{}/packages/{}", kura_alpm::aur::BASE_URL, i.name),
+        ));
+    } else {
+        return Err(l.msg_args("problem-not-found", &[("name", name.into())]) + "\n");
+    }
+    if let Some(v) = installed {
+        rows.push((l.msg("gui-installed"), v));
+    }
+    let width = rows.iter().map(|(k, _)| k.chars().count()).max().unwrap_or(0);
+    let mut out = format!("{name}\n\n");
+    for (k, v) in rows {
+        let pad = width - k.chars().count();
+        let _ = writeln!(out, "  {k}{}  {v}", " ".repeat(pad));
+    }
+    Ok(out)
 }
 
 /// Searches the repositories, then the AUR.

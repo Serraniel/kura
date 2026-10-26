@@ -19,6 +19,7 @@ cli-usage =
       search     Chercher des applications dans les dépôts et l'AUR : kura search <mot>
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
+      info       Détails d'un paquet, avec les signaux de confiance pour l'AUR : kura info <nom>
       kernels    Afficher les noyaux, en ajouter ou en retirer : kura kernels [add|remove <nom>]
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
       report     Afficher un rapport de problème et, si vous le souhaitez, l'ouvrir sur GitHub : kura report [ce qui s'est passé]
@@ -325,6 +326,16 @@ aur-votes = { $count ->
 aur-new = nouveau
 aur-orphaned = sans mainteneur
 aur-out-of-date = signalé comme obsolète
+info-source = Provient de
+info-version = Version
+info-description = Description
+info-signals = Votes et avertissements
+info-popularity = Popularité
+info-maintainer = Mainteneur
+info-first = Premier envoi
+info-changed = Dernière modification
+info-website = Site web
+info-files = Fichiers de compilation
 aur-mixed = Certains viennent de l'AUR. Installez-les séparément : kura install { $names }
 aur-build-list = Compilé sur cet ordinateur depuis l'AUR :
 aur-notice = Les paquets de l'AUR sont partagés par d'autres utilisateurs et ne sont pas vérifiés par Arch Linux. kura les compile dans un environnement séparé et restreint.
