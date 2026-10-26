@@ -44,6 +44,12 @@ pub enum Event {
     UpdatingKeyring,
     /// A change that is not a package change.
     Configuring { action: kura_core::action::Action },
+    /// An AUR package base is being built.
+    Building {
+        base: String,
+        current: usize,
+        total: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -148,6 +154,18 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
         // Restores and snapshot setups have their own way in; see
         // `apply_restore` and `kura_alpm::snapshots`.
         PlanKind::Restore { .. } | PlanKind::Snapshots => None,
+        // The repository part only; AUR packages are built and installed afterwards.
+        PlanKind::AurInstall => Some(Request::Dependencies(
+            plan.steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Install { name, .. } if !plan.builds.iter().any(|b| b.packages.contains(name)) => {
+                        Some(name.clone())
+                    }
+                    _ => None,
+                })
+                .collect(),
+        )),
     }
 }
 
@@ -291,6 +309,7 @@ fn without(plan: &Plan, names: &[String]) -> Plan {
             .cloned()
             .collect(),
         actions: plan.actions.clone(),
+        builds: plan.builds.clone(),
     }
 }
 
@@ -517,6 +536,45 @@ fn cleanup(handle: &mut Alpm, plan: &Plan, events: &Sender<Event>) -> Result<(),
     result
 }
 
+/// Installs package files kura-helper built itself, then sets each
+/// package's install reason. Signatures follow pacman's `LocalFileSigLevel`.
+pub fn install_files(
+    conf: &Config,
+    files: &[std::path::PathBuf],
+    reasons: &[(String, kura_core::package::InstallReason)],
+    events: &Sender<Event>,
+) -> Result<(), ApplyError> {
+    if !crate::is_root() {
+        return Err(ApplyError::NotRoot);
+    }
+    let mut handle = crate::handle(conf)?;
+    install_callbacks(&handle, &Plan::new(kura_core::plan::PlanKind::AurInstall), events);
+    with_trans(&mut handle, alpm::TransFlag::NONE, |h| {
+        let level = h.local_file_siglevel();
+        for path in files {
+            let shown = path.display();
+            let pkg = h
+                .pkg_load(path.to_string_lossy().as_bytes(), true, level)
+                .map_err(|e| ApplyError::Failed(format!("{shown}: {e}")))?;
+            h.trans_add_pkg(pkg)
+                .map_err(|e| ApplyError::Failed(e.to_string()))?;
+        }
+        h.trans_prepare()
+            .map_err(|e| ApplyError::Blocked(crate::prepare::problems(&e)))?;
+        commit(h)
+    })?;
+    for (name, reason) in reasons {
+        if let Ok(pkg) = handle.localdb().pkg(name.as_str()) {
+            let reason = match reason {
+                kura_core::package::InstallReason::Explicit => alpm::PackageReason::Explicit,
+                kura_core::package::InstallReason::Dependency => alpm::PackageReason::Depend,
+            };
+            pkg.set_reason(reason)?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use kura_core::package::InstallReason;
@@ -538,11 +596,13 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         let b = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         a.add_cleanup([("electron36", "36")]);
         assert!(same_change(&a, &b));
@@ -550,12 +610,14 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "3")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert!(!same_change(&a, &c));
         let d = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2"), up("mesa", "2")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert!(!same_change(&a, &d));
     }
@@ -570,6 +632,7 @@ mod tests {
                 up("endeavouros-keyring", "3"),
             ],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         let keys = keyring_upgrades(&plan);
         assert_eq!(keys, ["archlinux-keyring", "endeavouros-keyring"]);
@@ -591,6 +654,7 @@ mod tests {
                 })
                 .collect(),
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         let a = rm(&[
             ("gimp", RemovalReason::Requested),
@@ -619,6 +683,7 @@ mod tests {
                 up("mesa", "2"),
             ],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(request_for(&install), Some(Request::Install(vec!["gimp".into()])));
         let remove = Plan {
@@ -636,6 +701,7 @@ mod tests {
                 },
             ],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(request_for(&remove), Some(Request::Remove(vec!["gimp".into()])));
         assert_eq!(

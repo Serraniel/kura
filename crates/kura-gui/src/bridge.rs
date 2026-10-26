@@ -819,6 +819,7 @@ mod tests {
                 },
             ],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         plan.add_cleanup([("electron36", "36")]);
         let apps = BTreeSet::from(["firefox".to_owned()]);

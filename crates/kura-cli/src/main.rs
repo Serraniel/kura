@@ -75,7 +75,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         }
         Some("undo") => undo(l, names.first().map(String::as_str)),
         Some("update") => change(l, &Request::Update, "confirm-update"),
-        Some("install") if !names.is_empty() => change(l, &Request::Install(names), "confirm-install"),
+        Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => history(l),
         Some("doctor") => doctor(l),
@@ -372,6 +372,57 @@ fn confirm_and_apply(
             other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
+}
+
+/// Installs from the repositories; names they do not know come from the AUR.
+fn install(l: &Localizer, names: Vec<String>) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let mut aur = Vec::new();
+    for name in &names {
+        if !kura_alpm::in_repos(&conf, name).map_err(fail)? {
+            aur.push(name.clone());
+        }
+    }
+    if aur.is_empty() {
+        return change(l, &Request::Install(names), "confirm-install");
+    }
+    if aur.len() != names.len() {
+        return Err(l.msg_args("aur-mixed", &[("names", aur.join(" ").into())]) + "\n");
+    }
+    eprintln!("{}", l.msg("check-running"));
+    let check = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let outcome = kura_alpm::aur::prepare_install(&conf, Some(&check_dir()), &aur, true).map_err(check)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => {
+            let mut out = l.msg("change-blocked") + "\n";
+            for p in problems {
+                let _ = writeln!(out, "  {}", problem_text(l, p));
+            }
+            return Err(out);
+        }
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    let now = kura_alpm::background::now();
+    let mut text = format!(
+        "{}\n{}",
+        l.msg("preview-title"),
+        render(l, &plan, Some(&outcome), &apps)
+    );
+    let _ = writeln!(text, "\n{}", l.msg("aur-build-list"));
+    let infos = kura_alpm::aur::info(&aur).unwrap_or_default();
+    for b in &plan.builds {
+        let signals = infos
+            .iter()
+            .find(|i| i.package_base == b.base)
+            .map(|i| format!("  ({})", kura_i18n::present::aur_signals(l, i, now)))
+            .unwrap_or_default();
+        let _ = writeln!(text, "  {} {}{signals}", b.base, b.version);
+    }
+    let _ = writeln!(text, "\n{}", l.msg("aur-notice"));
+    say(&text);
+    confirm_and_apply(l, plan, &outcome, &apps, "confirm-aur")
 }
 
 /// Searches the repositories, then the AUR.

@@ -4,11 +4,15 @@
 //! The AUR through its RPC interface and git's HTTP refs, both with curl.
 //! Reads only.
 
+use std::path::Path;
 use std::process::Command;
 
 use kura_core::aur::{self, Info, Resolution, Satisfied};
+use kura_core::package::InstallReason;
+use kura_core::plan::{AurBuild, Plan, PlanKind, Step};
 
 use crate::Config;
+use crate::prepare::{Outcome, Problem, Request};
 
 pub const BASE_URL: &str = "https://aur.archlinux.org";
 
@@ -104,4 +108,111 @@ pub fn resolve(conf: &Config, targets: &[String]) -> Result<Resolution, crate::E
         }
     };
     Ok(aur::resolve(targets, fetch_with_providers, satisfied))
+}
+
+/// Bases in an order where each comes after everything in its `after`.
+fn ordered(res: &Resolution) -> Vec<String> {
+    let mut done = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    loop {
+        let next: Vec<String> = aur::ready(&res.builds, &done, &done)
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        if next.is_empty() {
+            return out;
+        }
+        done.extend(next.iter().cloned());
+        out.extend(next);
+    }
+}
+
+/// Plans installing packages from the AUR: the repository dependencies
+/// together with the full update, then the AUR package bases, each pinned
+/// to the commit it has right now.
+///
+/// `base-devel` is added when it is missing, because every build needs it.
+pub fn prepare_install(
+    conf: &Config,
+    workdir: Option<&Path>,
+    targets: &[String],
+    refresh: bool,
+) -> Result<Outcome, crate::Error> {
+    let blocked = |problems| Outcome {
+        plan: Err(problems),
+        available: Vec::new(),
+        download_size: 0,
+        installed_delta: 0,
+    };
+    let res = resolve(conf, targets)?;
+    if !res.missing.is_empty() {
+        return Ok(blocked(
+            res.missing
+                .iter()
+                .map(|(by, dep)| {
+                    if by.is_empty() {
+                        Problem::NotFound { name: dep.clone() }
+                    } else {
+                        Problem::UnsatisfiedDependency {
+                            target: by.clone(),
+                            dependency: dep.clone(),
+                            causing: None,
+                        }
+                    }
+                })
+                .collect(),
+        ));
+    }
+    let circle = aur::cycle(&res.builds);
+    if !circle.is_empty() {
+        return Ok(blocked(vec![Problem::Other {
+            message: format!("AUR packages need each other: {}", circle.join(", ")),
+        }]));
+    }
+    let mut builds = Vec::new();
+    for base in ordered(&res) {
+        let build = &res.builds[&base];
+        let commit = head_commit(&base).map_err(crate::Error::Config)?;
+        builds.push(AurBuild {
+            base: base.clone(),
+            commit,
+            version: build.version.clone(),
+            packages: build.packages.iter().cloned().collect(),
+            after: build.after.iter().cloned().collect(),
+        });
+    }
+
+    let mut deps: Vec<String> = res.repo_deps.iter().cloned().collect();
+    let handle = crate::handle(conf)?;
+    if handle.localdb().pkg("base-devel").is_err() {
+        deps.push("base-devel".into());
+    }
+    drop(handle);
+    let mut outcome = if deps.is_empty() {
+        Outcome {
+            plan: Ok(Plan::new(PlanKind::AurInstall)),
+            available: Vec::new(),
+            download_size: 0,
+            installed_delta: 0,
+        }
+    } else {
+        crate::prepare::prepare(conf, workdir, &Request::Dependencies(deps), refresh, &[])?
+    };
+    if let Ok(plan) = &mut outcome.plan {
+        for b in &builds {
+            for name in &b.packages {
+                plan.steps.push(Step::Install {
+                    name: name.clone(),
+                    version: b.version.clone(),
+                    reason: if targets.contains(name) {
+                        InstallReason::Explicit
+                    } else {
+                        InstallReason::Dependency
+                    },
+                });
+            }
+        }
+        plan.builds = builds;
+    }
+    Ok(outcome)
 }

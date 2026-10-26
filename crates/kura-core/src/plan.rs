@@ -29,6 +29,8 @@ pub enum PlanKind {
     Repair,
     /// Set up snapshots before updates: packages plus actions.
     Snapshots,
+    /// Build packages from the AUR and install them.
+    AurInstall,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +94,21 @@ pub struct Plan {
     /// Changes that are not package changes; they run after the packages.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<Action>,
+    /// AUR package bases to build, in an order that respects `after`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub builds: Vec<AurBuild>,
+}
+
+/// One AUR package base, pinned to the commit the preview showed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AurBuild {
+    pub base: String,
+    pub commit: String,
+    pub version: String,
+    /// Packages of this base to install.
+    pub packages: Vec<String>,
+    /// Bases that are built and installed first.
+    pub after: Vec<String>,
 }
 
 /// Facts about the system that a plan is checked against.
@@ -135,6 +152,7 @@ impl Plan {
             kind,
             steps: Vec::new(),
             actions: Vec::new(),
+            builds: Vec::new(),
         }
     }
 
@@ -166,6 +184,7 @@ impl Plan {
             kind,
             steps,
             actions: Vec::new(),
+            builds: Vec::new(),
         }
     }
 
@@ -182,7 +201,7 @@ impl Plan {
 
     /// Checks the rules every plan must follow.
     pub fn validate(&self, ctx: &Context) -> Result<(), PlanError> {
-        if self.steps.is_empty() && self.actions.is_empty() {
+        if self.steps.is_empty() && self.actions.is_empty() && self.builds.is_empty() {
             return Err(PlanError::Empty);
         }
         let mut seen = BTreeSet::new();
@@ -198,7 +217,11 @@ impl Plan {
         // upgrading everything is a partial upgrade.
         if matches!(
             self.kind,
-            PlanKind::SystemUpdate | PlanKind::Install | PlanKind::Repair | PlanKind::Snapshots
+            PlanKind::SystemUpdate
+                | PlanKind::Install
+                | PlanKind::Repair
+                | PlanKind::Snapshots
+                | PlanKind::AurInstall
         ) {
             let upgraded: BTreeSet<&str> = self
                 .steps
@@ -288,6 +311,7 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox"), up("mesa")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(plan.validate(&ctx(&["firefox", "mesa"])), Ok(()));
     }
@@ -298,6 +322,7 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(
             plan.validate(&ctx(&["firefox", "mesa"])),
@@ -311,6 +336,7 @@ mod tests {
                 reason: InstallReason::Explicit,
             }],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert!(matches!(
             install.validate(&ctx(&["mesa"])),
@@ -333,6 +359,7 @@ mod tests {
                 },
             ],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(plan.validate(&c), Ok(()));
     }
@@ -347,6 +374,7 @@ mod tests {
                 kind: PlanKind::SystemUpdate,
                 steps: vec![up("x")],
                 actions: Vec::new(),
+                builds: Vec::new(),
             };
             assert_eq!(plan.validate(&c), Err(PlanError::CannotHold(name.into())));
         }
@@ -376,6 +404,7 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("a"), up("a")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         assert_eq!(plan.validate(&ctx(&["a"])), Err(PlanError::Duplicate("a".into())));
     }
@@ -425,6 +454,7 @@ mod tests {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox"), up("mesa")],
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         plan.add_cleanup([("electron36", "36.9.0-1")]);
         let is_app = |p: &str| p == "firefox";
