@@ -482,6 +482,11 @@ fn doctor(l: &Localizer) -> Result<String, String> {
     let (name, _) = os_release();
     let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
     let foreign = set.iter().filter(|p| p.repo.is_none()).count();
+    let conf = kura_alpm::load_config()
+        .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))?;
+    let mounts = std::fs::read_to_string("/proc/mounts").unwrap_or_default();
+    let report = kura_alpm::system::snapshot_report(&conf, &set, &mounts);
+    let (snapshot_state, missing) = kura_i18n::present::snapshots(l, &report);
     let rows = [
         (l.msg("doctor-distro"), name),
         (l.msg("doctor-packages"), set.len().to_string()),
@@ -489,12 +494,19 @@ fn doctor(l: &Localizer) -> Result<String, String> {
         (l.msg("doctor-foreign"), foreign.to_string()),
         (l.msg("doctor-orphans"), set.orphans().len().to_string()),
         (l.msg("doctor-language"), l.language()),
+        (l.msg("health-snapshots"), snapshot_state.clone()),
     ];
     let width = rows.iter().map(|(k, _)| k.chars().count()).max().unwrap_or(0);
     let mut out = format!("{}\n\n", l.msg("doctor-title"));
     for (k, v) in rows {
         let pad = width - k.chars().count();
         let _ = writeln!(out, "  {k}{}  {v}", " ".repeat(pad));
+    }
+    if !missing.is_empty() {
+        let _ = writeln!(out, "\n{}", l.msg("snapshots-missing"));
+        for step in missing {
+            let _ = writeln!(out, "  {step}");
+        }
     }
     Ok(out)
 }

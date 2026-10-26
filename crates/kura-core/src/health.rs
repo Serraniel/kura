@@ -10,8 +10,8 @@ pub struct Facts {
     pub kernels: Vec<String>,
     /// File system of `/`, for example `btrfs`.
     pub root_fs: String,
-    /// Snapper is installed and has a configuration for `/`.
-    pub snapper: bool,
+    /// Snapshots are taken before updates and nothing is missing for that.
+    pub snapshots: bool,
     /// Packages nothing needs any more.
     pub orphans: usize,
     /// kura chose the download servers.
@@ -55,7 +55,7 @@ pub fn suggestions(facts: &Facts) -> Vec<Suggestion> {
     {
         out.push(Suggestion::BackupKernel);
     }
-    if facts.root_fs == "btrfs" && !facts.snapper {
+    if facts.root_fs == "btrfs" && !facts.snapshots {
         out.push(Suggestion::Snapshots);
     }
     if !facts.mirrors_ranked {
@@ -76,7 +76,7 @@ mod tests {
         let facts = Facts {
             kernels: vec!["linux".into(), "linux-zen".into()],
             root_fs: "btrfs".into(),
-            snapper: false,
+            snapshots: false,
             orphans: 39,
             mirrors_ranked: false,
         };
@@ -96,14 +96,14 @@ mod tests {
         let facts = Facts {
             kernels: vec!["linux".into(), "linux-lts".into()],
             root_fs: "ext4".into(),
-            snapper: false,
+            snapshots: false,
             orphans: 0,
             mirrors_ranked: true,
         };
         assert_eq!(suggestions(&facts), Vec::<Suggestion>::new());
         let snap = Facts {
             root_fs: "btrfs".into(),
-            snapper: true,
+            snapshots: true,
             ..facts
         };
         assert_eq!(suggestions(&snap), Vec::<Suggestion>::new());
