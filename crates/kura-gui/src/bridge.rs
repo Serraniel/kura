@@ -281,9 +281,22 @@ fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value 
             "items": steps.iter().map(|s| json!({"name": s.package(), "detail": present::step_detail(s)})).collect::<Vec<_>>(),
         })
     };
+    let reinstall = |s: &&&Step| {
+        matches!(
+            s,
+            Step::Remove {
+                why: RemovalReason::Reinstall,
+                ..
+            }
+        )
+    };
+    let again: Vec<&Step> = plan.steps.iter().filter(|s| reinstall(&s)).collect();
+    let apps: Vec<&Step> = groups.apps.iter().copied().filter(|s| !reinstall(&s)).collect();
+    let system: Vec<&Step> = system.into_iter().filter(|s| !reinstall(&s)).collect();
     let all = [
-        ("check-group-apps", groups.apps.as_slice()),
+        ("check-group-apps", apps.as_slice()),
         ("check-group-system", system.as_slice()),
+        ("check-group-reinstall", again.as_slice()),
         ("check-group-replaced", replaced.as_slice()),
         ("check-group-cleanup", groups.cleanup.as_slice()),
     ];
@@ -1038,6 +1051,19 @@ impl qobject::Kura {
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
         let qt = self.qt_thread();
+        // Apps a repair removed come back right after the update.
+        let again: Vec<String> = plan
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                Step::Remove {
+                    name,
+                    why: RemovalReason::Reinstall,
+                    ..
+                } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
         // After a profile with optimised builds changes, the switch follows.
         let switch_after = (plan.kind == kura_core::plan::PlanKind::Profile)
             .then(|| kura_core::profiles::known(&plan.actions))
@@ -1076,6 +1102,17 @@ impl qobject::Kura {
                 this.as_mut().set_progress_text(QString::default());
                 this.as_mut().set_preview_json(QString::from("[]"));
                 // A changed system needs a fresh preview before anything else.
+                if !failed && !again.is_empty() {
+                    let title = this.localizer.msg("reinstall-now");
+                    let label = this.localizer.msg("gui-install");
+                    let names = again.clone();
+                    this.as_mut().start_preview(
+                        move || prepare_preview(&Request::Install(names)),
+                        &title,
+                        &label,
+                    );
+                    return;
+                }
                 let profiles = profiles_value(&this.localizer).to_string();
                 this.as_mut().set_profiles_json(QString::from(&profiles));
                 if let Some(back) = switch_after.filter(|_| !failed) {

@@ -182,8 +182,21 @@ fn render(l: &Localizer, plan: &Plan, outcome: Option<&Outcome>, apps: &BTreeSet
             }
         )
     });
-    section("check-group-apps", &groups.apps);
+    let reinstall = |s: &&&Step| {
+        matches!(
+            s,
+            Step::Remove {
+                why: RemovalReason::Reinstall,
+                ..
+            }
+        )
+    };
+    let again: Vec<&Step> = plan.steps.iter().filter(|s| reinstall(&s)).collect();
+    let apps: Vec<&Step> = groups.apps.iter().copied().filter(|s| !reinstall(&s)).collect();
+    let system: Vec<&Step> = system.into_iter().filter(|s| !reinstall(&s)).collect();
+    section("check-group-apps", &apps);
     section("check-group-system", &system);
+    section("check-group-reinstall", &again);
     section("check-group-replaced", &replaced);
     section("check-group-cleanup", &groups.cleanup);
     if !plan.actions.is_empty() {
@@ -389,7 +402,26 @@ fn confirm_and_apply(
         let reply = kura_helper::apply(&plan, progress_printer(l))
             .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
         match reply {
-            Reply::Done => return Ok(l.msg("apply-done") + "\n"),
+            Reply::Done => {
+                // A repair removed apps that come back right after the update.
+                let again: Vec<String> = plan
+                    .steps
+                    .iter()
+                    .filter_map(|s| match s {
+                        Step::Remove {
+                            name,
+                            why: RemovalReason::Reinstall,
+                            ..
+                        } => Some(name.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                if again.is_empty() {
+                    return Ok(l.msg("apply-done") + "\n");
+                }
+                say(&l.msg("reinstall-now"));
+                return reinstall(l, again);
+            }
             Reply::Changed { plan: fresh } => {
                 plan = fresh;
                 say(&format!(
@@ -811,6 +843,19 @@ fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
         .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
     match reply {
         Reply::Done => Ok(l.msg("settings-saved") + "\n"),
+        other => Err(kura_helper::text::reply(l, &other)),
+    }
+}
+
+/// Installs again what a confirmed repair removed, without asking a second
+/// time: the user approved it with the update.
+fn reinstall(l: &Localizer, names: Vec<String>) -> Result<String, String> {
+    let (plan, outcome, apps) = prepare(l, &Request::Install(names))?;
+    say(&render(l, &plan, Some(&outcome), &apps));
+    let reply = kura_helper::apply(&plan, progress_printer(l))
+        .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+    match reply {
+        Reply::Done => Ok(l.msg("apply-done") + "\n"),
         other => Err(kura_helper::text::reply(l, &other)),
     }
 }
