@@ -30,7 +30,7 @@ Kirigami.ApplicationWindow {
 
     globalDrawer: Kirigami.GlobalDrawer {
         title: "kura"
-        titleIcon: "kura"
+        titleIcon: "qrc:/kura/kura.svg"
         modal: !root.wideScreen
         collapsible: false
         isMenu: false
@@ -64,8 +64,44 @@ Kirigami.ApplicationWindow {
                 text: kura.tr("nav-settings")
                 icon.name: "settings-configure"
                 onTriggered: root.show(settingsPage)
+            },
+            Kirigami.Action {
+                text: kura.tr("gui-log")
+                icon.name: "utilities-terminal"
+                checkable: true
+                checked: kura.showLog
+                shortcut: "F4"
+                onTriggered: kura.toggleLog()
             }
         ]
+    }
+
+    // The details panel: a read-only record of what kura does, like
+    // Dolphin's terminal panel. It takes room from the pages, never grows
+    // the window.
+    footer: ColumnLayout {
+        visible: kura.showLog
+        spacing: 0
+        Kirigami.Separator {
+            Layout.fillWidth: true
+        }
+        Controls.ScrollView {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 8
+            Controls.TextArea {
+                id: logArea
+                text: kura.logText.length > 0 ? kura.logText : kura.tr("gui-log-empty")
+                readOnly: true
+                selectByMouse: true
+                wrapMode: Text.NoWrap
+                font.family: "monospace"
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                background: Rectangle {
+                    color: Kirigami.Theme.backgroundColor
+                }
+                onTextChanged: cursorPosition = length
+            }
+        }
     }
 
     pageStack.initialPage: overviewPage

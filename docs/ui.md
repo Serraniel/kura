@@ -9,7 +9,12 @@ goes through the translation files.
 - The window keeps the size the user gives it. Navigating never resizes it;
   pages scroll inside the window.
 - Left: navigation (Kirigami global drawer). Right: the page.
-- Colours, fonts and icons come from the desktop theme. kura sets none.
+- Colours, fonts and icons come from the desktop theme. kura sets none,
+  except its own logo, which is built in so it shows even without the
+  installed icon.
+- Bottom, opt-in (F4 or "Show details"): a read-only panel with what kura
+  does, line by line, like Dolphin's terminal panel. It takes room from the
+  page; the window does not grow. The choice is remembered.
 
 ## Pages
 

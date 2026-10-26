@@ -784,6 +784,7 @@ dependencies = [
  "kura-core",
  "kura-helper",
  "kura-i18n",
+ "qt-build-utils",
  "serde_json",
 ]
 
