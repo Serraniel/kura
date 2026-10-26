@@ -347,6 +347,13 @@ Kirigami.ApplicationWindow {
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
+                            Controls.Label {
+                                visible: modelData.aur
+                                text: "AUR · " + (modelData.signals || "")
+                                color: Kirigami.Theme.neutralTextColor
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
                         }
                         Controls.Button {
                             text: modelData.installed ? kura.tr("gui-remove") : kura.tr("gui-install")
@@ -472,6 +479,42 @@ Kirigami.ApplicationWindow {
                     text: kura.tr("gui-tray-mono-hint")
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
+                }
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                }
+                Controls.Switch {
+                    Kirigami.FormData.label: kura.tr("gui-aur") + ":"
+                    checked: kura.aurEnabled
+                    onToggled: kura.changeAur(checked)
+                }
+                Controls.Label {
+                    text: kura.tr("gui-aur-hint")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+                Controls.SpinBox {
+                    Kirigami.FormData.label: kura.tr("settings-aur-wait") + ":"
+                    enabled: kura.aurEnabled
+                    from: 0
+                    to: 14
+                    value: kura.aurWait
+                    textFromValue: function (v) { return kura.trDays(v) }
+                    onValueModified: kura.changeAurWait(value)
+                }
+                Controls.Label {
+                    text: kura.tr("gui-aur-wait-hint")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: kura.message.length > 0
+                    type: Kirigami.MessageType.Warning
+                    text: kura.message
                 }
             }
         }
