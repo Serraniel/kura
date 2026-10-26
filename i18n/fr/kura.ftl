@@ -8,6 +8,7 @@ cli-usage =
     Utilisation : kura <commande>
 
     Commandes :
+      bundles    Ensembles d'applications avec leurs réglages : kura bundles [add <nom>]
       check      Rechercher des mises à jour et montrer ce qui changerait
       doctor     Afficher un résumé de ce système pour les rapports de problème
       history    Afficher les états enregistrés du système
@@ -216,6 +217,7 @@ gui-aur = Logiciels de l'AUR
 gui-aur-hint = L'AUR contient des logiciels partagés par d'autres utilisateurs. Arch Linux ne les vérifie pas. kura les compile sur cet ordinateur dans un environnement séparé et restreint.
 gui-aur-wait-hint = Les nouvelles versions de l'AUR attendent ce délai avant que kura les installe, pour que les problèmes apparaissent d'abord. Installer une application à la main prend toujours la version la plus récente.
 gui-profiles = Dépôts supplémentaires
+gui-bundles = Ensembles prêts à l'emploi
 gui-add = Ajouter
 gui-profile-add = Ajouter { $name }
 gui-profile-remove = Retirer { $name }
@@ -237,6 +239,8 @@ health-kernels = Noyaux
 health-kernel-running = en cours d’utilisation
 kernels-title = Noyaux : le cœur du système. Plusieurs peuvent être installés ; vous en choisissez un au démarrage.
 kernels-usage = Utilisation : kura kernels [add|remove <nom>]
+bundles-title = Ensembles prêts à l'emploi : des applications avec les réglages dont elles ont besoin.
+bundles-usage = Utilisation : kura bundles [add <nom> [extras…]]
 kernel-keep-running = { $name } est en cours d'utilisation. Démarrez d'abord l'ordinateur avec un autre noyau.
 kernel-keep-last = { $name } est le seul noyau. L'ordinateur ne pourrait pas démarrer sans lui.
 kernel-old = { $new } a démarré sans problème. L'ancien noyau { $old } peut maintenant être retiré : kura kernels remove { $old }
@@ -267,6 +271,7 @@ action-arch = Utiliser des paquets compilés pour { $arch }
 action-arch-generic = Utiliser à nouveau les paquets pour tous les processeurs x86-64
 action-regenerate-grub = Mettre à jour le menu de démarrage
 action-default-kernel = Démarrer avec { $name } par défaut
+action-user-group = Ajouter { $user } au groupe { $group }
 profiles-title = Dépôts supplémentaires que kura peut ajouter et retirer :
 profile-on = ajouté
 profile-off = non ajouté

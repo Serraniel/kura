@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "gaming"
+version = 1
+
+[name]
+en = "Gaming with Steam"
+de = "Spielen mit Steam"
+fr = "Jouer avec Steam"
+ja = "Steam でゲーム"
+
+[description]
+en = "Steam with Proton for Windows games, GameMode for more speed while playing, and the 32-bit system parts many games need."
+de = "Steam mit Proton für Windows-Spiele, GameMode für mehr Leistung beim Spielen und die 32-Bit-Systemteile, die viele Spiele brauchen."
+fr = "Steam avec Proton pour les jeux Windows, GameMode pour plus de performances en jeu et les composants 32 bits dont beaucoup de jeux ont besoin."
+ja = "Windows ゲーム用の Proton を含む Steam、プレイ中の性能を上げる GameMode、多くのゲームに必要な 32 ビットのシステム部品。"
+
+[packages]
+required = ["steam"]
+recommended = ["gamemode", "lib32-gamemode"]
+
+[[packages.optional]]
+name = "mangohud"
+reason = { en = "Shows frame rate and temperatures while playing.", de = "Zeigt beim Spielen Bildrate und Temperaturen an." }
+
+[[actions]]
+enable-repo = "multilib"
+
+[[actions]]
+user-group = "gamemode"

@@ -40,6 +40,8 @@ pub enum PlanKind {
     },
     /// Install or remove a kernel, with its boot menu.
     Kernel,
+    /// Install a bundle: apps plus their configuration.
+    Bundle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +235,7 @@ impl Plan {
                 | PlanKind::AurInstall
                 | PlanKind::Switch { .. }
                 | PlanKind::Kernel
+                | PlanKind::Bundle
         ) {
             let upgraded: BTreeSet<&str> = self
                 .steps

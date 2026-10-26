@@ -50,6 +50,8 @@ pub mod qobject {
         #[qproperty(bool, failed)]
         #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
         #[qproperty(bool, auto_security, cxx_name = "autoSecurity")]
+        // Bundles as JSON: [{"id", "name", "description"}].
+        #[qproperty(QString, bundles_json, cxx_name = "bundlesJson")]
         // Repository profiles as JSON: [{"id", "text", "active"}].
         #[qproperty(QString, profiles_json, cxx_name = "profilesJson")]
         type Kura = super::KuraRust;
@@ -126,6 +128,11 @@ pub mod qobject {
         #[cxx_name = "changeAutoSecurity"]
         fn change_auto_security(self: Pin<&mut Kura>, on: bool);
 
+        // Previews installing a bundle.
+        #[qinvokable]
+        #[cxx_name = "prepareBundle"]
+        fn prepare_bundle(self: Pin<&mut Kura>, id: &QString);
+
         // Previews adding (`add`) or removing a kernel.
         #[qinvokable]
         #[cxx_name = "prepareKernel"]
@@ -189,6 +196,7 @@ pub struct KuraRust {
     aur_wait: i32,
     auto_security: bool,
     profiles_json: QString,
+    bundles_json: QString,
     localizer: Localizer,
     pending: Option<Plan>,
 }
@@ -227,6 +235,7 @@ impl Default for KuraRust {
             aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
             auto_security: kura_alpm::aur::settings().auto_security,
             profiles_json: QString::from(&profiles_value(&Localizer::from_env()).to_string()),
+            bundles_json: QString::from(&bundles_value(&Localizer::from_env()).to_string()),
             localizer: Localizer::from_env(),
             pending: None,
         }
@@ -504,6 +513,49 @@ fn prepare_aur_preview(names: &[String]) -> Result<Prepared, String> {
     })
 }
 
+/// The bundles for the Software page.
+fn bundles_value(l: &Localizer) -> Value {
+    let lang = l.language();
+    let langs = [lang.as_str()];
+    Value::Array(
+        kura_alpm::bundles::load(Path::new(kura_alpm::bundles::DIR))
+            .iter()
+            .map(
+                |b| json!({"id": b.id, "name": b.name.get(&langs), "description": b.description.get(&langs)}),
+            )
+            .collect(),
+    )
+}
+
+/// Runs in a background thread: installing a bundle with its recommended apps.
+fn prepare_bundle_preview(bundle: &kura_core::bundles::Bundle) -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let user = std::env::var("USER").unwrap_or_default();
+    let outcome = kura_alpm::bundles::prepare(
+        &conf,
+        Some(&kura_alpm::background::check_dir()),
+        bundle,
+        &user,
+        &[],
+    )
+    .map_err(fail)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => return Err(blocked_text(&l, "change-blocked", problems)),
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    let lang = l.language();
+    Ok(Prepared {
+        preview: preview_groups(&l, &plan, &apps).to_string(),
+        news: "[]".into(),
+        summary: sizes(&l, &outcome),
+        headline: bundle.description.get(&[lang.as_str()]).to_owned(),
+        plan,
+    })
+}
+
 /// Runs in a background thread: adding or removing a kernel.
 fn prepare_kernel_preview(name: &str, add: bool) -> Result<Prepared, String> {
     let l = Localizer::from_env();
@@ -753,6 +805,16 @@ impl qobject::Kura {
             &title,
             &label,
         );
+    }
+
+    fn prepare_bundle(self: Pin<&mut Self>, id: &QString) {
+        let Some(bundle) = kura_alpm::bundles::find(&id.to_string()) else {
+            return;
+        };
+        let lang = self.localizer.language();
+        let title = bundle.name.get(&[lang.as_str()]).to_owned();
+        let label = self.localizer.msg("gui-install");
+        self.start_preview(move || prepare_bundle_preview(&bundle), &title, &label);
     }
 
     fn prepare_kernel(self: Pin<&mut Self>, name: &QString, add: bool) {

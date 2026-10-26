@@ -67,6 +67,11 @@ pub enum Action {
     SetDefaultKernel {
         kernel: String,
     },
+    /// Add a user to a group (user scope: always the person who asked).
+    AddUserToGroup {
+        user: String,
+        group: String,
+    },
 }
 
 #[cfg(test)]

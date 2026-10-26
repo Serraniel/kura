@@ -376,6 +376,43 @@ Kirigami.ApplicationWindow {
 
             ListView {
                 model: results
+                header: ColumnLayout {
+                    width: ListView.view.width
+                    visible: searchField.text.length === 0
+                    height: visible ? implicitHeight : 0
+                    Kirigami.Heading {
+                        text: kura.tr("gui-bundles")
+                        level: 3
+                    }
+                    Repeater {
+                        model: JSON.parse(kura.bundlesJson)
+                        Kirigami.AbstractCard {
+                            Layout.fillWidth: true
+                            contentItem: RowLayout {
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Controls.Label {
+                                        text: modelData.name
+                                        font.bold: true
+                                        Layout.fillWidth: true
+                                    }
+                                    Controls.Label {
+                                        text: modelData.description
+                                        color: Kirigami.Theme.disabledTextColor
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                                Controls.Button {
+                                    text: kura.tr("gui-install")
+                                    icon.name: "run-install"
+                                    enabled: !kura.busy
+                                    onClicked: { root.show(updatesPage); kura.prepareBundle(modelData.id) }
+                                }
+                            }
+                        }
+                    }
+                }
                 delegate: Controls.ItemDelegate {
                     width: ListView.view.width
                     contentItem: RowLayout {

@@ -10,6 +10,7 @@
 pub mod apply;
 pub mod aur;
 pub mod background;
+pub mod bundles;
 pub mod history;
 pub mod kernels;
 pub mod mirrors;

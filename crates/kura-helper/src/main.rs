@@ -58,6 +58,19 @@ async fn authorized(conn: &zbus::Connection, sender: &str, action: &str) -> bool
         .is_ok_and(|(ok, _, _)| ok)
 }
 
+/// The user name of the process that sent a request.
+async fn caller_name(conn: &zbus::Connection, sender: &str) -> Option<String> {
+    let dbus = zbus::fdo::DBusProxy::new(conn).await.ok()?;
+    let name = zbus::names::BusName::try_from(sender).ok()?;
+    let uid = dbus.get_connection_unix_user(name).await.ok()?;
+    let out = std::process::Command::new("id")
+        .args(["-nu", &uid.to_string()])
+        .output()
+        .ok()?;
+    let user = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    (out.status.success() && !user.is_empty()).then_some(user)
+}
+
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -70,7 +83,7 @@ struct Helper {
 }
 
 /// Runs a plan with the cause file in place, translating errors into replies.
-fn run(plan: &Plan, events: &mpsc::Sender<Event>) -> Reply {
+fn run(plan: &Plan, events: &mpsc::Sender<Event>, caller: Option<&str>) -> Reply {
     let conf = match kura_alpm::load_config() {
         Ok(c) => c,
         Err(e) => {
@@ -90,6 +103,7 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>) -> Reply {
         PlanKind::AurInstall => kura_helper::aur::apply_aur(&conf, plan, events),
         PlanKind::Profile => kura_helper::actions::apply_profile(&conf, plan, events),
         PlanKind::Kernel => kura_helper::actions::apply_kernel(&conf, plan, events),
+        PlanKind::Bundle => kura_helper::actions::apply_bundle(&conf, plan, events, caller),
         _ => kura_alpm::apply::apply(&conf, plan, events),
     };
     let _ = std::fs::remove_file(cause);
@@ -211,7 +225,8 @@ impl Helper {
             return Reply::Busy;
         }
         let (tx, rx) = mpsc::channel::<Event>();
-        let work = blocking::unblock(move || run(&plan, &tx));
+        let caller = caller_name(conn, sender.as_str()).await;
+        let work = blocking::unblock(move || run(&plan, &tx, caller.as_deref()));
         let forward = async {
             let rx = Arc::new(std::sync::Mutex::new(rx));
             loop {
