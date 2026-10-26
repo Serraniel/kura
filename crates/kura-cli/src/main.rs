@@ -555,6 +555,20 @@ fn profiles(l: &Localizer, args: &[String]) -> Result<String, String> {
         }
         ["add", id] => (true, *id),
         ["remove", id] => (false, *id),
+        ["switch", id] => {
+            // Switch everything now after choosing "gradually" before.
+            let profile = kura_core::profiles::find(id).ok_or_else(|| l.msg("profiles-usage") + "\n")?;
+            let level = kura_alpm::profiles::active_level(profile)
+                .filter(|l| l.architecture.is_some())
+                .ok_or_else(|| l.msg_args("profile-missing", &[("name", profile.id.into())]) + "\n")?;
+            let repos = level.repos.iter().map(|(n, _)| (*n).to_owned()).collect();
+            return change_with(
+                l,
+                &Request::Switch(Some(repos)),
+                "confirm-switch",
+                "profile-switch-title",
+            );
+        }
         _ => return Err(l.msg("profiles-usage") + "\n"),
     };
     let profile = kura_core::profiles::find(id).ok_or_else(|| l.msg("profiles-usage") + "\n")?;

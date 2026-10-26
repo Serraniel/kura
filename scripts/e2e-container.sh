@@ -100,8 +100,14 @@ if pacman-key --list-keys EF925EA60F33D0CB85C44AD13056513887B78AEB; then exit 1;
 # CachyOS: add it, switch every package, go back, and nothing is left.
 if grep -qw avx2 /proc/cpuinfo; then
   cp /etc/pacman.conf /tmp/pacman.conf.before-cachyos
-  printf 'y\ny\ny\n' | kura profiles add cachyos
+  printf 'y\nn\n' | kura profiles add cachyos
   pacman-conf --repo-list | grep -q '^cachyos-core-v[34]$'
+  if ! printf 'y\n' | kura profiles switch cachyos; then
+    pacman -S --noconfirm --needed gdb
+    printf 'y\n' >/tmp/yes
+    gdb -batch -ex 'run < /tmp/yes' -ex bt --args kura profiles switch cachyos || true
+    exit 1
+  fi
   test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -gt 0
   printf 'y\ny\n' | kura profiles remove cachyos
   cmp /etc/pacman.conf /tmp/pacman.conf.before-cachyos
