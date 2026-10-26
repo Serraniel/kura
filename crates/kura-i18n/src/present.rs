@@ -5,6 +5,7 @@
 //! both say the same thing.
 
 use kura_core::action::Action;
+use kura_core::aur;
 use kura_core::history::Record;
 use kura_core::plan::Step;
 use kura_core::security::{Finding, Severity};
@@ -76,6 +77,19 @@ pub fn severity(l: &Localizer, s: Severity) -> String {
         Severity::High => "severity-high",
         Severity::Critical => "severity-critical",
     })
+}
+
+/// Trust signals for an AUR package, joined for one line.
+pub fn aur_signals(l: &Localizer, info: &aur::Info, now: i64) -> String {
+    let mut parts = vec![l.msg_args("aur-votes", &[("count", info.num_votes.into())])];
+    for w in aur::warnings(info, now) {
+        parts.push(match w {
+            aur::Warning::New => l.msg("aur-new"),
+            aur::Warning::Orphaned => l.msg("aur-orphaned"),
+            aur::Warning::OutOfDate { .. } => l.msg("aur-out-of-date"),
+        });
+    }
+    parts.join(" · ")
 }
 
 /// One line for a change that is not a package change.
@@ -248,6 +262,27 @@ mod tests {
         );
         let partial = Report::Missing(vec![Step::Install("snap-pac".into())]);
         assert_eq!(snapshots(&en, &partial).0, "Partly set up");
+    }
+
+    #[test]
+    fn aur_signal_lines() {
+        let mut info = aur::Info {
+            name: "x".into(),
+            num_votes: 12,
+            first_submitted: 0,
+            maintainer: Some("m".into()),
+            ..aur::Info::default()
+        };
+        let now = 100 * 86_400;
+        assert_eq!(aur_signals(&l("en"), &info, now), "12 votes");
+        info.maintainer = None;
+        info.out_of_date = Some(1);
+        info.num_votes = 1;
+        info.first_submitted = now;
+        assert_eq!(
+            aur_signals(&l("en"), &info, now),
+            "1 vote · new · no maintainer · marked out of date"
+        );
     }
 
     #[test]

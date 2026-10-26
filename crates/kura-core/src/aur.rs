@@ -68,6 +68,24 @@ pub fn parse(json: &str) -> Result<Vec<Info>, String> {
     Ok(r.results)
 }
 
+/// The commit `HEAD` points to, from git's smart HTTP answer to
+/// `<base>.git/info/refs?service=git-upload-pack`. kura pins this commit in
+/// the plan, so the build uses exactly what the preview showed.
+pub fn head_commit(refs: &str) -> Option<String> {
+    refs.split(['\n', '\0']).find_map(|line| {
+        // pkt-line: 4 hex digits of length, then "<sha> <ref>". A flush
+        // packet "0000" can come right before it.
+        let mut line = line;
+        while let Some(rest) = line.strip_prefix("0000") {
+            line = rest;
+        }
+        let line = line.get(4..).filter(|_| line.len() > 45)?;
+        let (sha, name) = line.split_once(' ')?;
+        let valid = sha.len() == 40 && sha.bytes().all(|b| b.is_ascii_hexdigit());
+        (valid && name == "HEAD").then(|| sha.to_owned())
+    })
+}
+
 /// Things worth knowing before installing a package from the AUR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Warning {
@@ -316,6 +334,17 @@ mod tests {
         let err = r#"{"error":"Incorrect request type specified.","resultcount":0,"results":[],"type":"error","version":5}"#;
         assert_eq!(parse(err), Err("Incorrect request type specified.".into()));
         assert!(parse("not json").is_err());
+    }
+
+    #[test]
+    fn reads_the_head_commit() {
+        let refs = "001e# service=git-upload-pack\n0000015523a5d6a1d2e2b1b9a3f0f6d8b7e3f2c1a0b9c8d7 HEAD\0multi_ack thin-pack side-band symref=HEAD:refs/heads/master\n003f23a5d6a1d2e2b1b9a3f0f6d8b7e3f2c1a0b9c8d7 refs/heads/master\n0000";
+        assert_eq!(
+            head_commit(refs).as_deref(),
+            Some("23a5d6a1d2e2b1b9a3f0f6d8b7e3f2c1a0b9c8d7")
+        );
+        assert_eq!(head_commit("001e# service=git-upload-pack\n0000"), None);
+        assert_eq!(head_commit("0000zz HEAD"), None);
     }
 
     #[test]

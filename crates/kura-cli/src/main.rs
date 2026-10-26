@@ -79,6 +79,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => history(l),
         Some("doctor") => doctor(l),
+        Some("search") if !names.is_empty() => search(l, &names.join(" ")),
         Some("snapshots") => match names.first().map(String::as_str) {
             None => snapshots(l, false),
             Some("setup") => snapshots(l, true),
@@ -371,6 +372,57 @@ fn confirm_and_apply(
             other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
+}
+
+/// Searches the repositories, then the AUR.
+fn search(l: &Localizer, term: &str) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let repo = kura_alpm::system::search(&conf, term, 20).map_err(fail)?;
+    let aur = kura_alpm::aur::search(term, "name-desc");
+    let mut out = String::new();
+    if !repo.is_empty() {
+        let _ = writeln!(out, "{}", l.msg("search-repos"));
+        for h in &repo {
+            let mark = if h.installed {
+                format!("  [{}]", l.msg("gui-installed"))
+            } else {
+                String::new()
+            };
+            let _ = writeln!(out, "  {} {}{mark}\n      {}", h.name, h.version, h.description);
+        }
+    }
+    match aur {
+        Ok(mut hits) if !hits.is_empty() => {
+            hits.sort_by(|a, b| b.popularity.total_cmp(&a.popularity));
+            hits.truncate(20);
+            let now = kura_alpm::background::now();
+            let gap = if out.is_empty() { "" } else { "\n" };
+            let _ = writeln!(out, "{gap}{}", l.msg("search-aur"));
+            for h in &hits {
+                let _ = writeln!(
+                    out,
+                    "  {} {}  ({})\n      {}",
+                    h.name,
+                    h.version,
+                    kura_i18n::present::aur_signals(l, h, now),
+                    h.description.as_deref().unwrap_or_default()
+                );
+            }
+        }
+        Ok(_) => {}
+        Err(reason) => {
+            let _ = writeln!(
+                out,
+                "\n{}",
+                l.msg_args("search-aur-failed", &[("reason", reason.into())])
+            );
+        }
+    }
+    if out.is_empty() {
+        out = l.msg("search-none") + "\n";
+    }
+    Ok(out)
 }
 
 /// The snapshot state; with `setup`, a preview of what kura adds.

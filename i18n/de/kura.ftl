@@ -13,6 +13,7 @@ cli-usage =
       mirrors    Schnelle Download-Server auswählen
       orphans    Pakete auflisten, die nichts mehr braucht
       sbom       Liste aller installierten Software schreiben (CycloneDX)
+      search     Apps in den Paketquellen und im AUR suchen: kura search <Wort>
       update     Alle Updates installieren (zeigt vorher eine Vorschau)
       install    Eine App installieren: kura install <Name>
       remove     Eine App entfernen und was nur sie brauchte: kura remove <Name>
@@ -225,6 +226,16 @@ suggest-cleanup =
 suggest-cleanup-text = Sie werden mit dem nächsten Update entfernt.
 search-placeholder = Apps suchen, zum Beispiel „Foto“ oder „Musik“
 search-none = Keine Apps gefunden. Versuchen Sie ein anderes Wort.
+search-repos = Aus den Paketquellen:
+search-aur = Aus dem AUR (von der Community geteilt, wird auf diesem Computer gebaut):
+search-aur-failed = Das AUR konnte nicht durchsucht werden: { $reason }
+aur-votes = { $count ->
+    [one] { $count } Stimme
+   *[other] { $count } Stimmen
+}
+aur-new = neu
+aur-orphaned = ohne Betreuer
+aur-out-of-date = als veraltet markiert
 gui-installed = Installiert
 gui-remove = Entfernen
 gui-install-title = { $name } installieren
