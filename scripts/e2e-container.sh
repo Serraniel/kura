@@ -122,6 +122,13 @@ if grep -qw avx2 /proc/cpuinfo; then
   if pacman -Q cachyos-keyring; then exit 1; fi
 fi
 
+# pacman-style commands go through kura's preview.
+printf 'y\n' | kura -S figlet
+kura -Q figlet | grep -q '^figlet '
+printf 'y\n' | kura -Rns figlet
+if pacman -Q figlet; then exit 1; fi
+if kura -Sy; then exit 1; fi
+
 # Kernels: one can be added; the only kernel is never removed.
 printf 'y\n' | kura kernels add linux-lts
 pacman -Q linux-lts

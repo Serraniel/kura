@@ -44,6 +44,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura security` | Lists known security problems, named by the apps that use the affected part. |
 | `kura orphans` | Lists packages nothing needs any more. |
 | `kura sbom` | Writes a list of all installed software (CycloneDX). |
+| `kura -Syu`, `-S`, `-R`, `-Ss`, `-Si`, `-Q`, `-Qi`, `-Qs` | pacman-style shortcuts for the commands above, with the same preview. `-Sy` without `-u` is refused because it leads to partial upgrades. |
 | `kura doctor` | A short system summary for problem reports, with drivers and processor fixes your hardware is missing. |
 | `kura report [what happened]` | Shows a problem report without user name, computer name or home folder, and opens it as a prefilled GitHub issue if you want. kura sends nothing itself. |
 | `kura bundles [add <name>]` | Ready-made sets of apps with the settings they need, such as gaming with Steam (turns on multilib, adds you to the gamemode group) or HDR. |

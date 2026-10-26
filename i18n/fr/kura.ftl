@@ -29,6 +29,9 @@ cli-usage =
       undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
+pacman-partial = kura ne rafraîchit pas les listes de paquets sans mettre à jour, car une installation ultérieure mélangerait anciens et nouveaux paquets. Utilisez kura -Syu ou kura update.
+pacman-clean = kura garde les anciens fichiers de paquets pour pouvoir revenir à un état antérieur. Ils figurent sur la page État du système.
+pacman-usage = kura comprend -Syu, -S <nom>, -R <nom>, -Ss <mot>, -Si <nom>, -Q, -Qi <nom> et -Qs <mot>. Pour le reste, voir kura --help.
 cli-missing-command = Aucune commande indiquée.
 
 ## check
