@@ -12,7 +12,7 @@ use std::sync::mpsc::Sender;
 use kura_alpm::Config;
 use kura_alpm::apply::{ApplyError, Event};
 use kura_core::action::Action;
-use kura_core::plan::{Plan, PlanKind};
+use kura_core::plan::{Plan, PlanKind, Step};
 
 fn run_program(program: &str, args: &[&str]) -> Result<(), String> {
     let out = Command::new(program)
@@ -30,11 +30,44 @@ fn run_program(program: &str, args: &[&str]) -> Result<(), String> {
     }
 }
 
+const PACMAN_CONF: &str = "/etc/pacman.conf";
+
+/// Changes `pacman.conf` after keeping a copy of the old file next to it.
+fn edit_pacman_conf(change: impl FnOnce(&str) -> String) -> Result<(), String> {
+    let path = Path::new(PACMAN_CONF);
+    let old = fs::read_to_string(path).map_err(|e| format!("{PACMAN_CONF}: {e}"))?;
+    let new = change(&old);
+    if new == old {
+        return Ok(());
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    fs::copy(path, format!("{PACMAN_CONF}.kura-{stamp}")).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("conf.kura-new");
+    fs::write(&tmp, new).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
 /// Runs one action on the real system.
-pub fn run(action: &Action) -> Result<(), String> {
+pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(), String> {
     match action {
         Action::Enable { unit } => run_program("systemctl", &["enable", "--now", unit]),
         Action::SnapperRootConfig { keep_mount } => snapper_config("root", Path::new("/"), *keep_mount),
+        Action::TrustKey { key, keyserver } => {
+            run_program("pacman-key", &["--recv-keys", key, "--keyserver", keyserver])?;
+            run_program("pacman-key", &["--lsign-key", key])
+        }
+        Action::ForgetKey { key } => run_program("pacman-key", &["--delete", key]),
+        Action::InstallFrom { urls } => {
+            kura_alpm::apply::install_urls(conf, urls, events).map_err(|e| e.to_string())
+        }
+        Action::AddRepo {
+            name,
+            include,
+            before,
+        } => edit_pacman_conf(|c| kura_core::pacman_conf::add_repo(c, name, include, before.as_deref())),
+        Action::RemoveRepo { name } => edit_pacman_conf(|c| kura_core::pacman_conf::remove_repo(c, name)),
     }
 }
 
@@ -109,7 +142,54 @@ pub fn apply_snapshots(conf: &Config, approved: &Plan, events: &Sender<Event>) -
         let _ = events.send(Event::Configuring {
             action: action.clone(),
         });
-        run(action).map_err(ApplyError::Failed)?;
+        run(action, conf, events).map_err(ApplyError::Failed)?;
     }
     Ok(())
+}
+
+/// Adds or takes away a repository profile. Only the exact actions kura
+/// derives for one of its built-in profiles run; package steps may only
+/// remove that profile's keyring and mirror list packages.
+pub fn apply_profile(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
+    let profile = kura_core::profiles::ALL
+        .iter()
+        .find(|p| {
+            kura_core::profiles::add_actions(p) == approved.actions
+                || kura_core::profiles::remove_actions(p) == approved.actions
+        })
+        .ok_or_else(|| ApplyError::Failed("unknown repository profile change".into()))?;
+    let removals_ok = approved.steps.iter().all(
+        |s| matches!(s, Step::Remove { name, .. } if profile.bootstrap_packages.contains(&name.as_str())),
+    );
+    if !removals_ok {
+        return Err(ApplyError::Failed(
+            "unexpected package change in a profile plan".into(),
+        ));
+    }
+    let run_all = |actions: &[Action]| -> Result<(), ApplyError> {
+        for action in actions {
+            let _ = events.send(Event::Configuring {
+                action: action.clone(),
+            });
+            run(action, conf, events).map_err(ApplyError::Failed)?;
+        }
+        Ok(())
+    };
+    // Taking away: the repository goes first, then its packages, then the key.
+    let (before, after) = approved.actions.split_at(if approved.steps.is_empty() {
+        approved.actions.len()
+    } else {
+        profile.repos.len()
+    });
+    run_all(before)?;
+    if !approved.steps.is_empty() {
+        let packages = Plan {
+            kind: PlanKind::Remove,
+            steps: approved.steps.clone(),
+            actions: Vec::new(),
+            builds: Vec::new(),
+        };
+        kura_alpm::apply::apply(conf, &packages, events)?;
+    }
+    run_all(after)
 }

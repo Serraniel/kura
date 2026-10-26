@@ -109,11 +109,24 @@ pub fn driver(l: &Localizer, s: &kura_core::drivers::Suggestion) -> (String, Str
     }
 }
 
+/// The last 16 hex digits, the way key IDs are usually shown.
+fn short_key(key: &str) -> &str {
+    &key[key.len().saturating_sub(16)..]
+}
+
 /// One line for a change that is not a package change.
 pub fn action(l: &Localizer, action: &Action) -> String {
     match action {
         Action::Enable { unit } => l.msg_args("snapshots-step-enable", &[("unit", unit.clone().into())]),
         Action::SnapperRootConfig { .. } => l.msg("snapshots-step-config"),
+        Action::TrustKey { key, .. } => l.msg_args("action-trust-key", &[("key", short_key(key).into())]),
+        Action::ForgetKey { key } => l.msg_args("action-forget-key", &[("key", short_key(key).into())]),
+        Action::InstallFrom { urls } => {
+            let files: Vec<&str> = urls.iter().filter_map(|u| u.rsplit('/').next()).collect();
+            l.msg_args("action-install-from", &[("files", files.join(", ").into())])
+        }
+        Action::AddRepo { name, .. } => l.msg_args("action-add-repo", &[("name", name.clone().into())]),
+        Action::RemoveRepo { name } => l.msg_args("action-remove-repo", &[("name", name.clone().into())]),
     }
 }
 
@@ -249,6 +262,25 @@ mod tests {
         assert_eq!(
             action(&en, &Action::SnapperRootConfig { keep_mount: true }),
             "Create a snapper configuration for /"
+        );
+        assert_eq!(
+            action(
+                &en,
+                &Action::TrustKey {
+                    key: "EF925EA60F33D0CB85C44AD13056513887B78AEB".into(),
+                    keyserver: "k".into()
+                }
+            ),
+            "Trust the signing key 3056513887B78AEB"
+        );
+        assert_eq!(
+            action(
+                &en,
+                &Action::InstallFrom {
+                    urls: vec!["https://x/a.pkg.tar.zst".into()]
+                }
+            ),
+            "Download and install a.pkg.tar.zst"
         );
         assert_eq!(
             snapshots(&en, &Report::Unsupported).0,

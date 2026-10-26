@@ -11,10 +11,37 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "action", rename_all = "kebab-case")]
 pub enum Action {
     /// Enable and start a systemd unit.
-    Enable { unit: String },
+    Enable {
+        unit: String,
+    },
     /// Create the snapper configuration `root` for `/`. With an existing
     /// `/.snapshots` mount the mount is kept instead of snapper's own subvolume.
-    SnapperRootConfig { keep_mount: bool },
+    SnapperRootConfig {
+        keep_mount: bool,
+    },
+    /// Trust a repository's signing key in pacman's keyring.
+    TrustKey {
+        key: String,
+        keyserver: String,
+    },
+    /// Stop trusting a key kura added.
+    ForgetKey {
+        key: String,
+    },
+    /// Install package files from these addresses (a repository's keyring
+    /// and mirror list, before the repository itself exists).
+    InstallFrom {
+        urls: Vec<String>,
+    },
+    /// Add a repository section to `pacman.conf`, before `before` or at the end.
+    AddRepo {
+        name: String,
+        include: String,
+        before: Option<String>,
+    },
+    RemoveRepo {
+        name: String,
+    },
 }
 
 #[cfg(test)]

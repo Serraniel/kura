@@ -15,6 +15,8 @@ a network request must add it here.
 | The OpenPGP keyserver GnuPG uses by default | keys that sign an AUR package's sources | building an AUR package whose sources are signed |
 | `security.archlinux.org` | vulnerability data | daily |
 | `archive.archlinux.org` | old package versions | going back to an earlier generation |
+| `keyserver.ubuntu.com` | signing key of a repository profile | adding a repository profile (`kura profiles add`) |
+| `cdn-mirror.chaotic.cx` and the Chaotic-AUR mirrors | keyring, mirror list and packages | only after you add the Chaotic-AUR profile |
 | `github.com/Serraniel/kura-bundles` (raw files) | bundles, flows, hardware rules | daily, or when browsing bundles |
 
 Problem reports are never sent automatically. kura shows the report, removes

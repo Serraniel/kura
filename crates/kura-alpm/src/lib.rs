@@ -13,6 +13,7 @@ pub mod background;
 pub mod history;
 pub mod mirrors;
 pub mod prepare;
+pub mod profiles;
 pub mod restore;
 pub mod snapshots;
 pub mod system;

@@ -88,6 +88,7 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>) -> Reply {
         PlanKind::Restore { .. } => kura_alpm::apply::apply_restore(&conf, plan, Path::new(JOURNAL), events),
         PlanKind::Snapshots => kura_helper::actions::apply_snapshots(&conf, plan, events),
         PlanKind::AurInstall => kura_helper::aur::apply_aur(&conf, plan, events),
+        PlanKind::Profile => kura_helper::actions::apply_profile(&conf, plan, events),
         _ => kura_alpm::apply::apply(&conf, plan, events),
     };
     let _ = std::fs::remove_file(cause);
