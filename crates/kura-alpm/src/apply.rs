@@ -144,7 +144,7 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
                 .filter_map(|s| match s {
                     Step::Remove {
                         name,
-                        why: RemovalReason::Repair,
+                        why: RemovalReason::Repair | RemovalReason::Reinstall,
                         ..
                     } => Some(name.clone()),
                     _ => None,

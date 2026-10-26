@@ -132,6 +132,7 @@ pub fn propose(flow: &Flow, problems: &[Unsatisfied], set: &PackageSet) -> Optio
     Some(Repair {
         remove,
         rule: flow.id.clone(),
+        reinstall: Vec::new(),
     })
 }
 

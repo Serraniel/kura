@@ -26,6 +26,8 @@ pub struct Repair {
     pub remove: Vec<String>,
     /// The rule or flow that found it, for the details view and problem reports.
     pub rule: String,
+    /// Removed packages that are installed again right after the update.
+    pub reinstall: Vec<String>,
 }
 
 /// `target` and every installed package that needs it, directly or indirectly.
@@ -70,16 +72,55 @@ pub fn stale_chain(problems: &[Unsatisfied], set: &PackageSet) -> Option<Repair>
     Some(Repair {
         remove: remove.into_iter().map(str::to_owned).collect(),
         rule: "stale-chain".into(),
+        reinstall: Vec::new(),
     })
 }
 
-/// Flows for known cases first, then the built-in rules. The first
-/// proposal wins.
-pub fn propose(problems: &[Unsatisfied], set: &PackageSet, flows: &[crate::flows::Flow]) -> Option<Repair> {
+/// Rule "remove, update, reinstall": like the stale chain, but apps the
+/// user installed on purpose are in it. They are removed for the update and
+/// installed again afterwards, which only works when the repositories still
+/// have every one of them (`available`).
+pub fn reinstall_chain(
+    problems: &[Unsatisfied],
+    set: &PackageSet,
+    available: impl Fn(&str) -> bool,
+) -> Option<Repair> {
+    let mut remove: BTreeSet<&str> = BTreeSet::new();
+    for p in problems {
+        set.resolve(dep_name(&p.dependency)).next()?;
+        remove.extend(chain(set, &p.target));
+    }
+    let reinstall: Vec<String> = remove
+        .iter()
+        .filter(|n| {
+            set.get(n)
+                .is_some_and(|pkg| pkg.reason == InstallReason::Explicit)
+        })
+        .map(|n| (*n).to_owned())
+        .collect();
+    if remove.is_empty() || reinstall.is_empty() || !reinstall.iter().all(|n| available(n)) {
+        return None;
+    }
+    Some(Repair {
+        remove: remove.into_iter().map(str::to_owned).collect(),
+        rule: "reinstall-chain".into(),
+        reinstall,
+    })
+}
+
+/// Flows for known cases first, then the built-in rules, lowest risk first.
+/// The first proposal wins.
+pub fn propose(
+    problems: &[Unsatisfied],
+    set: &PackageSet,
+    flows: &[crate::flows::Flow],
+    available: impl Fn(&str) -> bool,
+) -> Option<Repair> {
     flows
         .iter()
         .find_map(|f| crate::flows::propose(f, problems, set))
         .or_else(|| stale_chain(problems, set))
+        .or_else(|| reinstall_chain(problems, set, available))
 }
 
 #[cfg(test)]
@@ -118,7 +159,7 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>(),
         );
-        let repair = propose(&problem(), &set, &[]).unwrap();
+        let repair = propose(&problem(), &set, &[], |_| false).unwrap();
         assert_eq!(repair.remove, ["lib32-audit", "lib32-libcap", "lib32-pam"]);
         assert_eq!(repair.rule, "stale-chain");
     }
@@ -126,7 +167,18 @@ mod tests {
     #[test]
     fn keeps_chains_an_app_needs() {
         // steam needs lib32-libcap, so removing the chain would break an app.
-        assert_eq!(propose(&problem(), &cachyos(), &[]), None);
+        assert_eq!(propose(&problem(), &cachyos(), &[], |_| false), None);
+    }
+
+    #[test]
+    fn reinstalls_apps_the_repositories_still_have() {
+        let repair = propose(&problem(), &cachyos(), &[], |n| n == "steam").unwrap();
+        assert_eq!(repair.rule, "reinstall-chain");
+        assert_eq!(repair.reinstall, ["steam"]);
+        assert_eq!(
+            repair.remove,
+            ["lib32-audit", "lib32-libcap", "lib32-pam", "steam"]
+        );
     }
 
     #[test]
@@ -142,12 +194,12 @@ mod tests {
             target: "lib32-audit".into(),
             dependency: "nothing>=1".into(),
         }];
-        assert_eq!(propose(&unknown_dep, &set, &[]), None);
+        assert_eq!(propose(&unknown_dep, &set, &[], |_| false), None);
         let unknown_target = vec![Unsatisfied {
             target: "ghost".into(),
             dependency: "audit".into(),
         }];
-        assert_eq!(propose(&unknown_target, &set, &[]), None);
-        assert_eq!(propose(&[], &set, &[]), None);
+        assert_eq!(propose(&unknown_target, &set, &[], |_| false), None);
+        assert_eq!(propose(&[], &set, &[], |_| false), None);
     }
 }

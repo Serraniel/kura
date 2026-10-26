@@ -224,17 +224,30 @@ pub fn prepare_with_repair(
         return Ok((outcome, None));
     }
     let installed = crate::installed(conf)?;
-    let Some(repair) = kura_core::solver::propose(&unsatisfied, &installed, &load_flows()) else {
+    let handle = open(conf, workdir)?;
+    let available = |n: &str| handle.syncdbs().iter().any(|db| db.pkg(n).is_ok());
+    let proposal = kura_core::solver::propose(&unsatisfied, &installed, &load_flows(), available);
+    drop(handle);
+    let Some(repair) = proposal else {
         return Ok((outcome, None));
     };
     // L1 simulation of the proposal; if it does not work, the original problem stands.
-    let repaired = prepare(
+    let mut repaired = prepare(
         conf,
         workdir,
         &Request::Repair(repair.remove.clone()),
         false,
         locales,
     )?;
+    if let Ok(plan) = &mut repaired.plan {
+        for step in &mut plan.steps {
+            if let Step::Remove { name, why, .. } = step
+                && repair.reinstall.contains(name)
+            {
+                *why = RemovalReason::Reinstall;
+            }
+        }
+    }
     if repaired.plan.is_ok() {
         Ok((repaired, Some(repair)))
     } else {

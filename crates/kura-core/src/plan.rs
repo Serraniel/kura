@@ -55,6 +55,8 @@ pub enum RemovalReason {
     Repair,
     /// Replaced by another package during an update (pacman's `replaces`).
     Replaced,
+    /// Removed for a repair and installed again right after the update.
+    Reinstall,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
