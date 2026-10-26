@@ -63,6 +63,70 @@ pub fn hook_updates_grub(hook: &str) -> bool {
     })
 }
 
+/// The id `grub-set-default` takes for the normal (not fallback, not
+/// recovery) entry that starts `kernel`, from `grub.cfg`. Entries inside a
+/// submenu get the submenu id in front: `submenu>entry`.
+pub fn grub_entry_id(cfg: &str, kernel: &str) -> Option<String> {
+    let image = format!("/vmlinuz-{kernel}");
+    let id_of = |line: &str| {
+        let rest = line.split("$menuentry_id_option '").nth(1)?;
+        Some(rest.split('\'').next()?.to_owned())
+    };
+    let indented = |line: &str| line.starts_with([' ', '\t']);
+    let mut submenu: Option<String> = None;
+    // The current entry: its full id, and whether it is a fallback or recovery one.
+    let mut entry: Option<(String, bool)> = None;
+    for line in cfg.lines() {
+        let t = line.trim_start();
+        let mut words = t.split_whitespace();
+        match words.next() {
+            Some("submenu") => submenu = id_of(t),
+            Some("menuentry") => {
+                let title = t.to_lowercase();
+                let unwanted = title.contains("fallback") || title.contains("recovery");
+                let inside = indented(line).then_some(submenu.as_ref()).flatten();
+                entry = id_of(t).map(|id| {
+                    let full = inside.map_or_else(|| id.clone(), |s| format!("{s}>{id}"));
+                    (full, unwanted)
+                });
+            }
+            Some("linux") if words.next().is_some_and(|p| p.ends_with(&image)) => {
+                if let Some((id, false)) = &entry {
+                    return Some(id.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The systemd-boot entry (file name without `.conf`) that starts `kernel`
+/// with its normal initramfs. `entries` are `(file name, content)` pairs.
+pub fn sdboot_entry(entries: &[(String, String)], kernel: &str) -> Option<String> {
+    let image = format!("/vmlinuz-{kernel}");
+    entries
+        .iter()
+        .filter(|(_, c)| {
+            c.lines().any(|l| {
+                let mut w = l.split_whitespace();
+                w.next() == Some("linux") && w.next().is_some_and(|p| p.ends_with(&image))
+            }) && !c.contains("fallback")
+        })
+        .map(|(name, _)| name.trim_end_matches(".conf").to_owned())
+        .next()
+}
+
+/// `GRUB_DEFAULT=saved` in `/etc/default/grub`: only then kura may choose
+/// the default entry.
+pub fn grub_uses_saved_default(defaults: &str) -> bool {
+    defaults.lines().any(|l| {
+        l.trim()
+            .strip_prefix("GRUB_DEFAULT=")
+            .is_some_and(|v| v.trim_matches('"') == "saved")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,6 +143,45 @@ mod tests {
         let one = names(&["linux-zen", "linux-firmware"]);
         assert_eq!(can_remove("linux-zen", &one, None), Err(Keep::Last));
         assert!(KNOWN.iter().all(|k| is_kernel(k)));
+    }
+
+    #[test]
+    fn finds_boot_entries() {
+        let cfg = "menuentry 'Arch Linux' --class arch $menuentry_id_option 'gnulinux-simple-abc' {\n\tlinux\t/vmlinuz-linux root=UUID=abc rw\n}\nsubmenu 'Advanced options for Arch Linux' $menuentry_id_option 'gnulinux-advanced-abc' {\n\tmenuentry 'Arch Linux, with Linux linux-lts' --class arch $menuentry_id_option 'gnulinux-linux-lts-advanced-abc' {\n\t\tlinux\t/vmlinuz-linux-lts root=UUID=abc rw\n\t}\n\tmenuentry 'Arch Linux, with Linux linux-lts (fallback initramfs)' --class arch $menuentry_id_option 'gnulinux-linux-lts-fallback-abc' {\n\t\tlinux\t/vmlinuz-linux-lts root=UUID=abc rw\n\t}\n}\n";
+        assert_eq!(
+            grub_entry_id(cfg, "linux").as_deref(),
+            Some("gnulinux-simple-abc")
+        );
+        assert_eq!(
+            grub_entry_id(cfg, "linux-lts").as_deref(),
+            Some("gnulinux-advanced-abc>gnulinux-linux-lts-advanced-abc")
+        );
+        assert_eq!(grub_entry_id(cfg, "linux-zen"), None);
+
+        let entries = vec![
+            (
+                "arch-fallback.conf".to_owned(),
+                "title Arch (fallback)\nlinux /vmlinuz-linux\ninitrd /initramfs-linux-fallback.img\n"
+                    .to_owned(),
+            ),
+            (
+                "arch-zen.conf".to_owned(),
+                "title Arch zen\nlinux /vmlinuz-linux-zen\ninitrd /initramfs-linux-zen.img\n".to_owned(),
+            ),
+            (
+                "arch.conf".to_owned(),
+                "title Arch\nlinux /vmlinuz-linux\ninitrd /initramfs-linux.img\n".to_owned(),
+            ),
+        ];
+        assert_eq!(sdboot_entry(&entries, "linux").as_deref(), Some("arch"));
+        assert_eq!(sdboot_entry(&entries, "linux-zen").as_deref(), Some("arch-zen"));
+        assert_eq!(sdboot_entry(&entries, "linux-lts"), None);
+
+        assert!(grub_uses_saved_default(
+            "GRUB_DEFAULT=saved\nGRUB_SAVEDEFAULT=true\n"
+        ));
+        assert!(grub_uses_saved_default("GRUB_DEFAULT=\"saved\"\n"));
+        assert!(!grub_uses_saved_default("GRUB_DEFAULT=0\n"));
     }
 
     #[test]

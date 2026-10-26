@@ -126,6 +126,11 @@ pub mod qobject {
         #[cxx_name = "changeAutoSecurity"]
         fn change_auto_security(self: Pin<&mut Kura>, on: bool);
 
+        // Previews adding (`add`) or removing a kernel.
+        #[qinvokable]
+        #[cxx_name = "prepareKernel"]
+        fn prepare_kernel(self: Pin<&mut Kura>, name: &QString, add: bool);
+
         // Previews adding or taking away a repository profile.
         #[qinvokable]
         #[cxx_name = "prepareProfile"]
@@ -499,6 +504,44 @@ fn prepare_aur_preview(names: &[String]) -> Result<Prepared, String> {
     })
 }
 
+/// Runs in a background thread: adding or removing a kernel.
+fn prepare_kernel_preview(name: &str, add: bool) -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    if !add {
+        let installed: Vec<String> = kura_alpm::installed(&conf)
+            .map_err(fail)?
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        let running = kura_alpm::kernels::running_package();
+        match kura_core::kernels::can_remove(name, &installed, running.as_deref()) {
+            Err(kura_core::kernels::Keep::Running) => {
+                return Err(l.msg_args("kernel-keep-running", &[("name", name.into())]));
+            }
+            Err(kura_core::kernels::Keep::Last) => {
+                return Err(l.msg_args("kernel-keep-last", &[("name", name.into())]));
+            }
+            Ok(()) => {}
+        }
+    }
+    let outcome = kura_alpm::kernels::prepare(&conf, Some(&kura_alpm::background::check_dir()), name, add)
+        .map_err(fail)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => return Err(blocked_text(&l, "change-blocked", problems)),
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    Ok(Prepared {
+        preview: preview_groups(&l, &plan, &apps).to_string(),
+        news: "[]".into(),
+        summary: sizes(&l, &outcome),
+        headline: String::new(),
+        plan,
+    })
+}
+
 /// The repository profiles for the settings page.
 fn profiles_value(l: &Localizer) -> Value {
     Value::Array(
@@ -710,6 +753,18 @@ impl qobject::Kura {
             &title,
             &label,
         );
+    }
+
+    fn prepare_kernel(self: Pin<&mut Self>, name: &QString, add: bool) {
+        let name = name.to_string();
+        let (title, label) = if add {
+            ("gui-install-title", "gui-install")
+        } else {
+            ("gui-remove-title", "gui-remove")
+        };
+        let title = self.localizer.msg_args(title, &[("name", name.clone().into())]);
+        let label = self.localizer.msg(label);
+        self.start_preview(move || prepare_kernel_preview(&name, add), &title, &label);
     }
 
     fn prepare_profile(self: Pin<&mut Self>, id: &QString) {
@@ -1053,6 +1108,19 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
             let install = kura_core::health::kernel_packages("linux-lts", info.facts.dkms).join(" ");
             json!({"id": id, "title": title, "text": text, "install": install})
         })
+        .collect();
+    // A new kernel that started fine: the old one may go.
+    let suggestions: Vec<Value> = kura_alpm::kernels::replaced_kernel()
+        .map(|(added, old)| {
+            json!({
+                "id": "old-kernel",
+                "title": l.msg_args("suggest-old-kernel", &[("old", old.clone().into())]),
+                "text": l.msg_args("kernel-old", &[("new", added.into()), ("old", old.clone().into())]),
+                "install": old,
+            })
+        })
+        .into_iter()
+        .chain(suggestions)
         .collect();
     // Drivers first: they matter most for a computer that just got Linux.
     let suggestions: Vec<Value> = info

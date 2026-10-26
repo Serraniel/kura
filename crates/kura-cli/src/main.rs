@@ -555,6 +555,13 @@ fn kernels(l: &Localizer, args: &[String]) -> Result<String, String> {
                 };
                 let _ = writeln!(out, "\n  {k}{state}\n  {}", l.msg(&format!("kernel-{k}")));
             }
+            if let Some((added, old)) = kura_alpm::kernels::replaced_kernel() {
+                let _ = writeln!(
+                    out,
+                    "\n{}",
+                    l.msg_args("kernel-old", &[("new", added.into()), ("old", old.into())])
+                );
+            }
             return Ok(out);
         }
         ["add", k] => (true, *k),

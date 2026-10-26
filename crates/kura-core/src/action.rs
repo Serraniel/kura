@@ -62,6 +62,11 @@ pub enum Action {
     /// Write GRUB's boot menu again (`grub-mkconfig`), when no pacman hook
     /// does it after kernels change.
     RegenerateGrub,
+    /// Start this kernel by default (systemd-boot, or GRUB with
+    /// `GRUB_DEFAULT=saved`).
+    SetDefaultKernel {
+        kernel: String,
+    },
 }
 
 #[cfg(test)]

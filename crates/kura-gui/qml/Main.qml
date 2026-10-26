@@ -502,11 +502,12 @@ Kirigami.ApplicationWindow {
                             }
                             Controls.Button {
                                 enabled: !kura.busy
-                                text: modelData.id === "cleanup" ? kura.tr("gui-review") : kura.tr("gui-setup")
+                                text: modelData.id === "cleanup" ? kura.tr("gui-review") : modelData.id === "old-kernel" ? kura.tr("gui-remove") : kura.tr("gui-setup")
                                 onClicked: {
                                     if (modelData.id === "mirrors") kura.rankMirrors()
                                     else if (modelData.id === "backup-kernel" || modelData.id === "driver") { root.show(updatesPage); kura.prepareInstall(modelData.install) }
                                     else if (modelData.id === "snapshots") { root.show(updatesPage); kura.prepareSnapshots() }
+                                    else if (modelData.id === "old-kernel") { root.show(updatesPage); kura.prepareKernel(modelData.install, false) }
                                     else { root.show(updatesPage); kura.prepareUpdate() }
                                 }
                             }

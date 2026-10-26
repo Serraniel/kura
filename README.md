@@ -45,7 +45,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura sbom` | Writes a list of all installed software (CycloneDX). |
 | `kura doctor` | A short system summary for problem reports, with drivers and processor fixes your hardware is missing. |
 | `kura report [what happened]` | Shows a problem report without user name, computer name or home folder, and opens it as a prefilled GitHub issue if you want. kura sends nothing itself. |
-| `kura kernels [add\|remove <name>]` | Lists kernels with what they are good for, adds one next to the others (with headers when DKMS needs them) and checks that DKMS modules were built. The running and the last kernel are never removed. |
+| `kura kernels [add\|remove <name>]` | Lists kernels with what they are good for, adds one next to the others (with headers when DKMS needs them) and checks that DKMS modules were built. The new kernel becomes the default where kura can set it (systemd-boot, or GRUB with `GRUB_DEFAULT=saved`); once it has started, kura offers to remove the old one. The running and the last kernel are never removed. |
 | `kura profiles [add\|remove <name>]` | Adds or takes away an extra repository: Chaotic-AUR, or CachyOS with packages built for newer processors. Shows the download a full switch needs and lets you switch now or with the next updates; taking it away switches every package back. |
 | `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`, `auto-security on`/`off`. With `auto-security` on, the daily check installs updates that fix a known security problem, but only when the test run is clean and no Arch news concerns them. |
 | `kura snapshots [setup]` | Shows whether snapshots are taken before updates; `setup` adds what is missing. |
