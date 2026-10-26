@@ -127,6 +127,7 @@ pub fn check(
         blocked,
         news,
         security,
+        ..Status::default()
     })
 }
 
@@ -169,6 +170,7 @@ mod tests {
             blocked: false,
             news: vec!["x".into()],
             security: vec![],
+            ..Status::default()
         };
         write_status(&path, &s).unwrap();
         assert_eq!(read_status(&path), s);

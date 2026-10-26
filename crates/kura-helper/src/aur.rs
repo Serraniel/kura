@@ -234,7 +234,12 @@ pub fn apply_aur(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Resu
                 name,
                 reason: InstallReason::Explicit,
                 ..
-            } if approved.builds.iter().any(|b| b.packages.contains(name)) => Some(name.clone()),
+            }
+            | Step::Upgrade { name, .. }
+                if approved.builds.iter().any(|b| b.packages.contains(name)) =>
+            {
+                Some(name.clone())
+            }
             _ => None,
         })
         .collect();
@@ -275,6 +280,8 @@ fn build_all(
     targets: &[String],
     events: &Sender<Event>,
 ) -> Result<(), ApplyError> {
+    // Updates keep their install reason; only new packages get one.
+    let before = kura_alpm::installed(conf)?;
     let reason = |name: &str| {
         if targets.iter().any(|t| t == name) {
             InstallReason::Explicit
@@ -337,8 +344,12 @@ fn build_all(
                             .is_some_and(|n| build.packages.contains(&n))
                     })
                     .collect();
-                let reasons: Vec<(String, InstallReason)> =
-                    build.packages.iter().map(|p| (p.clone(), reason(p))).collect();
+                let reasons: Vec<(String, InstallReason)> = build
+                    .packages
+                    .iter()
+                    .filter(|p| before.get(p).is_none())
+                    .map(|p| (p.clone(), reason(p)))
+                    .collect();
                 match kura_alpm::apply::install_files(conf, &wanted, &reasons, events) {
                     Ok(()) => {
                         done.insert(base);

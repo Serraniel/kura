@@ -158,6 +158,39 @@ pub fn ready_at(info: &Info, days: u32, maintainer_since: Option<i64>) -> i64 {
     info.last_modified.max(maintainer_since.unwrap_or(i64::MIN)) + i64::from(days) * DAY
 }
 
+/// Who maintains a package and since when kura knows it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, Deserialize)]
+pub struct Maintainer {
+    pub name: Option<String>,
+    pub since: i64,
+}
+
+/// Updates what kura remembers about maintainers. A package seen for the
+/// first time does not count as a change; a different maintainer does.
+pub fn track_maintainers(
+    known: &BTreeMap<String, Maintainer>,
+    infos: &[Info],
+    now: i64,
+) -> BTreeMap<String, Maintainer> {
+    infos
+        .iter()
+        .map(|i| {
+            let m = match known.get(&i.name) {
+                Some(m) if m.name == i.maintainer => m.clone(),
+                Some(_) => Maintainer {
+                    name: i.maintainer.clone(),
+                    since: now,
+                },
+                None => Maintainer {
+                    name: i.maintainer.clone(),
+                    since: i64::MIN,
+                },
+            };
+            (i.name.clone(), m)
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Update {
     pub name: String,
@@ -478,6 +511,26 @@ mod tests {
                 .iter()
                 .all(|u| u.waits_until.is_none())
         );
+    }
+
+    #[test]
+    fn notices_new_maintainers() {
+        let mut a = info("a", "a", &[], &[]);
+        let b = info("b", "b", &[], &[]);
+        let first = track_maintainers(&BTreeMap::new(), &[a.clone(), b.clone()], 10);
+        assert_eq!(first["a"].since, i64::MIN);
+        let same = track_maintainers(&first, &[a.clone(), b.clone()], 20);
+        assert_eq!(same, first);
+        a.maintainer = Some("new".into());
+        let changed = track_maintainers(&same, &[a, b], 30);
+        assert_eq!(
+            changed["a"],
+            Maintainer {
+                name: Some("new".into()),
+                since: 30
+            }
+        );
+        assert_eq!(changed["b"], first["b"]);
     }
 
     #[test]

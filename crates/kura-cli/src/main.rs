@@ -74,7 +74,8 @@ fn run(l: &Localizer) -> Result<String, String> {
             }
         }
         Some("undo") => undo(l, names.first().map(String::as_str)),
-        Some("update") => change(l, &Request::Update, "confirm-update"),
+        Some("update") => update(l),
+        Some("settings") => settings(l, &names),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => history(l),
@@ -251,15 +252,49 @@ fn headline(l: &Localizer, outcome: &Outcome) -> String {
 fn check(l: &Localizer) -> Result<String, String> {
     eprintln!("{}", l.msg("check-running"));
     let (plan, outcome, apps) = prepare(l, &Request::Update)?;
-    if plan.steps.is_empty() {
-        return Ok(l.msg("check-none") + "\n");
+    let mut out = if plan.steps.is_empty() {
+        l.msg("check-none") + "\n"
+    } else {
+        format!(
+            "{}\n{}\n{}\n",
+            headline(l, &outcome),
+            render(l, &plan, Some(&outcome), &apps),
+            l.msg("check-preview-only")
+        )
+    };
+    let settings = kura_alpm::aur::settings();
+    if settings.aur
+        && let Ok(conf) = kura_alpm::load_config()
+    {
+        match kura_alpm::aur::updates(&conf, &settings, kura_alpm::background::now(), false) {
+            Ok(updates) if !updates.is_empty() => {
+                let ready = updates.iter().filter(|u| u.waits_until.is_none()).count();
+                let _ = writeln!(
+                    out,
+                    "\n{}",
+                    l.msg_args(
+                        "check-aur",
+                        &[
+                            ("ready", ready.into()),
+                            ("waiting", (updates.len() - ready).into())
+                        ]
+                    )
+                );
+                for u in &updates {
+                    let _ = writeln!(out, "  {}  {} → {}", u.name, u.from, u.to);
+                }
+            }
+            Ok(_) => {}
+            Err(reason) => {
+                let _ = writeln!(
+                    out,
+                    "\n{}",
+                    l.msg_args("aur-check-failed", &[("reason", reason.into())])
+                );
+            }
+        }
     }
-    Ok(format!(
-        "{}\n{}\n{}\n",
-        headline(l, &outcome),
-        render(l, &plan, Some(&outcome), &apps),
-        l.msg("check-preview-only")
-    ))
+    Ok(out)
 }
 
 fn say(text: &str) {
@@ -390,9 +425,25 @@ fn install(l: &Localizer, names: Vec<String>) -> Result<String, String> {
     if aur.len() != names.len() {
         return Err(l.msg_args("aur-mixed", &[("names", aur.join(" ").into())]) + "\n");
     }
+    if !kura_alpm::aur::settings().aur {
+        return Err(l.msg_args("aur-off", &[("names", aur.join(" ").into())]) + "\n");
+    }
+    aur_change(l, &conf, &aur, true, "preview-title", "confirm-aur")
+}
+
+/// Previews building `names` from the AUR, asks and runs it.
+fn aur_change(
+    l: &Localizer,
+    conf: &kura_alpm::Config,
+    names: &[String],
+    refresh: bool,
+    title_id: &str,
+    question_id: &str,
+) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
     eprintln!("{}", l.msg("check-running"));
     let check = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
-    let outcome = kura_alpm::aur::prepare_install(&conf, Some(&check_dir()), &aur, true).map_err(check)?;
+    let outcome = kura_alpm::aur::prepare_install(conf, Some(&check_dir()), names, refresh).map_err(check)?;
     let plan = match &outcome.plan {
         Ok(plan) => plan.clone(),
         Err(problems) => {
@@ -403,15 +454,11 @@ fn install(l: &Localizer, names: Vec<String>) -> Result<String, String> {
             return Err(out);
         }
     };
-    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    let apps = kura_alpm::apps(conf).map_err(fail)?;
     let now = kura_alpm::background::now();
-    let mut text = format!(
-        "{}\n{}",
-        l.msg("preview-title"),
-        render(l, &plan, Some(&outcome), &apps)
-    );
+    let mut text = format!("{}\n{}", l.msg(title_id), render(l, &plan, Some(&outcome), &apps));
     let _ = writeln!(text, "\n{}", l.msg("aur-build-list"));
-    let infos = kura_alpm::aur::info(&aur).unwrap_or_default();
+    let infos = kura_alpm::aur::info(names).unwrap_or_default();
     for b in &plan.builds {
         let signals = infos
             .iter()
@@ -422,7 +469,79 @@ fn install(l: &Localizer, names: Vec<String>) -> Result<String, String> {
     }
     let _ = writeln!(text, "\n{}", l.msg("aur-notice"));
     say(&text);
-    confirm_and_apply(l, plan, &outcome, &apps, "confirm-aur")
+    confirm_and_apply(l, plan, &outcome, &apps, question_id)
+}
+
+/// AUR updates: the ready ones are offered, the others are named with the
+/// reason they wait.
+fn aur_updates(l: &Localizer) -> Result<String, String> {
+    let settings = kura_alpm::aur::settings();
+    if !settings.aur {
+        return Ok(String::new());
+    }
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let updates = kura_alpm::aur::updates(&conf, &settings, kura_alpm::background::now(), false)
+        .map_err(|reason| l.msg_args("aur-check-failed", &[("reason", reason.into())]))?;
+    let (ready, waiting): (Vec<_>, Vec<_>) = updates.iter().partition(|u| u.waits_until.is_none());
+    let mut note = String::new();
+    if !waiting.is_empty() {
+        let names: Vec<&str> = waiting.iter().map(|u| u.name.as_str()).collect();
+        note = l.msg_args(
+            "aur-waiting",
+            &[
+                ("count", waiting.len().into()),
+                ("days", settings.aur_cooling_days.into()),
+                ("names", names.join(", ").into()),
+            ],
+        ) + "\n";
+    }
+    if ready.is_empty() {
+        return Ok(note);
+    }
+    say(&note);
+    let names: Vec<String> = ready.iter().map(|u| u.name.clone()).collect();
+    aur_change(l, &conf, &names, false, "aur-updates-title", "confirm-aur-update")
+}
+
+/// The repository update, then AUR updates that are ready.
+fn update(l: &Localizer) -> Result<String, String> {
+    let repo = change(l, &Request::Update, "confirm-update")?;
+    say(repo.trim_end());
+    aur_updates(l)
+}
+
+/// Shows or changes the settings for all users.
+fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
+    let mut s = kura_alpm::aur::settings();
+    let on_off = |on: bool| l.msg(if on { "settings-on" } else { "settings-off" });
+    match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] => {
+            return Ok(format!(
+                "{}: {}\n{}: {}\n",
+                l.msg("settings-aur"),
+                on_off(s.aur),
+                l.msg("settings-aur-wait"),
+                l.msg_args("settings-days", &[("days", s.aur_cooling_days.into())])
+            ));
+        }
+        ["aur", "on"] => s.aur = true,
+        ["aur", "off"] => s.aur = false,
+        ["aur-wait", days] => {
+            s.aur_cooling_days = days
+                .parse::<u32>()
+                .ok()
+                .filter(|d| *d <= kura_core::settings::Settings::MAX_COOLING_DAYS)
+                .ok_or_else(|| l.msg("settings-usage") + "\n")?;
+        }
+        _ => return Err(l.msg("settings-usage") + "\n"),
+    }
+    let reply = kura_helper::set_settings(&s)
+        .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+    match reply {
+        Reply::Done => Ok(l.msg("settings-saved") + "\n"),
+        other => Err(kura_helper::text::reply(l, &other)),
+    }
 }
 
 /// Searches the repositories, then the AUR.

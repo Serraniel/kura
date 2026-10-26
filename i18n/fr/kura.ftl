@@ -19,6 +19,7 @@ cli-usage =
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
       security   Afficher les problèmes de sécurité connus des logiciels installés
+      settings   Afficher ou modifier les réglages : kura settings aur on|off, kura settings aur-wait <jours>
       snapshots  Afficher l'état des instantanés ; kura snapshots setup ajoute ce qui manque
       undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
@@ -254,6 +255,25 @@ aur-mixed = Certains viennent de l'AUR. Installez-les séparément : kura instal
 aur-build-list = Compilé sur cet ordinateur depuis l'AUR :
 aur-notice = Les paquets de l'AUR sont partagés par d'autres utilisateurs et ne sont pas vérifiés par Arch Linux. kura les compile dans un environnement séparé et restreint.
 confirm-aur = Compiler et installer ceci ? [o/N]
+aur-off = { $names } n'est pas dans les dépôts et l'AUR est désactivé. Pour l'activer : kura settings aur on
+aur-check-failed = Impossible de vérifier les mises à jour de l'AUR : { $reason }
+check-aur = Depuis l'AUR : { $ready } prêtes, { $waiting } en attente
+aur-updates-title = Mises à jour depuis l'AUR :
+aur-waiting = { $count ->
+    [one] Une mise à jour de l'AUR attend
+   *[other] { $count } mises à jour de l'AUR attendent
+} d'avoir { $days } jours, pour que les problèmes des nouvelles versions apparaissent d'abord : { $names }
+confirm-aur-update = Compiler et installer ces mises à jour ? [o/N]
+settings-aur = AUR
+settings-aur-wait = Attente avant les mises à jour de l'AUR
+settings-on = activé
+settings-off = désactivé
+settings-days = { $days ->
+    [one] { $days } jour
+   *[other] { $days } jours
+}
+settings-saved = Enregistré.
+settings-usage = Utilisation : kura settings [aur on|off] [aur-wait <0–14>]
 gui-installed = Installé
 gui-remove = Supprimer
 gui-install-title = Installer { $name }

@@ -139,8 +139,48 @@ impl Helper {
         serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
     }
 
+    async fn set_settings(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &zbus::Connection,
+        settings: String,
+    ) -> String {
+        self.last_activity.store(now(), Ordering::Relaxed);
+        let reply = match header.sender() {
+            Some(sender) if authorized(conn, sender.as_str(), "org.kura.settings").await => {
+                write_settings(&settings)
+            }
+            _ => Reply::NotAuthorized,
+        };
+        serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
+    }
+
     #[zbus(signal)]
     async fn progress(emitter: &SignalEmitter<'_>, event: &str) -> zbus::Result<()>;
+}
+
+/// Writes the system-wide settings. Only known fields within their limits
+/// reach the file.
+fn write_settings(json: &str) -> Reply {
+    let Ok(settings) = serde_json::from_str::<kura_core::settings::Settings>(json) else {
+        return Reply::Failed {
+            message: "not settings".into(),
+        };
+    };
+    let path = Path::new(kura_core::settings::PATH);
+    let text = serde_json::to_string_pretty(&settings.clamped()).unwrap_or_default();
+    let tmp = path.with_extension("json.tmp");
+    let result = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::write(&tmp, text + "\n"))
+        .and_then(|()| std::fs::rename(&tmp, path));
+    match result {
+        Ok(()) => Reply::Done,
+        Err(e) => Reply::Failed {
+            message: format!("{}: {e}", path.display()),
+        },
+    }
 }
 
 impl Helper {
@@ -258,10 +298,23 @@ fn check() -> Result<(), String> {
         advisories.as_deref(),
     )
     .map_err(|e| e.to_string())?;
+    let mut status = status;
+    let settings = kura_alpm::aur::settings();
+    if settings.aur {
+        match kura_alpm::aur::updates(&conf, &settings, now(), true) {
+            Ok(updates) => {
+                status.aur_updates = updates.iter().filter(|u| u.waits_until.is_none()).count();
+                status.aur_waiting = updates.len() - status.aur_updates;
+            }
+            Err(e) => eprintln!("kura: AUR not checked: {e}"),
+        }
+    }
     write_status(Path::new(STATUS), &status).map_err(|e| e.to_string())?;
     eprintln!(
-        "kura: {} updates, downloaded: {}, security findings: {}",
+        "kura: {} updates, {} from the AUR ({} waiting), downloaded: {}, security findings: {}",
         status.updates,
+        status.aur_updates,
+        status.aur_waiting,
         status.downloaded,
         status.security.len()
     );
