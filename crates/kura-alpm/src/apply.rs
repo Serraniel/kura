@@ -257,16 +257,7 @@ fn install_callbacks(handle: &Alpm, plan: &Plan, events: &Sender<Event>) {
         },
     );
 
-    let tx = events.clone();
-    handle.set_dl_cb(tx, |file, event, tx: &mut Sender<Event>| {
-        if let alpm::DownloadEvent::Progress(p) = event.event() {
-            let _ = tx.send(Event::Downloading {
-                file: file.to_owned(),
-                done: u64::try_from(p.downloaded).unwrap_or(0),
-                total: u64::try_from(p.total).unwrap_or(0),
-            });
-        }
-    });
+    forward_downloads(handle, events);
 
     let tx = events.clone();
     handle.set_event_cb(tx, |event: AnyEvent, tx: &mut Sender<Event>| {
@@ -275,6 +266,19 @@ fn install_callbacks(handle: &Alpm, plan: &Plan, events: &Sender<Event>) {
                 name: h.name().to_owned(),
                 current: h.position(),
                 total: h.total(),
+            });
+        }
+    });
+}
+
+/// Sends download progress as [`Event::Downloading`].
+pub(crate) fn forward_downloads(handle: &Alpm, events: &Sender<Event>) {
+    handle.set_dl_cb(events.clone(), |file, event, tx: &mut Sender<Event>| {
+        if let alpm::DownloadEvent::Progress(p) = event.event() {
+            let _ = tx.send(Event::Downloading {
+                file: file.to_owned(),
+                done: u64::try_from(p.downloaded).unwrap_or(0),
+                total: u64::try_from(p.total).unwrap_or(0),
             });
         }
     });

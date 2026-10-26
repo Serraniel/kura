@@ -23,6 +23,7 @@ pub mod package;
 pub mod pacman_conf;
 pub mod plan;
 pub mod profiles;
+pub mod progress;
 pub mod report;
 pub mod security;
 pub mod settings;

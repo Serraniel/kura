@@ -136,6 +136,46 @@ pub fn aur_context(l: &Localizer, conf: &kura_alpm::Config) -> String {
     lines.join("\n")
 }
 
+/// "12 MB of 80 MB · about 2 minutes left" for a progress tracker.
+pub fn progress(l: &Localizer, tracker: &kura_core::progress::Tracker, now: f64) -> String {
+    use kura_core::progress::Measure;
+    let Some(measure) = tracker.measure() else {
+        return String::new();
+    };
+    let amount = match measure {
+        Measure::Bytes { done, total } => l.msg_args(
+            "progress-of",
+            &[("done", l.size(done).into()), ("total", l.size(total).into())],
+        ),
+        Measure::Items { current, total } => l.msg_args(
+            "progress-of",
+            &[
+                ("done", current.to_string().into()),
+                ("total", total.to_string().into()),
+            ],
+        ),
+    };
+    match tracker.remaining(now) {
+        Some(secs) if secs < 60 => format!("{amount} · {}", l.msg("progress-under-minute")),
+        Some(secs) => format!(
+            "{amount} · {}",
+            l.msg_args("progress-minutes", &[("minutes", secs.div_ceil(60).into())])
+        ),
+        None => amount,
+    }
+}
+
+/// Feeds an event into a tracker; `now` in seconds.
+pub fn track(tracker: &mut kura_core::progress::Tracker, event: &Event, now: f64) {
+    match event {
+        Event::Downloading { file, done, total } => tracker.download(file, *done, *total, now),
+        Event::Progress { current, total, .. } | Event::Building { current, total, .. } => {
+            tracker.item(*current, *total, now);
+        }
+        _ => {}
+    }
+}
+
 /// What to tell the user about a reply. `Changed` asks for a new review.
 pub fn reply(l: &Localizer, reply: &Reply) -> String {
     match reply {

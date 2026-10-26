@@ -59,6 +59,17 @@ impl Request {
     }
 }
 
+thread_local! {
+    static PROGRESS: std::cell::RefCell<Option<std::sync::mpsc::Sender<crate::apply::Event>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Sends download progress of previews prepared on this thread to `tx`,
+/// or stops with `None`.
+pub fn report_progress_to(tx: Option<std::sync::mpsc::Sender<crate::apply::Event>>) {
+    PROGRESS.with(|p| *p.borrow_mut() = tx);
+}
+
 /// Why libalpm could not prepare the change.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -163,6 +174,12 @@ pub fn prepare(
 ) -> Result<Outcome, Error> {
     let mut handle = open(conf, workdir)?;
     if refresh {
+        PROGRESS.with(|p| {
+            if let Some(tx) = p.borrow().as_ref() {
+                let _ = tx.send(crate::apply::Event::Refreshing);
+                crate::apply::forward_downloads(&handle, tx);
+            }
+        });
         // Downloads all databases in parallel.
         handle.syncdbs_mut().update(false)?;
     }
