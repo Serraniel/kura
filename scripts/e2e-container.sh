@@ -104,7 +104,8 @@ if grep -qw avx2 /proc/cpuinfo; then
   pacman-conf --repo-list | grep -q '^cachyos-core-v[34]$'
   if ! printf 'y\n' | kura profiles switch cachyos; then
     pacman -S --noconfirm --needed gdb
-    gdb -batch -ex run -ex bt --args kura profiles switch cachyos </dev/null || true
+    rm -f /var/lib/kura/checkdb/db.lck
+    gdb -batch -ex run -ex 'thread apply all bt' --args kura profiles switch cachyos </dev/null || true
     exit 1
   fi
   test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -gt 0
