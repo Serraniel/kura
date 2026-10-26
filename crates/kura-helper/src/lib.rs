@@ -57,7 +57,7 @@ pub enum Reply {
 pub fn action_for(kind: PlanKind) -> &'static str {
     match kind {
         PlanKind::SystemUpdate | PlanKind::Repair | PlanKind::Switch { .. } => "org.kura.update",
-        PlanKind::Install => "org.kura.install",
+        PlanKind::Install | PlanKind::Bundle => "org.kura.install",
         PlanKind::Remove => "org.kura.remove",
         PlanKind::Restore { .. } => "org.kura.restore",
         PlanKind::Snapshots => "org.kura.snapshots",
@@ -79,6 +79,7 @@ pub fn cause_for(kind: PlanKind) -> String {
         PlanKind::AurInstall => "aur-install",
         PlanKind::Profile => "profile",
         PlanKind::Kernel => "kernel",
+        PlanKind::Bundle => "bundle",
         PlanKind::Switch { .. } => "switch",
     };
     format!("kura:{kind}")

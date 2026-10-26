@@ -30,6 +30,9 @@ install -Dm644 "$here/kura-check.timer" "$dest/usr/lib/systemd/system/kura-check
 install -dm755 "$dest/usr/lib/systemd/system/timers.target.wants"
 ln -sf ../kura-check.timer "$dest/usr/lib/systemd/system/timers.target.wants/kura-check.timer"
 install -Dm644 "$here/kura-history.hook" "$dest/usr/share/libalpm/hooks/kura-history.hook"
+for bundle in "$here"/../data/bundles/*.toml; do
+  install -Dm644 "$bundle" "$dest/usr/share/kura/bundles/$(basename "$bundle")"
+done
 install -Dm644 "$here/org.kura.app.desktop" "$dest/usr/share/applications/org.kura.app.desktop"
 install -Dm644 "$here/org.kura.agent.desktop" "$dest/etc/xdg/autostart/org.kura.agent.desktop"
 install -Dm644 "$here/icons/kura.svg" "$dest/usr/share/icons/hicolor/scalable/apps/kura.svg"

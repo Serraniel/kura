@@ -8,6 +8,7 @@ cli-usage =
     使い方: kura <コマンド>
 
     コマンド:
+      bundles    アプリと設定をまとめたセット: kura bundles [add <名前>]
       check      アップデートを確認し、変更内容を表示します
       doctor     問題報告用にこのシステムの概要を表示します
       history    保存されたシステムの状態を表示します
@@ -177,6 +178,7 @@ gui-aur = AUR のソフトウェア
 gui-aur-hint = AUR には他のユーザーが共有するソフトウェアがあります。Arch Linux による確認は受けていません。kura はこのコンピューター上の分離された制限付きの環境でビルドします。
 gui-aur-wait-hint = 問題が先に見つかるよう、AUR の新しいバージョンはこの期間待ってからインストールされます。アプリを手動でインストールすると、常に最新バージョンになります。
 gui-profiles = 追加のリポジトリ
+gui-bundles = すぐ使えるセット
 gui-add = 追加
 gui-profile-add = { $name } を追加
 gui-profile-remove = { $name } を削除
@@ -195,6 +197,8 @@ health-kernels = カーネル
 health-kernel-running = 使用中
 kernels-title = カーネル: システムの中核です。複数インストールでき、起動時に選べます。
 kernels-usage = 使い方: kura kernels [add|remove <名前>]
+bundles-title = すぐ使えるセット: アプリと必要な設定をまとめたものです。
+bundles-usage = 使い方: kura bundles [add <名前> [追加…]]
 kernel-keep-running = { $name } は現在使用中です。先に別のカーネルでコンピューターを起動してください。
 kernel-keep-last = { $name } は唯一のカーネルです。これがないとコンピューターは起動できません。
 kernel-old = { $new } は問題なく起動しました。古いカーネル { $old } は削除できます: kura kernels remove { $old }
@@ -225,6 +229,7 @@ action-arch = { $arch } 向けにビルドされたパッケージを使用
 action-arch-generic = すべての x86-64 プロセッサー向けのパッケージに戻す
 action-regenerate-grub = 起動メニューを更新
 action-default-kernel = 既定で { $name } で起動する
+action-user-group = { $user } をグループ { $group } に追加
 profiles-title = kura が追加・削除できる追加のリポジトリ:
 profile-on = 追加済み
 profile-off = 未追加

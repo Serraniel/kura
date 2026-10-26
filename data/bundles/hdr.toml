@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "hdr"
+version = 1
+
+[name]
+en = "HDR for games and videos"
+de = "HDR für Spiele und Videos"
+fr = "HDR pour les jeux et les vidéos"
+ja = "ゲームと動画の HDR"
+
+[description]
+en = "Gamescope runs games in HDR on Plasma. Turn on HDR for your screen in the display settings first; the screen must support it."
+de = "Gamescope lässt Spiele unter Plasma in HDR laufen. Schalten Sie HDR zuerst in den Anzeigeeinstellungen für Ihren Bildschirm ein; der Bildschirm muss es unterstützen."
+fr = "Gamescope lance les jeux en HDR sous Plasma. Activez d'abord le HDR de votre écran dans les paramètres d'affichage ; l'écran doit le prendre en charge."
+ja = "Gamescope により Plasma 上でゲームを HDR で動かします。先にディスプレイ設定で画面の HDR を有効にしてください。画面が HDR に対応している必要があります。"
+
+[packages]
+required = ["gamescope"]
+
+[[packages.optional]]
+name = "mpv"
+reason = { en = "A video player that shows HDR videos in HDR.", de = "Ein Videoplayer, der HDR-Videos in HDR zeigt." }

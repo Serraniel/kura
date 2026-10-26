@@ -102,6 +102,7 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
         }
         Action::RegenerateGrub => run_program("grub-mkconfig", &["-o", "/boot/grub/grub.cfg"]),
         Action::SetDefaultKernel { kernel } => set_default_kernel(kernel),
+        Action::AddUserToGroup { user, group } => run_program("gpasswd", &["-a", user, group]),
         Action::SetArchitecture { value } => {
             edit_pacman_conf(|c| kura_core::pacman_conf::set_option(c, "Architecture", value))
         }
@@ -322,4 +323,73 @@ pub fn apply_kernel(conf: &Config, approved: &Plan, events: &Sender<Event>) -> R
         }
     }
     Ok(())
+}
+
+/// Installs a bundle for `caller`. The bundle is found by what the plan
+/// installs and does; actions run only when they are exactly what the
+/// shipped bundle file gives, and user-scope actions only for the caller.
+pub fn apply_bundle(
+    conf: &Config,
+    approved: &Plan,
+    events: &Sender<Event>,
+    caller: Option<&str>,
+) -> Result<(), ApplyError> {
+    let caller = caller.ok_or_else(|| ApplyError::Failed("unknown caller".into()))?;
+    let explicit: Vec<String> = approved
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Install {
+                name,
+                reason: kura_core::package::InstallReason::Explicit,
+                ..
+            } => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    let active: Vec<String> = conf.repos.iter().map(|r| r.name.clone()).collect();
+    let bundle = kura_alpm::bundles::load(Path::new(kura_alpm::bundles::DIR))
+        .into_iter()
+        .find(|b| {
+            let (before, after) = kura_core::bundles::actions(b, &active, caller);
+            let expected: Vec<Action> = before.into_iter().chain(after).collect();
+            let allowed = kura_alpm::bundles::packages(
+                b,
+                &b.packages
+                    .optional
+                    .iter()
+                    .map(|o| o.name.clone())
+                    .collect::<Vec<_>>(),
+            );
+            expected == approved.actions && explicit.iter().all(|n| allowed.contains(n))
+        })
+        .ok_or_else(|| ApplyError::Failed("not a bundle kura knows".into()))?;
+    let (before, after) = kura_core::bundles::actions(&bundle, &active, caller);
+    let run_all = |actions: &[Action], conf: &Config| -> Result<(), ApplyError> {
+        for action in actions {
+            let _ = events.send(Event::Configuring {
+                action: action.clone(),
+            });
+            run(action, conf, events).map_err(ApplyError::Failed)?;
+        }
+        Ok(())
+    };
+    run_all(&before, conf)?;
+    // Repositories may have changed: read the configuration again.
+    let conf = kura_alpm::load_config()?;
+    let packages = Plan {
+        kind: PlanKind::Install,
+        steps: approved.steps.clone(),
+        actions: Vec::new(),
+        builds: Vec::new(),
+    };
+    kura_alpm::apply::apply(&conf, &packages, events).map_err(|e| match e {
+        ApplyError::Changed(mut plan) => {
+            plan.kind = PlanKind::Bundle;
+            plan.actions.clone_from(&approved.actions);
+            ApplyError::Changed(plan)
+        }
+        other => other,
+    })?;
+    run_all(&after, &conf)
 }

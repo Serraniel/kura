@@ -79,6 +79,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("report") => Ok(report(l, &names.join(" "))),
         Some("profiles") => profiles(l, &names),
         Some("kernels") => kernels(l, &names),
+        Some("bundles") => bundles(l, &names),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => kura_helper::report::history(l),
@@ -531,6 +532,62 @@ fn report(l: &Localizer, what: &str) -> String {
         .stderr(std::process::Stdio::null())
         .spawn();
     l.msg_args("report-opened", &[("url", url.into())]) + "\n"
+}
+
+/// Lists the bundles, or installs one: `kura bundles add <id> [optional…]`.
+fn bundles(l: &Localizer, args: &[String]) -> Result<String, String> {
+    let lang = l.language();
+    let langs = [lang.as_str()];
+    let Some((verb, rest)) = args.split_first() else {
+        let mut out = l.msg("bundles-title") + "\n";
+        for b in kura_alpm::bundles::load(std::path::Path::new(kura_alpm::bundles::DIR)) {
+            let _ = writeln!(
+                out,
+                "\n  {}  {}\n  {}",
+                b.id,
+                b.name.get(&langs),
+                b.description.get(&langs)
+            );
+            for o in &b.packages.optional {
+                let _ = writeln!(out, "    + {}: {}", o.name, o.reason.get(&langs));
+            }
+        }
+        return Ok(out);
+    };
+    let (Some(id), "add") = (rest.first(), verb.as_str()) else {
+        return Err(l.msg("bundles-usage") + "\n");
+    };
+    let bundle = kura_alpm::bundles::find(id).ok_or_else(|| l.msg("bundles-usage") + "\n")?;
+    let user = std::env::var("USER").unwrap_or_default();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    eprintln!("{}", l.msg("check-running"));
+    let outcome = kura_alpm::bundles::prepare(
+        &conf,
+        Some(&kura_alpm::background::check_dir()),
+        &bundle,
+        &user,
+        &rest[1..],
+    )
+    .map_err(fail)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => {
+            let mut out = l.msg("change-blocked") + "\n";
+            for p in problems {
+                let _ = writeln!(out, "  {}", problem_text(l, p));
+            }
+            return Err(out);
+        }
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    say(&format!(
+        "{}\n{}\n{}",
+        bundle.name.get(&langs),
+        bundle.description.get(&langs),
+        render(l, &plan, Some(&outcome), &apps)
+    ));
+    confirm_and_apply(l, plan, &outcome, &apps, "confirm-install")
 }
 
 /// Lists kernels, or adds or removes one next to the others.

@@ -7,6 +7,7 @@ cli-usage =
     Aufruf: kura <Befehl>
 
     Befehle:
+      bundles    Fertige Zusammenstellungen von Apps mit Einstellungen: kura bundles [add <Name>]
       check      Nach Updates suchen und zeigen, was sich ändern würde
       doctor     Übersicht über dieses System für Problemberichte anzeigen
       history    Gespeicherte Systemstände anzeigen
@@ -203,6 +204,7 @@ gui-aur = Software aus dem AUR
 gui-aur-hint = Das AUR enthält Software, die andere Nutzer teilen. Arch Linux prüft sie nicht. kura baut sie auf diesem Computer in einer getrennten, eingeschränkten Umgebung.
 gui-aur-wait-hint = Neue AUR-Versionen warten so lange, bevor kura sie installiert, damit Probleme vorher auffallen. Wenn Sie eine App von Hand installieren, nimmt kura immer die neueste Version.
 gui-profiles = Zusätzliche Paketquellen
+gui-bundles = Fertige Zusammenstellungen
 gui-add = Hinzufügen
 gui-profile-add = { $name } hinzufügen
 gui-profile-remove = { $name } entfernen
@@ -224,6 +226,8 @@ health-kernels = Kernel
 health-kernel-running = in Verwendung
 kernels-title = Kernel: der Kern des Systems. Mehrere können installiert sein; beim Start wählen Sie einen aus.
 kernels-usage = Aufruf: kura kernels [add|remove <Name>]
+bundles-title = Fertige Zusammenstellungen: Apps zusammen mit den Einstellungen, die sie brauchen.
+bundles-usage = Aufruf: kura bundles [add <Name> [Extras…]]
 kernel-keep-running = { $name } läuft gerade. Starten Sie den Computer zuerst mit einem anderen Kernel.
 kernel-keep-last = { $name } ist der einzige Kernel. Ohne ihn könnte der Computer nicht starten.
 kernel-old = { $new } ist ohne Probleme gestartet. Der alte Kernel { $old } kann jetzt weg: kura kernels remove { $old }
@@ -254,6 +258,7 @@ action-arch = Pakete verwenden, die für { $arch } gebaut sind
 action-arch-generic = Wieder die Pakete für alle x86-64-Prozessoren verwenden
 action-regenerate-grub = Startmenü aktualisieren
 action-default-kernel = Standardmäßig mit { $name } starten
+action-user-group = { $user } zur Gruppe { $group } hinzufügen
 profiles-title = Zusätzliche Paketquellen, die kura hinzufügen und wieder entfernen kann:
 profile-on = hinzugefügt
 profile-off = nicht hinzugefügt

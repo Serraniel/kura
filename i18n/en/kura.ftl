@@ -7,6 +7,7 @@ cli-usage =
     Usage: kura <command>
 
     Commands:
+      bundles    Ready-made sets of apps with their settings: kura bundles [add <name>]
       check      Look for updates and show what would change
       doctor     Show a summary of this system for problem reports
       history    Show saved states of this system
@@ -203,6 +204,7 @@ gui-aur = Software from the AUR
 gui-aur-hint = The AUR has software that other users share. It is not checked by Arch Linux. kura builds it on this computer in a separate, restricted environment.
 gui-aur-wait-hint = New AUR versions wait this long before kura installs them, so problems can show up first. Installing an app by hand always takes the newest version.
 gui-profiles = Extra repositories
+gui-bundles = Ready-made sets
 gui-add = Add
 gui-profile-add = Add { $name }
 gui-profile-remove = Remove { $name }
@@ -224,6 +226,8 @@ health-kernels = Kernels
 health-kernel-running = in use
 kernels-title = Kernels: the core of the system. Several can be installed; you pick one when the computer starts.
 kernels-usage = Usage: kura kernels [add|remove <name>]
+bundles-title = Ready-made sets: apps together with the settings they need.
+bundles-usage = Usage: kura bundles [add <name> [extras…]]
 kernel-keep-running = { $name } is running right now. Start the computer with another kernel first.
 kernel-keep-last = { $name } is the only kernel. The computer could not start without it.
 kernel-old = { $new } started without problems. The old kernel { $old } can go now: kura kernels remove { $old }
@@ -254,6 +258,7 @@ action-arch = Use packages built for { $arch }
 action-arch-generic = Use the builds for every x86-64 processor again
 action-regenerate-grub = Update the boot menu
 action-default-kernel = Start { $name } by default
+action-user-group = Add { $user } to the group { $group }
 profiles-title = Extra repositories kura can add and take away again:
 profile-on = added
 profile-off = not added

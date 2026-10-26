@@ -130,6 +130,12 @@ pacman -Q linux-lts
 # kura remembers the kernel it added, to offer removing the old one later.
 grep -q '"added":"linux-lts"' /var/lib/kura/kernel-added.json
 
+# A bundle turns on multilib, installs Steam and adds the user to a group.
+printf 'y\n' | USER=root kura bundles add gaming
+pacman-conf --repo-list | grep -qx multilib
+pacman -Q steam gamemode
+id -nG root | grep -qw gamemode
+
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"
 
