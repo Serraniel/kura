@@ -11,7 +11,11 @@ use std::path::Path;
 #[test]
 #[ignore = "needs root and a prepared btrfs mount (e2e container only)"]
 fn keeps_the_existing_snapshots_mount() {
-    let root = std::env::var("KURA_TEST_BTRFS").expect("KURA_TEST_BTRFS");
+    // The coverage job runs ignored tests too; only the e2e job sets this.
+    let Ok(root) = std::env::var("KURA_TEST_BTRFS") else {
+        eprintln!("KURA_TEST_BTRFS not set, skipping");
+        return;
+    };
     let root = Path::new(&root);
     let dir = root.join(".snapshots");
     let target = dir.to_str().unwrap();
