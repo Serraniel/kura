@@ -46,6 +46,8 @@ pub mod qobject {
         #[qproperty(QString, security_json, cxx_name = "securityJson")]
         #[qproperty(QString, results_json, cxx_name = "resultsJson")]
         #[qproperty(bool, aur_enabled, cxx_name = "aurEnabled")]
+        // The message is about a failure; the window offers a problem report.
+        #[qproperty(bool, failed)]
         #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
         type Kura = super::KuraRust;
     }
@@ -116,6 +118,11 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "changeAurWait"]
         fn change_aur_wait(self: Pin<&mut Kura>, days: i32);
+
+        // The anonymised problem report as JSON: {"text", "url"}.
+        #[qinvokable]
+        #[cxx_name = "problemReport"]
+        fn problem_report(self: &Kura) -> QString;
     }
 
     impl cxx_qt::Threading for Kura {}
@@ -161,6 +168,7 @@ pub struct KuraRust {
     security_json: QString,
     results_json: QString,
     aur_enabled: bool,
+    failed: bool,
     aur_wait: i32,
     localizer: Localizer,
     pending: Option<Plan>,
@@ -196,6 +204,7 @@ impl Default for KuraRust {
             security_json: QString::from("[]"),
             results_json: QString::from("[]"),
             aur_enabled: kura_alpm::aur::settings().aur,
+            failed: false,
             aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
             localizer: Localizer::from_env(),
             pending: None,
@@ -464,6 +473,11 @@ impl qobject::Kura {
         QString::from(&self.localizer.msg(&id.to_string()))
     }
 
+    fn problem_report(&self) -> QString {
+        let (text, url) = kura_helper::report::build(&self.message().to_string());
+        QString::from(&json!({"text": text, "url": url}).to_string())
+    }
+
     fn tr_days(&self, days: i32) -> QString {
         QString::from(&self.localizer.msg_args("settings-days", &[("days", days.into())]))
     }
@@ -596,6 +610,7 @@ impl qobject::Kura {
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
         self.as_mut().set_message(QString::default());
+        self.as_mut().set_failed(false);
         self.as_mut().set_preview_json(QString::from("[]"));
         self.as_mut().set_news_json(QString::from("[]"));
         self.as_mut().set_progress_text(QString::from(&running));
@@ -617,6 +632,7 @@ impl qobject::Kura {
                     }
                     Err(text) => {
                         this.as_mut().set_message(QString::from(&text));
+                        this.as_mut().set_failed(true);
                         this.as_mut().set_progress_text(QString::default());
                     }
                 }
@@ -773,21 +789,27 @@ impl qobject::Kura {
                 let line = kura_helper::text::event(&l, &event);
                 let _ = events.queue(move |mut this| this.as_mut().set_progress_text(QString::from(&line)));
             });
-            let (text, fresh) = match result {
+            let (text, fresh, failed) = match result {
                 Ok(reply) => {
                     let fresh = match &reply {
                         kura_helper::Reply::Changed { plan } => Some(plan.clone()),
                         _ => None,
                     };
-                    (kura_helper::text::reply(&l, &reply), fresh)
+                    let failed = !matches!(
+                        reply,
+                        kura_helper::Reply::Done | kura_helper::Reply::Changed { .. }
+                    );
+                    (kura_helper::text::reply(&l, &reply), fresh, failed)
                 }
                 Err(e) => (
                     l.msg_args("error-helper", &[("reason", e.to_string().into())]),
                     None,
+                    true,
                 ),
             };
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_message(QString::from(&text));
+                this.as_mut().set_failed(failed);
                 this.as_mut().set_busy(false);
                 this.as_mut().set_progress_text(QString::default());
                 this.as_mut().set_preview_json(QString::from("[]"));

@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 use kura_alpm::apply::Event;
 use kura_alpm::prepare::{Outcome, Problem, Request};
-use kura_core::package::{InstallReason, PackageSet};
+use kura_core::package::PackageSet;
 use kura_core::plan::Plan;
 use kura_core::plan::{RemovalReason, Step};
 use kura_helper::Reply;
@@ -79,8 +79,8 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("report") => Ok(report(l, &names.join(" "))),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
-        Some("history") => history(l),
-        Some("doctor") => doctor(l),
+        Some("history") => kura_helper::report::history(l),
+        Some("doctor") => kura_helper::report::summary(l),
         Some("search") if !names.is_empty() => search(l, &names.join(" ")),
         Some("snapshots") => match names.first().map(String::as_str) {
             None => snapshots(l, false),
@@ -106,20 +106,6 @@ fn load(l: &Localizer) -> Result<PackageSet, String> {
     kura_alpm::load_config()
         .and_then(|conf| kura_alpm::installed(&conf))
         .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))
-}
-
-/// `NAME` and `ID` from /etc/os-release.
-fn os_release() -> (String, String) {
-    let text = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
-    let field = |key: &str| {
-        text.lines()
-            .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
-            .map(|v| v.trim_matches('"').to_owned())
-    };
-    (
-        field("NAME").unwrap_or_else(|| "Linux".into()),
-        field("ID").unwrap_or_else(|| "linux".into()),
-    )
 }
 
 /// Private copy of the sync databases, so checks never touch pacman's own.
@@ -505,42 +491,14 @@ fn update(l: &Localizer) -> Result<String, String> {
     aur_updates(l)
 }
 
-/// Who uses this computer, to be removed from reports.
-fn identity() -> kura_core::report::Identity {
-    let env = |k: &str| std::env::var(k).unwrap_or_default();
-    kura_core::report::Identity {
-        user: std::env::var("USER").unwrap_or_else(|_| env("LOGNAME")),
-        host: std::fs::read_to_string("/proc/sys/kernel/hostname")
-            .unwrap_or_default()
-            .trim()
-            .to_owned(),
-        home: env("HOME"),
-    }
-}
-
 /// Shows an anonymised problem report and, on request, opens a prefilled
 /// GitHub issue in the browser. kura itself sends nothing.
 fn report(l: &Localizer, what: &str) -> String {
-    // Reports are read by the developers, so they are in English.
-    let en = Localizer::new(&[kura_core::locale::Locale::parse("en").expect("valid locale")]);
-    let mut body = format!("kura {}\n\n", kura_core::VERSION);
-    body.push_str(&doctor(&en).unwrap_or_else(|e| e));
-    let status = kura_alpm::background::read_status(std::path::Path::new(kura_alpm::background::STATUS));
-    let _ = writeln!(
-        body,
-        "\nLast check: {} · updates {} · blocked {} · AUR {} ready, {} waiting",
-        status.checked, status.updates, status.blocked, status.aur_updates, status.aur_waiting
-    );
-    if let Ok(history) = history(&en) {
-        let lines: Vec<&str> = history.lines().collect();
-        let _ = writeln!(body, "\n{}", lines[lines.len().saturating_sub(8)..].join("\n"));
-    }
-    let text = kura_core::report::anonymize(&body, &identity());
+    let (text, url) = kura_helper::report::build(what);
     say(&format!("{}\n\n{text}", l.msg("report-intro")));
     if !confirm(l, "confirm-report") {
         return String::new();
     }
-    let url = kura_core::report::issue_url("Problem report", what, &text, kura_core::VERSION);
     let _ = std::process::Command::new("xdg-open")
         .arg(&url)
         .stdout(std::process::Stdio::null())
@@ -776,71 +734,6 @@ fn undo(l: &Localizer, arg: Option<&str>) -> Result<String, String> {
     }
 }
 
-fn history(l: &Localizer) -> Result<String, String> {
-    let journal = kura_alpm::history::load(std::path::Path::new(kura_alpm::history::JOURNAL))
-        .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))?;
-    if journal.is_empty() {
-        return Ok(l.msg("history-empty") + "\n");
-    }
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
-    let rows: Vec<(String, String, String)> = journal
-        .records()
-        .iter()
-        .rev()
-        .map(|r| {
-            let text = kura_i18n::present::record_text(l, r);
-            (
-                format!("#{}", r.id),
-                kura_i18n::present::when(l, r.created, now),
-                text,
-            )
-        })
-        .collect();
-    let w0 = rows.iter().map(|r| r.0.chars().count()).max().unwrap_or(0);
-    let w1 = rows.iter().map(|r| r.1.chars().count()).max().unwrap_or(0);
-    let mut out = l.msg("history-title") + "\n\n";
-    for (id, day, text) in rows {
-        let _ = writeln!(out, "  {id:>w0$}  {day:w1$}  {text}");
-    }
-    Ok(out)
-}
-
-fn doctor(l: &Localizer) -> Result<String, String> {
-    let set = load(l)?;
-    let (name, _) = os_release();
-    let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
-    let foreign = set.iter().filter(|p| p.repo.is_none()).count();
-    let conf = kura_alpm::load_config()
-        .map_err(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))?;
-    let mounts = std::fs::read_to_string("/proc/mounts").unwrap_or_default();
-    let report = kura_alpm::system::snapshot_report(&conf, &set, &mounts);
-    let (snapshot_state, missing) = kura_i18n::present::snapshots(l, &report);
-    let rows = [
-        (l.msg("doctor-distro"), name),
-        (l.msg("doctor-packages"), set.len().to_string()),
-        (l.msg("doctor-explicit"), explicit.to_string()),
-        (l.msg("doctor-foreign"), foreign.to_string()),
-        (l.msg("doctor-orphans"), set.orphans().len().to_string()),
-        (l.msg("doctor-language"), l.language()),
-        (l.msg("health-snapshots"), snapshot_state.clone()),
-    ];
-    let width = rows.iter().map(|(k, _)| k.chars().count()).max().unwrap_or(0);
-    let mut out = format!("{}\n\n", l.msg("doctor-title"));
-    for (k, v) in rows {
-        let pad = width - k.chars().count();
-        let _ = writeln!(out, "  {k}{}  {v}", " ".repeat(pad));
-    }
-    if !missing.is_empty() {
-        let _ = writeln!(out, "\n{}", l.msg("snapshots-missing"));
-        for step in missing {
-            let _ = writeln!(out, "  {step}");
-        }
-    }
-    Ok(out)
-}
-
 fn orphans(l: &Localizer) -> Result<String, String> {
     let set = load(l)?;
     let orphans = set.orphans();
@@ -858,7 +751,7 @@ fn orphans(l: &Localizer) -> Result<String, String> {
 
 fn sbom(l: &Localizer, output: Option<&str>) -> Result<String, String> {
     let set = load(l)?;
-    let (name, id) = os_release();
+    let (name, id) = kura_helper::report::os_release();
     let uuid = std::fs::read_to_string("/proc/sys/kernel/random/uuid").unwrap_or_default();
     let serial = format!("urn:uuid:{}", uuid.trim());
     let now = SystemTime::now()

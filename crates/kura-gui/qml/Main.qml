@@ -70,6 +70,44 @@ Kirigami.ApplicationWindow {
 
     pageStack.initialPage: overviewPage
 
+    // Shows the anonymised report; nothing leaves the computer unless the
+    // user opens it on GitHub.
+    Kirigami.Dialog {
+        id: reportDialog
+        property var report: ({ text: "", url: "" })
+        function show() { report = JSON.parse(kura.problemReport()); open() }
+
+        title: kura.tr("gui-report")
+        preferredWidth: Kirigami.Units.gridUnit * 32
+        preferredHeight: Kirigami.Units.gridUnit * 24
+        standardButtons: Kirigami.Dialog.Close
+        customFooterActions: [
+            Kirigami.Action {
+                text: kura.tr("gui-report-open")
+                icon.name: "internet-services"
+                onTriggered: { Qt.openUrlExternally(reportDialog.report.url); reportDialog.close() }
+            }
+        ]
+
+        ColumnLayout {
+            Controls.Label {
+                text: kura.tr("report-intro")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            Controls.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Controls.TextArea {
+                    text: reportDialog.report.text
+                    readOnly: true
+                    font.family: "monospace"
+                    wrapMode: Text.NoWrap
+                }
+            }
+        }
+    }
+
     Component {
         id: overviewPage
 
@@ -206,8 +244,16 @@ Kirigami.ApplicationWindow {
                 Kirigami.InlineMessage {
                     Layout.fillWidth: true
                     visible: kura.message.length > 0
-                    type: Kirigami.MessageType.Information
+                    type: kura.failed ? Kirigami.MessageType.Warning : Kirigami.MessageType.Information
                     text: kura.message
+                    actions: [
+                        Kirigami.Action {
+                            visible: kura.failed
+                            text: kura.tr("gui-report")
+                            icon.name: "tools-report-bug"
+                            onTriggered: reportDialog.show()
+                        }
+                    ]
                 }
 
                 Repeater {
@@ -389,8 +435,16 @@ Kirigami.ApplicationWindow {
                 Kirigami.InlineMessage {
                     Layout.fillWidth: true
                     visible: kura.message.length > 0
-                    type: Kirigami.MessageType.Information
+                    type: kura.failed ? Kirigami.MessageType.Warning : Kirigami.MessageType.Information
                     text: kura.message
+                    actions: [
+                        Kirigami.Action {
+                            visible: kura.failed
+                            text: kura.tr("gui-report")
+                            icon.name: "tools-report-bug"
+                            onTriggered: reportDialog.show()
+                        }
+                    ]
                 }
 
                 Kirigami.FormLayout {
