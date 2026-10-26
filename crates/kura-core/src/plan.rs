@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::action::Action;
 use crate::generation::Change;
 use crate::package::InstallReason;
 
@@ -26,6 +27,8 @@ pub enum PlanKind {
     },
     /// Steps chosen by the problem solver.
     Repair,
+    /// Set up snapshots before updates: packages plus actions.
+    Snapshots,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +89,9 @@ impl Step {
 pub struct Plan {
     pub kind: PlanKind,
     pub steps: Vec<Step>,
+    /// Changes that are not package changes; they run after the packages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<Action>,
 }
 
 /// Facts about the system that a plan is checked against.
@@ -128,6 +134,7 @@ impl Plan {
         Self {
             kind,
             steps: Vec::new(),
+            actions: Vec::new(),
         }
     }
 
@@ -155,7 +162,11 @@ impl Plan {
                 Change::Reason { name, reason } => Step::MarkReason { name, reason },
             })
             .collect();
-        Self { kind, steps }
+        Self {
+            kind,
+            steps,
+            actions: Vec::new(),
+        }
     }
 
     /// Adds removal of packages nothing needs any more.
@@ -171,7 +182,7 @@ impl Plan {
 
     /// Checks the rules every plan must follow.
     pub fn validate(&self, ctx: &Context) -> Result<(), PlanError> {
-        if self.steps.is_empty() {
+        if self.steps.is_empty() && self.actions.is_empty() {
             return Err(PlanError::Empty);
         }
         let mut seen = BTreeSet::new();
@@ -187,7 +198,7 @@ impl Plan {
         // upgrading everything is a partial upgrade.
         if matches!(
             self.kind,
-            PlanKind::SystemUpdate | PlanKind::Install | PlanKind::Repair
+            PlanKind::SystemUpdate | PlanKind::Install | PlanKind::Repair | PlanKind::Snapshots
         ) {
             let upgraded: BTreeSet<&str> = self
                 .steps
@@ -276,6 +287,7 @@ mod tests {
         let plan = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox"), up("mesa")],
+            actions: Vec::new(),
         };
         assert_eq!(plan.validate(&ctx(&["firefox", "mesa"])), Ok(()));
     }
@@ -285,6 +297,7 @@ mod tests {
         let plan = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox")],
+            actions: Vec::new(),
         };
         assert_eq!(
             plan.validate(&ctx(&["firefox", "mesa"])),
@@ -297,6 +310,7 @@ mod tests {
                 version: "3".into(),
                 reason: InstallReason::Explicit,
             }],
+            actions: Vec::new(),
         };
         assert!(matches!(
             install.validate(&ctx(&["mesa"])),
@@ -318,6 +332,7 @@ mod tests {
                     why: RemovalReason::Repair,
                 },
             ],
+            actions: Vec::new(),
         };
         assert_eq!(plan.validate(&c), Ok(()));
     }
@@ -331,6 +346,7 @@ mod tests {
             let plan = Plan {
                 kind: PlanKind::SystemUpdate,
                 steps: vec![up("x")],
+                actions: Vec::new(),
             };
             assert_eq!(plan.validate(&c), Err(PlanError::CannotHold(name.into())));
         }
@@ -359,6 +375,7 @@ mod tests {
         let plan = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("a"), up("a")],
+            actions: Vec::new(),
         };
         assert_eq!(plan.validate(&ctx(&["a"])), Err(PlanError::Duplicate("a".into())));
     }
@@ -407,6 +424,7 @@ mod tests {
         let mut plan = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox"), up("mesa")],
+            actions: Vec::new(),
         };
         plan.add_cleanup([("electron36", "36.9.0-1")]);
         let is_app = |p: &str| p == "firefox";

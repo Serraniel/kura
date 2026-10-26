@@ -51,6 +51,7 @@ pub fn event(l: &Localizer, event: &Event) -> String {
     };
     match event {
         Event::Refreshing => l.msg("apply-refreshing"),
+        Event::Configuring { action } => kura_i18n::present::action(l, action),
         Event::Downloading { file, .. } => l.msg_args("apply-downloading", &[("file", file.clone().into())]),
         Event::Progress {
             phase: Phase::Installing,

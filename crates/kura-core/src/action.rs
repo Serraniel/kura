@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: 2026 The kura contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Changes to the system that are not package changes. Each action is a
+//! fixed, declarative operation; `kura-helper` only runs actions it derived
+//! itself from the system's state, never ones it received.
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "kebab-case")]
+pub enum Action {
+    /// Enable and start a systemd unit.
+    Enable { unit: String },
+    /// Create the snapper configuration `root` for `/`. With an existing
+    /// `/.snapshots` mount the mount is kept instead of snapper's own subvolume.
+    SnapperRootConfig { keep_mount: bool },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialises_as_tagged_objects() {
+        let a = Action::Enable {
+            unit: "snapper-cleanup.timer".into(),
+        };
+        let json = serde_json::to_string(&a).unwrap();
+        assert_eq!(json, r#"{"action":"enable","unit":"snapper-cleanup.timer"}"#);
+        assert_eq!(serde_json::from_str::<Action>(&json).unwrap(), a);
+        let c = Action::SnapperRootConfig { keep_mount: true };
+        assert_eq!(
+            serde_json::to_string(&c).unwrap(),
+            r#"{"action":"snapper-root-config","keep_mount":true}"#
+        );
+    }
+}

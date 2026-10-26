@@ -7,6 +7,7 @@
 //! The helper accepts exactly one kind of request: an approved plan. Before
 //! running it, it asks polkit whether the caller may do this kind of change.
 
+pub mod actions;
 pub mod text;
 
 use std::sync::mpsc;
@@ -57,6 +58,7 @@ pub fn action_for(kind: PlanKind) -> &'static str {
         PlanKind::Install => "org.kura.install",
         PlanKind::Remove => "org.kura.remove",
         PlanKind::Restore { .. } => "org.kura.restore",
+        PlanKind::Snapshots => "org.kura.snapshots",
     }
 }
 
@@ -68,6 +70,7 @@ pub fn cause_for(kind: PlanKind) -> String {
         PlanKind::Remove => "remove",
         PlanKind::Restore { .. } => "restore",
         PlanKind::Repair => "repair",
+        PlanKind::Snapshots => "snapshots",
     };
     format!("kura:{kind}")
 }
@@ -166,6 +169,7 @@ mod tests {
         assert_eq!(action_for(PlanKind::Repair), "org.kura.update");
         assert_eq!(action_for(PlanKind::Install), "org.kura.install");
         assert_eq!(action_for(PlanKind::Remove), "org.kura.remove");
+        assert_eq!(action_for(PlanKind::Snapshots), "org.kura.snapshots");
         assert_eq!(
             action_for(PlanKind::Restore { generation: 1 }),
             "org.kura.restore"

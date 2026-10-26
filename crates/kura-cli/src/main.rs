@@ -79,6 +79,11 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => history(l),
         Some("doctor") => doctor(l),
+        Some("snapshots") => match names.first().map(String::as_str) {
+            None => snapshots(l, false),
+            Some("setup") => snapshots(l, true),
+            Some(other) => Err(l.msg_args("cli-unknown-command", &[("command", other.to_owned().into())])),
+        },
         Some("orphans") => orphans(l),
         Some("sbom") => sbom(l, output.as_deref()),
         Some(other) => Err(format!(
@@ -202,6 +207,12 @@ fn render(l: &Localizer, plan: &Plan, outcome: Option<&Outcome>, apps: &BTreeSet
     section("check-group-system", &system);
     section("check-group-replaced", &replaced);
     section("check-group-cleanup", &groups.cleanup);
+    if !plan.actions.is_empty() {
+        let _ = writeln!(out, "\n{}", l.msg("preview-actions"));
+        for action in &plan.actions {
+            let _ = writeln!(out, "  {}", kura_i18n::present::action(l, action));
+        }
+    }
     if let Some(outcome) = outcome
         && plan.steps.iter().any(|s| {
             !matches!(
@@ -308,7 +319,7 @@ fn show_news(l: &Localizer, items: &[kura_core::news::Item]) {
 /// preview is shown and confirmed again.
 fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String, String> {
     eprintln!("{}", l.msg("check-running"));
-    let (mut plan, outcome, apps) = prepare(l, request)?;
+    let (plan, outcome, apps) = prepare(l, request)?;
     if plan.steps.is_empty() {
         return Ok(l.msg("check-none") + "\n");
     }
@@ -329,6 +340,18 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
             None => say(&format!("\n{}", l.msg("news-unavailable"))),
         }
     }
+    confirm_and_apply(l, plan, &outcome, &apps, question_id)
+}
+
+/// Asks, runs the plan through the helper and shows a new preview when the
+/// system changed in the meantime.
+fn confirm_and_apply(
+    l: &Localizer,
+    mut plan: Plan,
+    outcome: &Outcome,
+    apps: &BTreeSet<String>,
+    question_id: &str,
+) -> Result<String, String> {
     loop {
         if !confirm(l, question_id) {
             return Ok(l.msg("apply-cancelled") + "\n");
@@ -342,12 +365,57 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
                 say(&format!(
                     "\n{}\n{}",
                     l.msg("apply-changed"),
-                    render(l, &plan, Some(&outcome), &apps)
+                    render(l, &plan, Some(outcome), apps)
                 ));
             }
             other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
+}
+
+/// The snapshot state; with `setup`, a preview of what kura adds.
+fn snapshots(l: &Localizer, setup: bool) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let set = load(l)?;
+    let mounts = std::fs::read_to_string("/proc/mounts").unwrap_or_default();
+    let report = kura_alpm::system::snapshot_report(&conf, &set, &mounts);
+    let (state, missing) = kura_i18n::present::snapshots(l, &report);
+    let mut out = format!("{}: {state}\n", l.msg("health-snapshots"));
+    if !missing.is_empty() {
+        let _ = writeln!(out, "\n{}", l.msg("snapshots-missing"));
+        for step in &missing {
+            let _ = writeln!(out, "  {step}");
+        }
+    }
+    if !setup {
+        if !missing.is_empty() {
+            let _ = writeln!(out, "\n{}", l.msg("snapshots-setup-hint"));
+        }
+        return Ok(out);
+    }
+    say(&out);
+    eprintln!("{}", l.msg("check-running"));
+    let Some(outcome) = kura_alpm::snapshots::prepare(&conf, Some(&check_dir()), true).map_err(fail)? else {
+        return Ok(l.msg("snapshots-nothing") + "\n");
+    };
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => {
+            let mut out = l.msg("change-blocked") + "\n";
+            for p in problems {
+                let _ = writeln!(out, "  {}", problem_text(l, p));
+            }
+            return Err(out);
+        }
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    say(&format!(
+        "{}\n{}",
+        l.msg("preview-title"),
+        render(l, &plan, Some(&outcome), &apps)
+    ));
+    confirm_and_apply(l, plan, &outcome, &apps, "confirm-snapshots")
 }
 
 /// Known vulnerabilities, named by the apps that use the affected package.

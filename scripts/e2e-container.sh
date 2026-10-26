@@ -83,3 +83,24 @@ grep -q '"checked"' /var/lib/kura/status.json
 
 kura history
 echo "e2e passed"
+
+# Snapshots: the root of this container is not btrfs, so nothing is offered.
+kura snapshots | grep -q "Not possible"
+kura snapshots setup | grep -q "Nothing to set up"
+
+# A snapper configuration next to an existing .snapshots mount, on a btrfs
+# image laid out like a typical install (@ and @snapshots).
+pacman -S --noconfirm --needed btrfs-progs snapper
+truncate -s 512M /tmp/kura-btrfs.img
+mkfs.btrfs -q /tmp/kura-btrfs.img
+dev=$(losetup -f --show /tmp/kura-btrfs.img)
+mkdir -p /mnt/kura-top /mnt/kura-root
+mount "$dev" /mnt/kura-top
+btrfs subvolume create /mnt/kura-top/@
+btrfs subvolume create /mnt/kura-top/@snapshots
+mount -o subvol=@ "$dev" /mnt/kura-root
+mkdir /mnt/kura-root/.snapshots
+mount -o subvol=@snapshots "$dev" /mnt/kura-root/.snapshots
+KURA_TEST_BTRFS=/mnt/kura-root cargo test --locked -p kura-helper --test snapper -- --ignored
+snapper --no-dbus -c kuratest create -d e2e
+btrfs subvolume list /mnt/kura-top | grep -q "@snapshots/1/snapshot"

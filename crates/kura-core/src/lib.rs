@@ -4,6 +4,7 @@
 //! Domain logic of kura. Nothing in here touches the real system, so all of it
 //! can be tested without root or a pacman database.
 
+pub mod action;
 pub mod generation;
 pub mod hardware;
 pub mod health;

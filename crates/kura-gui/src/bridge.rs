@@ -95,6 +95,11 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "rankMirrors"]
         fn rank_mirrors(self: Pin<&mut Kura>);
+
+        // Prepares setting up snapshots before updates.
+        #[qinvokable]
+        #[cxx_name = "prepareSnapshots"]
+        fn prepare_snapshots(self: Pin<&mut Kura>);
     }
 
     impl cxx_qt::Threading for Kura {}
@@ -232,12 +237,18 @@ fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value 
         ("check-group-replaced", replaced.as_slice()),
         ("check-group-cleanup", groups.cleanup.as_slice()),
     ];
-    Value::Array(
-        all.iter()
-            .filter(|(_, s)| !s.is_empty())
-            .map(|(id, s)| group(id, s))
-            .collect(),
-    )
+    let mut out: Vec<Value> = all
+        .iter()
+        .filter(|(_, s)| !s.is_empty())
+        .map(|(id, s)| group(id, s))
+        .collect();
+    if !plan.actions.is_empty() {
+        out.push(json!({
+            "title": l.msg("preview-actions"),
+            "items": plan.actions.iter().map(|a| json!({"name": present::action(l, a), "detail": ""})).collect::<Vec<_>>(),
+        }));
+    }
+    Value::Array(out)
 }
 
 struct Prepared {
@@ -262,18 +273,14 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     )
     .map_err(fail)?;
     let mut plan = match outcome.plan {
-        Ok(plan) => plan,
-        Err(problems) => {
-            let mut text = l.msg(if matches!(request, Request::Update) {
+        Ok(ref plan) => plan.clone(),
+        Err(ref problems) => {
+            let id = if matches!(request, Request::Update) {
                 "check-blocked"
             } else {
                 "change-blocked"
-            });
-            for p in &problems {
-                text.push_str("\n• ");
-                text.push_str(&kura_helper::text::problem(&l, p));
-            }
-            return Err(text);
+            };
+            return Err(blocked_text(&l, id, problems));
         }
     };
     if matches!(request, Request::Update) {
@@ -319,18 +326,52 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     } else {
         l.msg_args("check-found", &[("count", outcome.available.len().into())])
     };
-    let summary = l.msg_args(
+    Ok(Prepared {
+        preview: preview_groups(&l, &plan, &apps).to_string(),
+        news: news.to_string(),
+        summary: sizes(&l, &outcome),
+        headline,
+        plan,
+    })
+}
+
+fn blocked_text(l: &Localizer, id: &str, problems: &[kura_alpm::prepare::Problem]) -> String {
+    let mut text = l.msg(id);
+    for p in problems {
+        text.push_str("\n• ");
+        text.push_str(&kura_helper::text::problem(l, p));
+    }
+    text
+}
+
+fn sizes(l: &Localizer, outcome: &kura_alpm::prepare::Outcome) -> String {
+    l.msg_args(
         "check-sizes",
         &[
             ("download", l.size(outcome.download_size).into()),
             ("delta", l.size_delta(outcome.installed_delta).into()),
         ],
-    );
+    )
+}
+
+/// Runs in a background thread: what setting up snapshots would change.
+fn prepare_snapshots_preview() -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let outcome = kura_alpm::snapshots::prepare(&conf, Some(&check_dir()), true)
+        .map_err(fail)?
+        .ok_or_else(|| l.msg("snapshots-nothing"))?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => return Err(blocked_text(&l, "change-blocked", problems)),
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
     Ok(Prepared {
         preview: preview_groups(&l, &plan, &apps).to_string(),
-        news: news.to_string(),
-        summary,
-        headline,
+        news: "[]".into(),
+        summary: sizes(&l, &outcome),
+        headline: String::new(),
         plan,
     })
 }
@@ -411,7 +452,7 @@ impl qobject::Kura {
     fn prepare_update(self: Pin<&mut Self>) {
         let title = self.localizer.msg("nav-updates");
         let label = self.localizer.msg("gui-install");
-        self.start_preview(Request::Update, &title, &label);
+        self.start_preview(|| prepare_preview(&Request::Update), &title, &label);
     }
 
     fn prepare_install(self: Pin<&mut Self>, names: &QString) {
@@ -420,7 +461,7 @@ impl qobject::Kura {
             .localizer
             .msg_args("gui-install-title", &[("name", names.join(", ").into())]);
         let label = self.localizer.msg("gui-install");
-        self.start_preview(Request::Install(names), &title, &label);
+        self.start_preview(move || prepare_preview(&Request::Install(names)), &title, &label);
     }
 
     fn prepare_remove(self: Pin<&mut Self>, name: &QString) {
@@ -429,11 +470,26 @@ impl qobject::Kura {
             .localizer
             .msg_args("gui-remove-title", &[("name", name.clone().into())]);
         let label = self.localizer.msg("gui-remove");
-        self.start_preview(Request::Remove(vec![name]), &title, &label);
+        self.start_preview(
+            move || prepare_preview(&Request::Remove(vec![name])),
+            &title,
+            &label,
+        );
+    }
+
+    fn prepare_snapshots(self: Pin<&mut Self>) {
+        let title = self.localizer.msg("suggest-snapshots");
+        let label = self.localizer.msg("gui-setup");
+        self.start_preview(prepare_snapshots_preview, &title, &label);
     }
 
     /// Prepares any request in a background thread and shows it as the preview.
-    fn start_preview(mut self: Pin<&mut Self>, request: Request, title: &str, label: &str) {
+    fn start_preview(
+        mut self: Pin<&mut Self>,
+        prepare: impl FnOnce() -> Result<Prepared, String> + Send + 'static,
+        title: &str,
+        label: &str,
+    ) {
         if *self.busy() {
             return;
         }
@@ -448,11 +504,11 @@ impl qobject::Kura {
         self.as_mut().set_progress_text(QString::from(&running));
         let qt = self.qt_thread();
         std::thread::spawn(move || {
-            let result = prepare_preview(&request);
+            let result = prepare();
             let _ = qt.queue(move |mut this| {
                 match result {
                     Ok(p) => {
-                        let has_changes = !p.plan.steps.is_empty();
+                        let has_changes = !p.plan.steps.is_empty() || !p.plan.actions.is_empty();
                         this.as_mut().set_preview_json(QString::from(&p.preview));
                         this.as_mut().set_news_json(QString::from(&p.news));
                         this.as_mut().set_summary_text(QString::from(&p.summary));
@@ -762,6 +818,7 @@ mod tests {
                     why: RemovalReason::Replaced,
                 },
             ],
+            actions: Vec::new(),
         };
         plan.add_cleanup([("electron36", "36")]);
         let apps = BTreeSet::from(["firefox".to_owned()]);

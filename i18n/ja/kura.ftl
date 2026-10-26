@@ -18,6 +18,7 @@ cli-usage =
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
       security   インストール済みソフトウェアの既知のセキュリティ問題を表示します
+      snapshots  スナップショットの状態を表示します。kura snapshots setup で不足分を追加します
       undo       以前の状態に戻します: kura undo [番号]
       version    kura のバージョンを表示します
 cli-unknown-command = 不明なコマンドです: { $command }
@@ -183,10 +184,14 @@ snapshots-missing = 不足しているもの:
 snapshots-step-install = { $package } をインストール
 snapshots-step-config = / の snapper 設定を作成
 snapshots-step-enable = { $unit } を有効化
+snapshots-setup-hint = 不足分を追加するには: kura snapshots setup
+snapshots-nothing = 設定するものはありません。
+preview-actions = 変更される設定:
+confirm-snapshots = スナップショットを設定しますか? [y/N]
 suggest-backup-kernel = 予備のカーネルをインストール
 suggest-backup-kernel-text = アップデートの後にコンピューターが起動しなくなった場合でも、起動メニューで予備のカーネルを選べます。
 suggest-snapshots = 自動スナップショットを有効にする
-suggest-snapshots-text = このディスクはスナップショットに対応しています。設定は今後の kura のバージョンで対応します。
+suggest-snapshots-text = スナップショットは、アップデートの前に毎回システムの状態を保存します。問題が起きたときに元に戻せます。kura は既存の設定をそのまま残し、不足しているものだけを追加します。
 suggest-mirrors = より速いダウンロードサーバーを選ぶ
 suggest-mirrors-text = kura が近くのサーバーをテストし、最も速いものを使います。
 suggest-cleanup = 不要になったパッケージが { $count } 個あります

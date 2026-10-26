@@ -440,12 +440,12 @@ Kirigami.ApplicationWindow {
                                 }
                             }
                             Controls.Button {
-                                visible: modelData.id !== "snapshots"
                                 enabled: !kura.busy
                                 text: modelData.id === "cleanup" ? kura.tr("gui-review") : kura.tr("gui-setup")
                                 onClicked: {
                                     if (modelData.id === "mirrors") kura.rankMirrors()
                                     else if (modelData.id === "backup-kernel") { root.show(updatesPage); kura.prepareInstall("linux-lts linux-lts-headers") }
+                                    else if (modelData.id === "snapshots") { root.show(updatesPage); kura.prepareSnapshots() }
                                     else { root.show(updatesPage); kura.prepareUpdate() }
                                 }
                             }
