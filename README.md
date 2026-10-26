@@ -44,6 +44,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura orphans` | Lists packages nothing needs any more. |
 | `kura sbom` | Writes a list of all installed software (CycloneDX). |
 | `kura doctor` | A short system summary for problem reports. |
+| `kura report [what happened]` | Shows a problem report without user name, computer name or home folder, and opens it as a prefilled GitHub issue if you want. kura sends nothing itself. |
 | `kura settings` | Shows or changes settings for all users: `aur on`/`off`, `aur-wait <days>`. |
 | `kura snapshots [setup]` | Shows whether snapshots are taken before updates; `setup` adds what is missing. |
 

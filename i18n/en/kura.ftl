@@ -17,6 +17,7 @@ cli-usage =
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
+      report     Show a problem report and, if you want, open it on GitHub: kura report [what happened]
       security   Show known security problems of installed software
       settings   Show or change settings: kura settings aur on|off, kura settings aur-wait <days>
       snapshots  Show snapshot status; kura snapshots setup adds what is missing
@@ -267,6 +268,9 @@ settings-days = { $days ->
 }
 settings-saved = Saved.
 settings-usage = Usage: kura settings [aur on|off] [aur-wait <0–14>]
+report-intro = This report contains no user name, computer name or home folder. Please read it before you share it:
+confirm-report = Open it as a prefilled problem report on GitHub in your browser? [y/N]
+report-opened = If no browser opened, copy this address: { $url }
 gui-installed = Installed
 gui-remove = Remove
 gui-install-title = Install { $name }

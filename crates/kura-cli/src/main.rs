@@ -76,6 +76,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("undo") => undo(l, names.first().map(String::as_str)),
         Some("update") => update(l),
         Some("settings") => settings(l, &names),
+        Some("report") => Ok(report(l, &names.join(" "))),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => history(l),
@@ -502,6 +503,50 @@ fn update(l: &Localizer) -> Result<String, String> {
     let repo = change(l, &Request::Update, "confirm-update")?;
     say(repo.trim_end());
     aur_updates(l)
+}
+
+/// Who uses this computer, to be removed from reports.
+fn identity() -> kura_core::report::Identity {
+    let env = |k: &str| std::env::var(k).unwrap_or_default();
+    kura_core::report::Identity {
+        user: std::env::var("USER").unwrap_or_else(|_| env("LOGNAME")),
+        host: std::fs::read_to_string("/proc/sys/kernel/hostname")
+            .unwrap_or_default()
+            .trim()
+            .to_owned(),
+        home: env("HOME"),
+    }
+}
+
+/// Shows an anonymised problem report and, on request, opens a prefilled
+/// GitHub issue in the browser. kura itself sends nothing.
+fn report(l: &Localizer, what: &str) -> String {
+    // Reports are read by the developers, so they are in English.
+    let en = Localizer::new(&[kura_core::locale::Locale::parse("en").expect("valid locale")]);
+    let mut body = format!("kura {}\n\n", kura_core::VERSION);
+    body.push_str(&doctor(&en).unwrap_or_else(|e| e));
+    let status = kura_alpm::background::read_status(std::path::Path::new(kura_alpm::background::STATUS));
+    let _ = writeln!(
+        body,
+        "\nLast check: {} · updates {} · blocked {} · AUR {} ready, {} waiting",
+        status.checked, status.updates, status.blocked, status.aur_updates, status.aur_waiting
+    );
+    if let Ok(history) = history(&en) {
+        let lines: Vec<&str> = history.lines().collect();
+        let _ = writeln!(body, "\n{}", lines[lines.len().saturating_sub(8)..].join("\n"));
+    }
+    let text = kura_core::report::anonymize(&body, &identity());
+    say(&format!("{}\n\n{text}", l.msg("report-intro")));
+    if !confirm(l, "confirm-report") {
+        return String::new();
+    }
+    let url = kura_core::report::issue_url("Problem report", what, &text, kura_core::VERSION);
+    let _ = std::process::Command::new("xdg-open")
+        .arg(&url)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    l.msg_args("report-opened", &[("url", url.into())]) + "\n"
 }
 
 /// Shows or changes the settings for all users.
