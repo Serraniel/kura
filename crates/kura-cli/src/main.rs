@@ -341,6 +341,15 @@ fn show_news(l: &Localizer, items: &[kura_core::news::Item]) {
 /// Preview, confirm, apply. If the system changed since the preview, the new
 /// preview is shown and confirmed again.
 fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String, String> {
+    change_with(l, request, question_id, "preview-title")
+}
+
+fn change_with(
+    l: &Localizer,
+    request: &Request,
+    question_id: &str,
+    title_id: &str,
+) -> Result<String, String> {
     eprintln!("{}", l.msg("check-running"));
     let (plan, outcome, apps) = prepare(l, request)?;
     if plan.steps.is_empty() {
@@ -349,7 +358,7 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
     let title = if matches!(request, Request::Update) {
         headline(l, &outcome)
     } else {
-        l.msg("preview-title")
+        l.msg(title_id)
     };
     say(&format!("{title}\n{}", render(l, &plan, Some(&outcome), &apps)));
     let mut question_id = question_id;
@@ -554,26 +563,73 @@ fn profiles(l: &Localizer, args: &[String]) -> Result<String, String> {
         return Ok(l.msg_args(id, &[("name", profile.id.into())]) + "\n");
     }
     let conf = kura_alpm::load_config().map_err(fail)?;
-    let plan = kura_alpm::profiles::prepare(&conf, profile).map_err(fail)?;
+    let switches = kura_core::profiles::level(profile, kura_alpm::profiles::cpu_level())
+        .or_else(|| kura_alpm::profiles::active_level(profile))
+        .is_some_and(|l| l.architecture.is_some());
+    if add && kura_core::profiles::level(profile, kura_alpm::profiles::cpu_level()).is_none() {
+        return Err(l.msg_args("profile-cpu", &[("name", profile.id.into())]) + "\n");
+    }
+    eprintln!("{}", l.msg("check-running"));
+    let check = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let (change, estimate) = kura_alpm::profiles::prepare(
+        &conf,
+        Some(&kura_alpm::background::check_dir()),
+        profile,
+        switches,
+    )
+    .map_err(check)?;
     let apps = kura_alpm::apps(&conf).map_err(fail)?;
-    say(&format!(
+    let mut text = format!(
         "{}\n{}\n{}",
         l.msg("preview-title"),
-        render(l, &plan, None, &apps),
+        render(l, &change, None, &apps),
         l.msg(&format!("profile-{}-text", profile.id))
-    ));
+    );
+    if let Some(Ok(plan)) = estimate.as_ref().map(|o| o.plan.as_ref()) {
+        let outcome = estimate.as_ref().expect("checked above");
+        let _ = writeln!(
+            text,
+            "\n{}",
+            l.msg_args(
+                if add {
+                    "profile-switch-estimate"
+                } else {
+                    "profile-switch-back-estimate"
+                },
+                &[
+                    ("count", plan.steps.len().into()),
+                    ("download", l.size(outcome.download_size).into()),
+                ]
+            )
+        );
+    }
+    say(&text);
     let question = if add {
         "confirm-profile-add"
     } else {
         "confirm-profile-remove"
     };
-    let outcome = Outcome {
-        plan: Ok(plan.clone()),
-        available: Vec::new(),
-        download_size: 0,
-        installed_delta: 0,
+    if !confirm(l, question) {
+        return Ok(l.msg("apply-cancelled") + "\n");
+    }
+    // Going back always switches back; adding asks.
+    let switch_now = switches && (!add || confirm(l, "confirm-profile-switch"));
+    let reply = kura_helper::apply(&change, progress_printer(l))
+        .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+    if !matches!(reply, Reply::Done) {
+        return Err(kura_helper::text::reply(l, &reply));
+    }
+    if !switch_now {
+        return Ok(l.msg("apply-done") + "\n");
+    }
+    // The real switch, prepared with the repositories as they are now.
+    let request = if add {
+        let level = kura_alpm::profiles::active_level(profile).ok_or_else(|| l.msg("apply-changed"))?;
+        Request::Switch(Some(level.repos.iter().map(|(n, _)| (*n).to_owned()).collect()))
+    } else {
+        Request::Switch(None)
     };
-    confirm_and_apply(l, plan, &outcome, &apps, question)
+    change_with(l, &request, "confirm-switch", "profile-switch-title")
 }
 
 /// Shows or changes the settings for all users.

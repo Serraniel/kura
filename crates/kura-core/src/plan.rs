@@ -33,6 +33,11 @@ pub enum PlanKind {
     AurInstall,
     /// Add or take away a repository profile.
     Profile,
+    /// Move installed packages to a repository profile's builds, or `back`
+    /// to the generic ones.
+    Switch {
+        back: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,6 +229,7 @@ impl Plan {
                 | PlanKind::Repair
                 | PlanKind::Snapshots
                 | PlanKind::AurInstall
+                | PlanKind::Switch { .. }
         ) {
             let upgraded: BTreeSet<&str> = self
                 .steps

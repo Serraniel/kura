@@ -75,6 +75,35 @@ pub fn pci_name(pci_ids: &str, vendor: u16, device: u16) -> Option<String> {
     vendor_name.map(|n| bracketed(n).to_owned())
 }
 
+/// The x86-64 microarchitecture level (1 to 4) from the `flags` line of
+/// `/proc/cpuinfo`, as glibc and CachyOS define the levels.
+pub fn x86_64_level(cpuinfo: &str) -> u8 {
+    let Some(flags) = cpuinfo.lines().find_map(|l| {
+        let (key, value) = l.split_once(':')?;
+        (key.trim() == "flags").then_some(value)
+    }) else {
+        return 0;
+    };
+    let has: Vec<&str> = flags.split_whitespace().collect();
+    let all = |list: &[&str]| list.iter().all(|f| has.contains(f));
+    let v2 = ["cx16", "lahf_lm", "popcnt", "sse4_1", "sse4_2", "ssse3"];
+    let v3 = [
+        "avx", "avx2", "bmi1", "bmi2", "f16c", "fma", "abm", "movbe", "xsave",
+    ];
+    let v4 = ["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
+    if !all(&["lm"]) {
+        0
+    } else if !all(&v2) {
+        1
+    } else if !all(&v3) {
+        2
+    } else if !all(&v4) {
+        3
+    } else {
+        4
+    }
+}
+
 /// Parses a sysfs hex id like `0x1002`.
 pub fn hex_id(s: &str) -> Option<u16> {
     u16::from_str_radix(s.trim().trim_start_matches("0x"), 16).ok()
@@ -111,6 +140,19 @@ mod tests {
             Some((412_000_000_000, 1_000_000_000_000))
         );
         assert_eq!(df_usage("header only\n"), None);
+    }
+
+    #[test]
+    fn x86_64_levels() {
+        let v2 = "lm cx16 lahf_lm popcnt sse4_1 sse4_2 ssse3";
+        let v3 = format!("{v2} avx avx2 bmi1 bmi2 f16c fma abm movbe xsave");
+        let v4 = format!("{v3} avx512f avx512bw avx512cd avx512dq avx512vl");
+        assert_eq!(x86_64_level(&format!("flags\t: {v2}\n")), 2);
+        assert_eq!(x86_64_level(&format!("flags\t: {v3}\n")), 3);
+        assert_eq!(x86_64_level(&format!("processor : 0\nflags : {v4}\n")), 4);
+        assert_eq!(x86_64_level("flags : lm\n"), 1);
+        assert_eq!(x86_64_level("flags : fpu\n"), 0);
+        assert_eq!(x86_64_level("Features : neon\n"), 0);
     }
 
     #[test]

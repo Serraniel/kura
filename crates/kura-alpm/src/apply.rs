@@ -154,6 +154,17 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
         // Restores and snapshot setups have their own way in; see
         // `apply_restore` and `kura_alpm::snapshots`.
         PlanKind::Restore { .. } | PlanKind::Snapshots | PlanKind::Profile => None,
+        PlanKind::Switch { back: true } => Some(Request::Switch(None)),
+        PlanKind::Switch { back: false } => {
+            // The repositories of the profile that is in pacman.conf now.
+            let conf = std::fs::read_to_string("/etc/pacman.conf").unwrap_or_default();
+            let level = kura_core::profiles::ALL.iter().find_map(|p| {
+                kura_core::profiles::active_level(p, &conf).filter(|l| l.architecture.is_some())
+            })?;
+            Some(Request::Switch(Some(
+                level.repos.iter().map(|(name, _)| (*name).to_owned()).collect(),
+            )))
+        }
         // The repository part only; AUR packages are built and installed afterwards.
         PlanKind::AurInstall => Some(Request::Dependencies(
             plan.steps
@@ -534,6 +545,35 @@ fn cleanup(handle: &mut Alpm, plan: &Plan, events: &Sender<Event>) -> Result<(),
     })();
     handle.trans_release()?;
     result
+}
+
+/// Installs packages from one repository right after it was added. The
+/// handle knows only that repository, so only its database is refreshed
+/// and nothing else changes version.
+pub fn install_from_repo(repo: &str, packages: &[String], events: &Sender<Event>) -> Result<(), ApplyError> {
+    if !crate::is_root() {
+        return Err(ApplyError::NotRoot);
+    }
+    // pacman.conf just changed; read it again.
+    let mut conf = crate::load_config()?;
+    conf.repos.retain(|r| r.name == repo);
+    let mut handle = crate::handle(&conf)?;
+    install_callbacks(&handle, &Plan::new(kura_core::plan::PlanKind::Install), events);
+    handle.syncdbs_mut().update(false)?;
+    with_trans(&mut handle, alpm::TransFlag::NONE, |h| {
+        for name in packages {
+            let pkg = h
+                .syncdbs()
+                .iter()
+                .find_map(|db| db.pkg(name.as_str()).ok())
+                .ok_or_else(|| ApplyError::Failed(format!("{repo} has no {name}")))?;
+            h.trans_add_pkg(pkg)
+                .map_err(|e| ApplyError::Failed(e.to_string()))?;
+        }
+        h.trans_prepare()
+            .map_err(|e| ApplyError::Blocked(crate::prepare::problems(&e)))?;
+        commit(h)
+    })
 }
 
 /// Installs packages from addresses, such as a repository's keyring

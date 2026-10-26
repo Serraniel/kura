@@ -68,6 +68,15 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
             before,
         } => edit_pacman_conf(|c| kura_core::pacman_conf::add_repo(c, name, include, before.as_deref())),
         Action::RemoveRepo { name } => edit_pacman_conf(|c| kura_core::pacman_conf::remove_repo(c, name)),
+        Action::AddRepoServer { name, server, before } => edit_pacman_conf(|c| {
+            kura_core::pacman_conf::add_repo_line(c, name, &format!("Server = {server}"), before.as_deref())
+        }),
+        Action::InstallFromRepo { repo, packages } => {
+            kura_alpm::apply::install_from_repo(repo, packages, events).map_err(|e| e.to_string())
+        }
+        Action::SetArchitecture { value } => {
+            edit_pacman_conf(|c| kura_core::pacman_conf::set_option(c, "Architecture", value))
+        }
     }
 }
 
@@ -151,16 +160,17 @@ pub fn apply_snapshots(conf: &Config, approved: &Plan, events: &Sender<Event>) -
 /// derives for one of its built-in profiles run; package steps may only
 /// remove that profile's keyring and mirror list packages.
 pub fn apply_profile(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
-    let profile = kura_core::profiles::ALL
-        .iter()
-        .find(|p| {
-            kura_core::profiles::add_actions(p) == approved.actions
-                || kura_core::profiles::remove_actions(p) == approved.actions
-        })
+    let (profile, _, add) = kura_core::profiles::known(&approved.actions)
         .ok_or_else(|| ApplyError::Failed("unknown repository profile change".into()))?;
-    let removals_ok = approved.steps.iter().all(
-        |s| matches!(s, Step::Remove { name, .. } if profile.bootstrap_packages.contains(&name.as_str())),
-    );
+    // Adding changes no packages here; taking away may only remove the
+    // profile's keyring and mirror list packages.
+    let removals_ok = if add {
+        approved.steps.is_empty()
+    } else {
+        approved.steps.iter().all(
+            |s| matches!(s, Step::Remove { name, .. } if profile.bootstrap_packages.contains(&name.as_str())),
+        )
+    };
     if !removals_ok {
         return Err(ApplyError::Failed(
             "unexpected package change in a profile plan".into(),
@@ -175,12 +185,12 @@ pub fn apply_profile(conf: &Config, approved: &Plan, events: &Sender<Event>) -> 
         }
         Ok(())
     };
-    // Taking away: the repository goes first, then its packages, then the key.
-    let (before, after) = approved.actions.split_at(if approved.steps.is_empty() {
-        approved.actions.len()
-    } else {
-        profile.repos.len()
-    });
+    if add {
+        return run_all(&approved.actions);
+    }
+    // Taking away: repositories and settings first, then the keyring and
+    // mirror list packages, the key last.
+    let (before, after) = approved.actions.split_at(approved.actions.len() - 1);
     run_all(before)?;
     if !approved.steps.is_empty() {
         let packages = Plan {

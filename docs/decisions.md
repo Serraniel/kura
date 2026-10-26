@@ -196,6 +196,11 @@ statement of the benefit and a trust warning.
   without "keep"), because it decides whom the system trusts.
 - `pacman.conf` is changed section by section and copied first; taking a
   profile away restores the file exactly.
+- CachyOS (decided 2026-10-26): the preview shows what switching every
+  installed package to CachyOS's builds would change and download. The user
+  chooses to switch now or let packages switch with their next updates.
+  Taking the profile away always switches every package back to Arch's
+  builds, CachyOS's pacman included.
 
 ## Command line
 

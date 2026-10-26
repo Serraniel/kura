@@ -21,10 +21,15 @@ pub fn has_repo(conf: &str, name: &str) -> bool {
 /// Adds `[name]` with `Include = include`, before the section `before` or
 /// at the end. Nothing changes when the repository is already there.
 pub fn add_repo(conf: &str, name: &str, include: &str, before: Option<&str>) -> String {
+    add_repo_line(conf, name, &format!("Include = {include}"), before)
+}
+
+/// Like [`add_repo`], with any setting line such as `Server = …`.
+pub fn add_repo_line(conf: &str, name: &str, line: &str, before: Option<&str>) -> String {
     if has_repo(conf, name) {
         return conf.to_owned();
     }
-    let block = format!("[{name}]\nInclude = {include}\n");
+    let block = format!("[{name}]\n{line}\n");
     let lines: Vec<&str> = conf.lines().collect();
     let at = before.and_then(|b| lines.iter().position(|l| l.trim() == format!("[{b}]")));
     let Some(i) = at else {
@@ -76,6 +81,55 @@ pub fn remove_repo(conf: &str, name: &str) -> String {
     out
 }
 
+/// The value of an option in `[options]`, such as `Architecture`.
+pub fn option(conf: &str, key: &str) -> Option<String> {
+    let mut in_options = false;
+    for line in conf.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_options = t == "[options]";
+            continue;
+        }
+        if in_options
+            && let Some((k, v)) = t.split_once('=')
+            && k.trim() == key
+        {
+            return Some(v.trim().to_owned());
+        }
+    }
+    None
+}
+
+/// Sets an option in `[options]`, replacing the active line or adding one
+/// right after the section header.
+pub fn set_option(conf: &str, key: &str, value: &str) -> String {
+    let setting = format!("{key} = {value}\n");
+    let mut out = String::new();
+    let mut in_options = false;
+    let mut done = false;
+    for line in conf.lines() {
+        let t = line.trim();
+        if t.starts_with('[') {
+            in_options = t == "[options]";
+            out.push_str(line);
+            out.push('\n');
+            if in_options && option(conf, key).is_none() && !done {
+                out.push_str(&setting);
+                done = true;
+            }
+            continue;
+        }
+        if in_options && !done && t.split_once('=').is_some_and(|(k, _)| k.trim() == key) {
+            out.push_str(&setting);
+            done = true;
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,6 +166,23 @@ mod tests {
         assert_eq!(remove_repo(&first, "cachyos"), ARCH);
         // Removing what is not there changes nothing.
         assert_eq!(remove_repo(ARCH, "chaotic-aur"), ARCH);
+    }
+
+    #[test]
+    fn options() {
+        assert_eq!(option(ARCH, "Architecture").as_deref(), Some("auto"));
+        assert_eq!(option(ARCH, "Missing"), None);
+        let v3 = set_option(ARCH, "Architecture", "x86_64 x86_64_v3");
+        assert_eq!(option(&v3, "Architecture").as_deref(), Some("x86_64 x86_64_v3"));
+        assert_eq!(set_option(&v3, "Architecture", "auto"), ARCH);
+        let added = set_option("[options]\nHoldPkg = pacman\n[core]\n", "Architecture", "auto");
+        assert_eq!(
+            added,
+            "[options]\nArchitecture = auto\nHoldPkg = pacman\n[core]\n"
+        );
+        // A commented-out line stays as it is.
+        let commented = set_option("[options]\n#Architecture = x\n", "Architecture", "auto");
+        assert_eq!(commented, "[options]\nArchitecture = auto\n#Architecture = x\n");
     }
 
     #[test]

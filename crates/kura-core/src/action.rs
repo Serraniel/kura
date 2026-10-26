@@ -42,6 +42,23 @@ pub enum Action {
     RemoveRepo {
         name: String,
     },
+    /// Add a repository section with a fixed server, for the moment before
+    /// its mirror list package is installed.
+    AddRepoServer {
+        name: String,
+        server: String,
+        before: Option<String>,
+    },
+    /// Install packages from one repository right after adding it. Only that
+    /// repository's database is refreshed, so nothing else changes version.
+    InstallFromRepo {
+        repo: String,
+        packages: Vec<String>,
+    },
+    /// Set `Architecture` in `pacman.conf`.
+    SetArchitecture {
+        value: String,
+    },
 }
 
 #[cfg(test)]
