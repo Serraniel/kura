@@ -18,6 +18,7 @@ jobs:
   rust:
     name: rust
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     # Build against the libalpm, Qt and Rust that Arch users actually have.
     container: archlinux:base-devel
     steps:
@@ -58,6 +59,7 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # A throwaway Arch system: kura installs and removes packages for real here.
     container:
       image: archlinux:base-devel
@@ -83,6 +85,7 @@ jobs:
   e2e-aur:
     name: e2e-aur
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # AUR builds run in systemd's sandbox, so this Arch container boots systemd.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
