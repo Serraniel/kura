@@ -577,6 +577,17 @@ Kirigami.ApplicationWindow {
                     Kirigami.FormData.isSection: true
                 }
                 Controls.Switch {
+                    Kirigami.FormData.label: kura.tr("settings-trial") + ":"
+                    checked: kura.trialRuns
+                    onToggled: kura.changeTrialRuns(checked)
+                }
+                Controls.Label {
+                    text: kura.tr("gui-trial-hint")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+                Controls.Switch {
                     Kirigami.FormData.label: kura.tr("settings-auto-security") + ":"
                     checked: kura.autoSecurity
                     onToggled: kura.changeAutoSecurity(checked)

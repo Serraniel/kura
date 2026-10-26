@@ -824,12 +824,14 @@ fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
                 l.msg_args("settings-days", &[("days", s.aur_cooling_days.into())]),
                 l.msg("settings-auto-security"),
                 on_off(s.auto_security)
-            ));
+            ) + &format!("{}: {}\n", l.msg("settings-trial"), on_off(s.trial_runs)));
         }
         ["aur", "on"] => s.aur = true,
         ["aur", "off"] => s.aur = false,
         ["auto-security", "on"] => s.auto_security = true,
         ["auto-security", "off"] => s.auto_security = false,
+        ["trial", "on"] => s.trial_runs = true,
+        ["trial", "off"] => s.trial_runs = false,
         ["aur-wait", days] => {
             s.aur_cooling_days = days
                 .parse::<u32>()

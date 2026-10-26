@@ -19,6 +19,8 @@ pub struct Settings {
     /// Install updates that fix a known vulnerability without asking, when
     /// nothing in the update needs attention. Off unless the user turns it on.
     pub auto_security: bool,
+    /// Before updates, run them in a throwaway btrfs snapshot first.
+    pub trial_runs: bool,
 }
 
 impl Default for Settings {
@@ -27,6 +29,7 @@ impl Default for Settings {
             aur: true,
             aur_cooling_days: 3,
             auto_security: false,
+            trial_runs: true,
         }
     }
 }
@@ -69,6 +72,9 @@ mod tests {
         );
         assert_eq!(Settings::parse(r#"{"aur": "yes"}"#), Settings::default());
         let json = serde_json::to_string(&Settings::default()).unwrap();
-        assert_eq!(json, r#"{"aur":true,"aur_cooling_days":3,"auto_security":false}"#);
+        assert_eq!(
+            json,
+            r#"{"aur":true,"aur_cooling_days":3,"auto_security":false,"trial_runs":true}"#
+        );
     }
 }

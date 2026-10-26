@@ -52,6 +52,7 @@ pub fn event(l: &Localizer, event: &Event) -> String {
     };
     match event {
         Event::Refreshing => l.msg("apply-refreshing"),
+        Event::Trial => l.msg("apply-trial"),
         Event::Configuring { action } => kura_i18n::present::action(l, action),
         Event::Building { base, current, total } => l.msg_args(
             "apply-building",
@@ -116,6 +117,9 @@ pub fn reply(l: &Localizer, reply: &Reply) -> String {
         }
         Reply::NotAuthorized => l.msg("apply-not-authorized"),
         Reply::Locked => l.msg("apply-locked"),
+        Reply::TrialFailed { reason } => {
+            l.msg_args("apply-trial-failed", &[("reason", reason.clone().into())])
+        }
         Reply::Busy => l.msg("apply-busy"),
         Reply::Failed { message } => l.msg_args("apply-failed", &[("reason", message.clone().into())]),
         Reply::Mirrors { count, backup } => l.msg_args(
