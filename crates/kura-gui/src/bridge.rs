@@ -45,6 +45,8 @@ pub mod qobject {
         #[qproperty(QString, health_json, cxx_name = "healthJson")]
         #[qproperty(QString, security_json, cxx_name = "securityJson")]
         #[qproperty(QString, results_json, cxx_name = "resultsJson")]
+        #[qproperty(bool, aur_enabled, cxx_name = "aurEnabled")]
+        #[qproperty(i32, aur_wait, cxx_name = "aurWait")]
         type Kura = super::KuraRust;
     }
 
@@ -52,6 +54,11 @@ pub mod qobject {
         /// Translated message for a Fluent ID.
         #[qinvokable]
         fn tr(self: &Kura, id: &QString) -> QString;
+
+        // "3 days", for the AUR wait setting.
+        #[qinvokable]
+        #[cxx_name = "trDays"]
+        fn tr_days(self: &Kura, days: i32) -> QString;
 
         /// Reads the system, the background check status and the history.
         #[qinvokable]
@@ -100,6 +107,15 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "prepareSnapshots"]
         fn prepare_snapshots(self: Pin<&mut Kura>);
+
+        // System-wide settings, saved through kura-helper.
+        #[qinvokable]
+        #[cxx_name = "changeAur"]
+        fn change_aur(self: Pin<&mut Kura>, on: bool);
+
+        #[qinvokable]
+        #[cxx_name = "changeAurWait"]
+        fn change_aur_wait(self: Pin<&mut Kura>, days: i32);
     }
 
     impl cxx_qt::Threading for Kura {}
@@ -119,6 +135,7 @@ use kura_i18n::Localizer;
 use kura_i18n::present;
 use serde_json::{Value, json};
 
+#[allow(clippy::struct_excessive_bools)] // one field per Qt property
 pub struct KuraRust {
     distro: QString,
     packages: i32,
@@ -143,6 +160,8 @@ pub struct KuraRust {
     health_json: QString,
     security_json: QString,
     results_json: QString,
+    aur_enabled: bool,
+    aur_wait: i32,
     localizer: Localizer,
     pending: Option<Plan>,
 }
@@ -176,6 +195,8 @@ impl Default for KuraRust {
             health_json: QString::from("{}"),
             security_json: QString::from("[]"),
             results_json: QString::from("[]"),
+            aur_enabled: kura_alpm::aur::settings().aur,
+            aur_wait: i32::try_from(kura_alpm::aur::settings().aur_cooling_days).unwrap_or(3),
             localizer: Localizer::from_env(),
             pending: None,
         }
@@ -344,6 +365,78 @@ fn sizes(l: &Localizer, outcome: &kura_alpm::prepare::Outcome) -> String {
     )
 }
 
+/// Search results as JSON: repository hits first, then AUR hits with their
+/// trust signals.
+fn search_value(l: &Localizer, query: &str, aur: bool) -> Value {
+    let Ok(conf) = kura_alpm::load_config() else {
+        return json!([]);
+    };
+    let mut out: Vec<Value> = kura_alpm::system::search(&conf, query, 40)
+        .unwrap_or_default()
+        .iter()
+        .map(|h| json!({"name": h.name, "version": h.version, "description": h.description, "installed": h.installed, "aur": false}))
+        .collect();
+    if aur && !query.trim().is_empty() {
+        let installed = kura_alpm::installed(&conf).unwrap_or_default();
+        let now = kura_alpm::background::now();
+        let mut hits = kura_alpm::aur::search(query.trim(), "name-desc").unwrap_or_default();
+        hits.sort_by(|a, b| b.popularity.total_cmp(&a.popularity));
+        hits.truncate(30);
+        out.extend(hits.iter().map(|h| {
+            json!({
+                "name": h.name,
+                "version": h.version,
+                "description": h.description.clone().unwrap_or_default(),
+                "installed": installed.get(&h.name).is_some(),
+                "aur": true,
+                "signals": present::aur_signals(l, h, now),
+            })
+        }));
+    }
+    Value::Array(out)
+}
+
+/// Runs in a background thread: what building `names` from the AUR changes.
+fn prepare_aur_preview(names: &[String]) -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    if !kura_alpm::aur::settings().aur {
+        return Err(l.msg_args("aur-off", &[("names", names.join(" ").into())]));
+    }
+    let outcome =
+        kura_alpm::aur::prepare_install(&conf, Some(&kura_alpm::background::check_dir()), names, true)
+            .map_err(fail)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => return Err(blocked_text(&l, "change-blocked", problems)),
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    let infos = kura_alpm::aur::info(names).unwrap_or_default();
+    let now = kura_alpm::background::now();
+    let mut preview = preview_groups(&l, &plan, &apps);
+    if let Value::Array(groups) = &mut preview {
+        groups.push(json!({
+            "title": l.msg("aur-build-list"),
+            "items": plan.builds.iter().map(|b| json!({
+                "name": b.base,
+                "detail": infos
+                    .iter()
+                    .find(|i| i.package_base == b.base)
+                    .map(|i| present::aur_signals(&l, i, now))
+                    .unwrap_or_default(),
+            })).collect::<Vec<_>>(),
+        }));
+    }
+    Ok(Prepared {
+        preview: preview.to_string(),
+        news: "[]".into(),
+        summary: sizes(&l, &outcome),
+        headline: l.msg("aur-notice"),
+        plan,
+    })
+}
+
 /// Runs in a background thread: what setting up snapshots would change.
 fn prepare_snapshots_preview() -> Result<Prepared, String> {
     let l = Localizer::from_env();
@@ -369,6 +462,10 @@ fn prepare_snapshots_preview() -> Result<Prepared, String> {
 impl qobject::Kura {
     fn tr(&self, id: &QString) -> QString {
         QString::from(&self.localizer.msg(&id.to_string()))
+    }
+
+    fn tr_days(&self, days: i32) -> QString {
+        QString::from(&self.localizer.msg_args("settings-days", &[("days", days.into())]))
     }
 
     fn refresh(mut self: Pin<&mut Self>) {
@@ -451,7 +548,17 @@ impl qobject::Kura {
             .localizer
             .msg_args("gui-install-title", &[("name", names.join(", ").into())]);
         let label = self.localizer.msg("gui-install");
-        self.start_preview(move || prepare_preview(&Request::Install(names)), &title, &label);
+        // Names no repository has come from the AUR.
+        let in_repos = kura_alpm::load_config().is_ok_and(|conf| {
+            names
+                .iter()
+                .all(|n| kura_alpm::in_repos(&conf, n).unwrap_or(false))
+        });
+        if in_repos {
+            self.start_preview(move || prepare_preview(&Request::Install(names)), &title, &label);
+        } else {
+            self.start_preview(move || prepare_aur_preview(&names), &title, &label);
+        }
     }
 
     fn prepare_remove(self: Pin<&mut Self>, name: &QString) {
@@ -498,7 +605,9 @@ impl qobject::Kura {
             let _ = qt.queue(move |mut this| {
                 match result {
                     Ok(p) => {
-                        let has_changes = !p.plan.steps.is_empty() || !p.plan.actions.is_empty();
+                        let has_changes = !p.plan.steps.is_empty()
+                            || !p.plan.actions.is_empty()
+                            || !p.plan.builds.is_empty();
                         this.as_mut().set_preview_json(QString::from(&p.preview));
                         this.as_mut().set_news_json(QString::from(&p.news));
                         this.as_mut().set_summary_text(QString::from(&p.summary));
@@ -523,16 +632,47 @@ impl qobject::Kura {
         self.as_mut().set_health_json(QString::from(&value.to_string()));
     }
 
-    fn search(mut self: Pin<&mut Self>, query: &QString) {
-        let hits = kura_alpm::load_config()
-            .and_then(|conf| kura_alpm::system::search(&conf, &query.to_string(), 40))
-            .unwrap_or_default();
-        let value: Vec<Value> = hits
-            .iter()
-            .map(|h| json!({"name": h.name, "version": h.version, "description": h.description, "installed": h.installed}))
-            .collect();
-        self.as_mut()
-            .set_results_json(QString::from(&Value::Array(value).to_string()));
+    fn search(self: Pin<&mut Self>, query: &QString) {
+        let query = query.to_string();
+        let aur = *self.aur_enabled();
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let value = search_value(&Localizer::from_env(), &query, aur);
+            let _ =
+                qt.queue(move |mut this| this.as_mut().set_results_json(QString::from(&value.to_string())));
+        });
+    }
+
+    fn change_aur(self: Pin<&mut Self>, on: bool) {
+        let mut s = kura_alpm::aur::settings();
+        s.aur = on;
+        self.save_settings(s);
+    }
+
+    fn change_aur_wait(self: Pin<&mut Self>, days: i32) {
+        let mut s = kura_alpm::aur::settings();
+        s.aur_cooling_days = u32::try_from(days).unwrap_or(0);
+        self.save_settings(s.clamped());
+    }
+
+    /// Saves through kura-helper and shows what is saved afterwards.
+    fn save_settings(self: Pin<&mut Self>, settings: kura_core::settings::Settings) {
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let l = Localizer::from_env();
+            let text = match kura_helper::set_settings(&settings) {
+                Ok(kura_helper::Reply::Done) => String::new(),
+                Ok(reply) => kura_helper::text::reply(&l, &reply),
+                Err(e) => l.msg_args("error-helper", &[("reason", e.to_string().into())]),
+            };
+            let saved = kura_alpm::aur::settings();
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_aur_enabled(saved.aur);
+                this.as_mut()
+                    .set_aur_wait(i32::try_from(saved.aur_cooling_days).unwrap_or(0));
+                this.as_mut().set_message(QString::from(&text));
+            });
+        });
     }
 
     fn rank_mirrors(mut self: Pin<&mut Self>) {
