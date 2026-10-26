@@ -151,7 +151,12 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     }
     let mut plan = match &outcome.plan {
         Err(problems) => {
-            let mut out = l.msg("check-blocked") + "\n";
+            let id = if matches!(request, Request::Update) {
+                "check-blocked"
+            } else {
+                "change-blocked"
+            };
+            let mut out = l.msg(id) + "\n";
             for p in problems {
                 let _ = writeln!(out, "  {}", problem_text(l, p));
             }
@@ -261,14 +266,14 @@ fn confirm(l: &Localizer, question_id: &str) -> bool {
     !answer.is_empty() && (answer.starts_with(&l.msg("confirm-yes")) || answer.starts_with('y'))
 }
 
-/// Prints progress events, one line per package and phase.
+/// Prints progress events, each line once. Parallel downloads report the
+/// same file many times.
 fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
-    let mut last = String::new();
+    let mut seen = BTreeSet::new();
     move |event| {
         let line = kura_helper::text::event(l, &event);
-        if line != last {
+        if seen.insert(line.clone()) {
             say(&line);
-            last = line;
         }
     }
 }
@@ -414,7 +419,7 @@ fn undo(l: &Localizer, arg: Option<&str>) -> Result<String, String> {
     let config = kura_alpm::load_config().map_err(fail)?;
     let generation = journal.generation(target).ok_or_else(unknown)?;
     if let Err(problems) = kura_alpm::restore::sources(&config.cache_dir, &plan, &generation) {
-        let mut out = l.msg("check-blocked") + "\n";
+        let mut out = l.msg("change-blocked") + "\n";
         for p in &problems {
             let _ = writeln!(out, "  {}", problem_text(l, p));
         }

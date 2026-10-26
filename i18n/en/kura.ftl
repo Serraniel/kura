@@ -38,6 +38,7 @@ check-group-cleanup = No longer needed ({ $count })
 check-sizes = Download: { $download } · Disk space: { $delta }
 check-preview-only = Nothing was changed. Installing updates comes with a later version of kura.
 check-blocked = The update cannot be prepared:
+change-blocked = The change cannot be prepared:
 problem-unsatisfied = { $target } needs { $dependency }, which is no longer available.
 problem-conflict = { $first } and { $second } cannot be installed together.
 problem-arch = Built for a different processor type: { $packages }

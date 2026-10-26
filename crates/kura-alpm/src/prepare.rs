@@ -249,6 +249,39 @@ fn with_language_packs(handle: &Alpm, request: &Request, locales: &[Locale]) -> 
     Request::Install(all)
 }
 
+/// Marks `names` for removal. Returns the problem if one is not installed.
+fn add_removals<'a>(
+    handle: &Alpm,
+    names: &'a [String],
+    explicit: &mut BTreeSet<&'a str>,
+) -> Result<Option<Problem>, Error> {
+    for name in names {
+        let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
+            return Ok(Some(Problem::NotFound { name: name.clone() }));
+        };
+        handle.trans_remove_pkg(pkg)?;
+        explicit.insert(name);
+    }
+    Ok(None)
+}
+
+/// Installed language packs that depend on one of `names`.
+fn packs_of<'h>(handle: &'h Alpm, names: &[String]) -> Vec<&'h alpm::Package> {
+    handle
+        .localdb()
+        .pkgs()
+        .into_iter()
+        .filter(|p| !names.iter().any(|n| n == p.name()))
+        .filter(|p| {
+            p.depends().into_iter().any(|d| {
+                names
+                    .iter()
+                    .any(|n| n == d.name() && kura_core::langpacks::is_pack_of(n, p.name()))
+            })
+        })
+        .collect()
+}
+
 pub(crate) fn flags(request: &Request) -> TransFlag {
     match request {
         // Like `pacman -Rs`: also remove dependencies nothing else needs.
@@ -305,21 +338,17 @@ pub(crate) fn build(
         }
         Request::Repair(names) => {
             handle.sync_sysupgrade(false)?;
-            for name in names {
-                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
-                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
-                };
-                handle.trans_remove_pkg(pkg)?;
-                explicit.insert(name);
+            if let Some(problem) = add_removals(handle, names, &mut explicit)? {
+                return Ok(blocked(vec![problem]));
             }
         }
         Request::Remove(names) => {
-            for name in names {
-                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
-                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
-                };
+            if let Some(problem) = add_removals(handle, names, &mut explicit)? {
+                return Ok(blocked(vec![problem]));
+            }
+            // Language packs that need a removed package go with it.
+            for pkg in packs_of(handle, names) {
                 handle.trans_remove_pkg(pkg)?;
-                explicit.insert(name);
             }
         }
     }

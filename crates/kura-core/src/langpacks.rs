@@ -88,6 +88,17 @@ pub fn for_package(base: &str, locales: &[Locale], exists: impl Fn(&str) -> bool
     names_for(family, locales).find(|name| exists(name))
 }
 
+/// Whether `name` is a language pack of `base`, judged by the family's
+/// name patterns. Used to remove packs together with their base package.
+pub fn is_pack_of(base: &str, name: &str) -> bool {
+    FAMILIES.iter().filter(|f| f.base == base).any(|f| {
+        f.patterns.iter().any(|p| {
+            let prefix = p.split('{').next().unwrap_or(p);
+            name != base && name.len() > prefix.len() && name.starts_with(prefix)
+        })
+    })
+}
+
 /// Picks the provider that matches the user's language, when libalpm asks
 /// which of several packages should satisfy a dependency (for example one of
 /// the many `tesseract-data-*` packages).
@@ -165,6 +176,16 @@ mod tests {
             for_package("firefox", &locales(&["xx", "pt_PT"]), exists).as_deref(),
             Some("firefox-i18n-pt-pt")
         );
+    }
+
+    #[test]
+    fn recognises_packs() {
+        assert!(is_pack_of("tesseract", "tesseract-data-deu"));
+        assert!(is_pack_of("firefox", "firefox-i18n-de"));
+        assert!(!is_pack_of("firefox", "firefox-developer-edition"));
+        assert!(!is_pack_of("tesseract", "tesseract"));
+        assert!(!is_pack_of("tesseract", "tesseract-data-"));
+        assert!(!is_pack_of("vlc", "vlc-plugins-all"));
     }
 
     #[test]

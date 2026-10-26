@@ -79,7 +79,7 @@ pub fn reply(l: &Localizer, reply: &Reply) -> String {
         Reply::Done => l.msg("apply-done"),
         Reply::Changed { .. } => l.msg("apply-changed"),
         Reply::Blocked { problems } => {
-            let mut out = l.msg("check-blocked");
+            let mut out = l.msg("change-blocked");
             for p in problems {
                 out.push_str("\n  ");
                 out.push_str(&problem(l, p));

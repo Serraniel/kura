@@ -264,7 +264,11 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     let mut plan = match outcome.plan {
         Ok(plan) => plan,
         Err(problems) => {
-            let mut text = l.msg("check-blocked");
+            let mut text = l.msg(if matches!(request, Request::Update) {
+                "check-blocked"
+            } else {
+                "change-blocked"
+            });
             for p in &problems {
                 text.push_str("\n• ");
                 text.push_str(&kura_helper::text::problem(&l, p));

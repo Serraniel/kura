@@ -76,6 +76,7 @@ pacman -Q hunspell-de
 printf 'j\n' | LANG=de_DE.UTF-8 kura install tesseract
 pacman -Q tesseract-data-deu
 printf 'j\n' | LANG=de_DE.UTF-8 kura remove tesseract hunspell hunspell-de
+! pacman -Q tesseract-data-deu
 
 kura security
 grep -q '"checked"' /var/lib/kura/status.json
