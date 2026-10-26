@@ -122,15 +122,6 @@ fn os_release() -> (String, String) {
 }
 
 /// Private copy of the sync databases, so checks never touch pacman's own.
-fn check_dir() -> std::path::PathBuf {
-    let base = std::env::var_os("XDG_CACHE_HOME")
-        .filter(|v| !v.is_empty())
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".cache")))
-        .unwrap_or_else(std::env::temp_dir);
-    base.join("kura").join("checkdb")
-}
-
 fn problem_text(l: &Localizer, p: &Problem) -> String {
     kura_helper::text::problem(l, p)
 }
@@ -143,7 +134,7 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let refresh = !matches!(request, Request::Remove(_));
     let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
         &config,
-        Some(&check_dir()),
+        Some(&kura_alpm::background::check_dir()),
         request,
         refresh,
         &user_locales(),
@@ -443,7 +434,9 @@ fn aur_change(
     let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
     eprintln!("{}", l.msg("check-running"));
     let check = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
-    let outcome = kura_alpm::aur::prepare_install(conf, Some(&check_dir()), names, refresh).map_err(check)?;
+    let outcome =
+        kura_alpm::aur::prepare_install(conf, Some(&kura_alpm::background::check_dir()), names, refresh)
+            .map_err(check)?;
     let plan = match &outcome.plan {
         Ok(plan) => plan.clone(),
         Err(problems) => {
@@ -618,7 +611,9 @@ fn snapshots(l: &Localizer, setup: bool) -> Result<String, String> {
     }
     say(&out);
     eprintln!("{}", l.msg("check-running"));
-    let Some(outcome) = kura_alpm::snapshots::prepare(&conf, Some(&check_dir()), true).map_err(fail)? else {
+    let Some(outcome) = kura_alpm::snapshots::prepare(&conf, Some(&kura_alpm::background::check_dir()), true)
+        .map_err(fail)?
+    else {
         return Ok(l.msg("snapshots-nothing") + "\n");
     };
     let plan = match &outcome.plan {

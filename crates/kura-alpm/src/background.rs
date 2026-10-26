@@ -18,6 +18,22 @@ use crate::{Config, Error};
 
 pub const STATUS: &str = "/var/lib/kura/status.json";
 pub const CHECK_DB: &str = "/var/lib/kura/checkdb";
+
+/// Where previews keep their private database copy: the user's cache, or
+/// for root the background check's copy, because pacman downloads as the
+/// `alpm` user, which cannot enter `/root`.
+pub fn check_dir() -> std::path::PathBuf {
+    if crate::is_root() {
+        return CHECK_DB.into();
+    }
+    std::env::var_os("XDG_CACHE_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| Path::new(&h).join(".cache")))
+        .unwrap_or_else(std::env::temp_dir)
+        .join("kura")
+        .join("checkdb")
+}
 const NEWS_FEED: &str = "https://archlinux.org/feeds/news/";
 const TRACKER: &str = "https://security.archlinux.org/issues/all.json";
 
