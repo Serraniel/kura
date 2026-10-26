@@ -127,6 +127,12 @@ pub fn cleanup(set: &PackageSet) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Whether a repository has a package with this name.
+pub fn in_repos(conf: &Config, name: &str) -> Result<bool, Error> {
+    let handle = handle(conf)?;
+    Ok(handle.syncdbs().iter().any(|db| db.pkg(name).is_ok()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

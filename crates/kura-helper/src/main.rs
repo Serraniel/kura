@@ -87,6 +87,7 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>) -> Reply {
     let result = match plan.kind {
         PlanKind::Restore { .. } => kura_alpm::apply::apply_restore(&conf, plan, Path::new(JOURNAL), events),
         PlanKind::Snapshots => kura_helper::actions::apply_snapshots(&conf, plan, events),
+        PlanKind::AurInstall => kura_helper::aur::apply_aur(&conf, plan, events),
         _ => kura_alpm::apply::apply(&conf, plan, events),
     };
     let _ = std::fs::remove_file(cause);
@@ -283,7 +284,15 @@ fn main() -> ExitCode {
         Some("serve") => serve(),
         Some("record") => record(),
         Some("check") => check(),
-        _ => Err("usage: kura-helper serve | record | check".to_owned()),
+        // Runs inside the build sandbox as a throwaway user; see `kura_helper::aur`.
+        Some("build") => {
+            let args: Vec<String> = std::env::args().skip(2).collect();
+            match args.as_slice() {
+                [base, commit] => kura_helper::aur::build_in_sandbox(base, commit),
+                _ => Err("usage: kura-helper build <base> <commit>".to_owned()),
+            }
+        }
+        _ => Err("usage: kura-helper serve | record | check | build".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

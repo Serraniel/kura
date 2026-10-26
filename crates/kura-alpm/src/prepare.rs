@@ -34,6 +34,9 @@ pub enum Request {
     /// Upgrade everything and remove these packages, as a repair proposed
     /// by the problem solver.
     Repair(Vec<String>),
+    /// Upgrade everything and install what satisfies these dependencies,
+    /// marked as dependencies: the repository part of an AUR install.
+    Dependencies(Vec<String>),
 }
 
 impl Request {
@@ -43,6 +46,7 @@ impl Request {
             Request::Install(_) => PlanKind::Install,
             Request::Remove(_) => PlanKind::Remove,
             Request::Repair(_) => PlanKind::Repair,
+            Request::Dependencies(_) => PlanKind::AurInstall,
         }
     }
 }
@@ -249,6 +253,31 @@ fn with_language_packs(handle: &Alpm, request: &Request, locales: &[Locale]) -> 
     Request::Install(all)
 }
 
+/// Adds packages from the repositories, by name or, with `satisfy`, by
+/// dependency (`pacman>6.1`). Returns the problem when one cannot be added.
+fn add_installs(handle: &Alpm, names: &[String], satisfy: bool) -> Option<Problem> {
+    for name in names {
+        let found = if satisfy {
+            handle.syncdbs().find_satisfier(name.as_str())
+        } else {
+            handle.syncdbs().iter().find_map(|db| db.pkg(name.as_str()).ok())
+        };
+        let Some(pkg) = found else {
+            return Some(Problem::NotFound { name: name.clone() });
+        };
+        // Already part of the update, or asked for twice.
+        if satisfy && handle.trans_add().iter().any(|p| p.name() == pkg.name()) {
+            continue;
+        }
+        if let Err(e) = handle.trans_add_pkg(pkg) {
+            return Some(Problem::Other {
+                message: e.to_string(),
+            });
+        }
+    }
+    None
+}
+
 /// Marks `names` for removal. Returns the problem if one is not installed.
 fn add_removals<'a>(
     handle: &Alpm,
@@ -286,6 +315,8 @@ pub(crate) fn flags(request: &Request) -> TransFlag {
     match request {
         // Like `pacman -Rs`: also remove dependencies nothing else needs.
         Request::Remove(_) => TransFlag::RECURSE,
+        // Like `pacman -S --asdeps`.
+        Request::Dependencies(_) => TransFlag::ALL_DEPS,
         _ => TransFlag::NONE,
     }
 }
@@ -323,17 +354,15 @@ pub(crate) fn build(
         Request::Update => handle.sync_sysupgrade(false)?,
         Request::Install(names) => {
             handle.sync_sysupgrade(false)?;
-            for name in names {
-                let found = handle.syncdbs().iter().find_map(|db| db.pkg(name.as_str()).ok());
-                let Some(pkg) = found else {
-                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
-                };
-                if let Err(e) = handle.trans_add_pkg(pkg) {
-                    return Ok(blocked(vec![Problem::Other {
-                        message: e.to_string(),
-                    }]));
-                }
-                explicit.insert(name);
+            if let Some(problem) = add_installs(handle, names, false) {
+                return Ok(blocked(vec![problem]));
+            }
+            explicit.extend(names.iter().map(String::as_str));
+        }
+        Request::Dependencies(deps) => {
+            handle.sync_sysupgrade(false)?;
+            if let Some(problem) = add_installs(handle, deps, true) {
+                return Ok(blocked(vec![problem]));
             }
         }
         Request::Repair(names) => {

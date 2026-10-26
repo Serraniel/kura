@@ -99,4 +99,19 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.aur">
+    <description>Build and install software from the AUR</description>
+    <description xml:lang="de">Software aus dem AUR bauen und installieren</description>
+    <description xml:lang="fr">Compiler et installer des logiciels de l'AUR</description>
+    <description xml:lang="ja">AUR のソフトウェアをビルドしてインストール</description>
+    <message>Authentication is required to build and install software from the AUR.</message>
+    <message xml:lang="de">Zum Bauen und Installieren von Software aus dem AUR ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour compiler et installer des logiciels de l'AUR.</message>
+    <message xml:lang="ja">AUR のソフトウェアをビルドしてインストールするには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

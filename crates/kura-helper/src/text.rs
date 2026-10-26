@@ -52,6 +52,14 @@ pub fn event(l: &Localizer, event: &Event) -> String {
     match event {
         Event::Refreshing => l.msg("apply-refreshing"),
         Event::Configuring { action } => kura_i18n::present::action(l, action),
+        Event::Building { base, current, total } => l.msg_args(
+            "apply-building",
+            &[
+                ("name", base.clone().into()),
+                ("current", (*current).into()),
+                ("total", (*total).into()),
+            ],
+        ),
         Event::Downloading { file, .. } => l.msg_args("apply-downloading", &[("file", file.clone().into())]),
         Event::Progress {
             phase: Phase::Installing,

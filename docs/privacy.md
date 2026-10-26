@@ -12,6 +12,7 @@ a network request must add it here.
 | `archlinux.org/feeds/news/` | Arch news before updates | before each update |
 | `aur.archlinux.org` | AUR search, metadata and build files | AUR enabled and in use |
 | Upstream source hosts named in AUR build files | AUR builds | building an AUR package |
+| The OpenPGP keyserver GnuPG uses by default | keys that sign an AUR package's sources | building an AUR package whose sources are signed |
 | `security.archlinux.org` | vulnerability data | daily |
 | `archive.archlinux.org` | old package versions | going back to an earlier generation |
 | `github.com/Serraniel/kura-bundles` (raw files) | bundles, flows, hardware rules | daily, or when browsing bundles |

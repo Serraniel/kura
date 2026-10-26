@@ -86,6 +86,47 @@ pub fn head_commit(refs: &str) -> Option<String> {
     })
 }
 
+/// Whether `base` is a valid AUR package base name. Names end up in paths
+/// and URLs, so nothing else is accepted.
+pub fn valid_base(base: &str) -> bool {
+    !base.is_empty()
+        && !base.starts_with(['-', '.'])
+        && base
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"@._+-".contains(&b))
+}
+
+/// Whether `commit` is a full git commit id.
+pub fn valid_commit(commit: &str) -> bool {
+    commit.len() == 40 && commit.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// What kura needs from a `.SRCINFO` file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SrcInfo {
+    pub pkgbase: String,
+    pub pkgnames: Vec<String>,
+    /// Keys that sign the sources; imported before the build.
+    pub validpgpkeys: Vec<String>,
+}
+
+/// Parses `.SRCINFO` (`key = value` lines).
+pub fn parse_srcinfo(text: &str) -> SrcInfo {
+    let mut out = SrcInfo::default();
+    for line in text.lines() {
+        let Some((key, value)) = line.trim().split_once(" = ") else {
+            continue;
+        };
+        match key {
+            "pkgbase" => value.clone_into(&mut out.pkgbase),
+            "pkgname" => out.pkgnames.push(value.to_owned()),
+            "validpgpkeys" => out.validpgpkeys.push(value.to_owned()),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Things worth knowing before installing a package from the AUR.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Warning {
@@ -345,6 +386,32 @@ mod tests {
         );
         assert_eq!(head_commit("001e# service=git-upload-pack\n0000"), None);
         assert_eq!(head_commit("0000zz HEAD"), None);
+    }
+
+    #[test]
+    fn validates_names_and_commits() {
+        for ok in ["pfetch", "lib32-foo", "python-foo.bar", "c++utils", "foo@bar"] {
+            assert!(valid_base(ok), "{ok}");
+        }
+        for bad in ["", "-x", ".x", "../etc", "a/b", "Foo", "a b"] {
+            assert!(!valid_base(bad), "{bad}");
+        }
+        assert!(valid_commit("23a5d6a1d2e2b1b9a3f0f6d8b7e3f2c1a0b9c8d7"));
+        assert!(!valid_commit("23A5d6a1d2e2b1b9a3f0f6d8b7e3f2c1a0b9c8d7"));
+        assert!(!valid_commit("23a5d6"));
+    }
+
+    #[test]
+    fn parses_srcinfo() {
+        let text = "pkgbase = tools\n\tpkgdesc = Tools\n\tpkgver = 1.0\n\tvalidpgpkeys = ABCDEF0123456789ABCDEF0123456789ABCDEF01\n\npkgname = tool-a\n\npkgname = tool-b\n\tdepends = tool-a\n";
+        assert_eq!(
+            parse_srcinfo(text),
+            SrcInfo {
+                pkgbase: "tools".into(),
+                pkgnames: vec!["tool-a".into(), "tool-b".into()],
+                validpgpkeys: vec!["ABCDEF0123456789ABCDEF0123456789ABCDEF01".into()],
+            }
+        );
     }
 
     #[test]

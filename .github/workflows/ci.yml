@@ -79,3 +79,18 @@ jobs:
         run: cargo build --locked -p kura-cli -p kura-helper
       - name: Run end-to-end test
         run: scripts/e2e-container.sh target/debug
+
+  e2e-aur:
+    name: e2e-aur
+    runs-on: ubuntu-latest
+    # AUR builds run in systemd's sandbox, so this Arch container boots systemd.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Boot an Arch system with systemd
+        run: |
+          docker run -d --name arch --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/src" \
+            --tmpfs /run --tmpfs /tmp \
+            archlinux:base-devel /usr/lib/systemd/systemd
+      - name: Build and install from the AUR
+        run: docker exec arch /src/scripts/e2e-aur.sh

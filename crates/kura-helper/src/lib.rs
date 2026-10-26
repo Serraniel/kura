@@ -8,6 +8,7 @@
 //! running it, it asks polkit whether the caller may do this kind of change.
 
 pub mod actions;
+pub mod aur;
 pub mod text;
 
 use std::sync::mpsc;
@@ -59,6 +60,7 @@ pub fn action_for(kind: PlanKind) -> &'static str {
         PlanKind::Remove => "org.kura.remove",
         PlanKind::Restore { .. } => "org.kura.restore",
         PlanKind::Snapshots => "org.kura.snapshots",
+        PlanKind::AurInstall => "org.kura.aur",
     }
 }
 
@@ -71,6 +73,7 @@ pub fn cause_for(kind: PlanKind) -> String {
         PlanKind::Restore { .. } => "restore",
         PlanKind::Repair => "repair",
         PlanKind::Snapshots => "snapshots",
+        PlanKind::AurInstall => "aur-install",
     };
     format!("kura:{kind}")
 }
@@ -170,6 +173,7 @@ mod tests {
         assert_eq!(action_for(PlanKind::Install), "org.kura.install");
         assert_eq!(action_for(PlanKind::Remove), "org.kura.remove");
         assert_eq!(action_for(PlanKind::Snapshots), "org.kura.snapshots");
+        assert_eq!(action_for(PlanKind::AurInstall), "org.kura.aur");
         assert_eq!(
             action_for(PlanKind::Restore { generation: 1 }),
             "org.kura.restore"

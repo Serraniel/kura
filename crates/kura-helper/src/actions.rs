@@ -94,6 +94,7 @@ pub fn apply_snapshots(conf: &Config, approved: &Plan, events: &Sender<Event>) -
             kind: PlanKind::Install,
             steps: approved.steps.clone(),
             actions: Vec::new(),
+            builds: Vec::new(),
         };
         kura_alpm::apply::apply(conf, &packages, events).map_err(|e| match e {
             ApplyError::Changed(mut plan) => {
