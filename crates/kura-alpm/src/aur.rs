@@ -269,3 +269,97 @@ pub fn updates(conf: &Config, settings: &Settings, now: i64, remember: bool) -> 
         |n| tracked.get(n).map(|m| m.since),
     ))
 }
+
+/// Programs and libraries of AUR packages that need a library which is gone,
+/// usually because a repository update changed its version. These packages
+/// must be built again. Returns package names with the missing libraries.
+pub fn needs_rebuild(conf: &Config) -> Result<Vec<(String, Vec<String>)>, crate::Error> {
+    use kura_core::elf;
+    use std::io::Read as _;
+
+    // The parts kura needs sit at the start of a file; huge files are cut.
+    const READ_LIMIT: u64 = 4 * 1024 * 1024;
+    let extra: Vec<String> = std::fs::read_dir("/etc/ld.so.conf.d")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+        .flat_map(|c| elf::ld_conf_dirs(&c))
+        .collect();
+    let handle = crate::handle(conf)?;
+    let foreign: Vec<_> = handle
+        .localdb()
+        .pkgs()
+        .into_iter()
+        .filter(|p| !handle.syncdbs().iter().any(|db| db.pkg(p.name()).is_ok()))
+        .collect();
+    let mut out = Vec::new();
+    for pkg in foreign {
+        let mut missing: Vec<String> = Vec::new();
+        for file in pkg.files().files() {
+            let name = String::from_utf8_lossy(file.name()).into_owned();
+            let checked = ["usr/bin/", "usr/lib/", "usr/lib32/"].iter().any(|dir| {
+                name.strip_prefix(dir)
+                    .is_some_and(|rest| !rest.contains('/') && !rest.is_empty())
+            });
+            if !checked {
+                continue;
+            }
+            let path = format!("/{name}");
+            let is_file = std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_file());
+            if !is_file {
+                continue;
+            }
+            let mut data = Vec::new();
+            let Ok(f) = std::fs::File::open(&path) else {
+                continue;
+            };
+            if f.take(READ_LIMIT).read_to_end(&mut data).is_err() {
+                continue;
+            }
+            let Some(linking) = elf::linking(&data) else {
+                continue;
+            };
+            let origin = path.rsplit_once('/').map_or("/", |(dir, _)| dir);
+            for lib in elf::missing(&linking, origin, &extra, |p| Path::new(p).exists()) {
+                if !missing.contains(&lib) {
+                    missing.push(lib);
+                }
+            }
+        }
+        if !missing.is_empty() {
+            out.push((pkg.name().to_owned(), missing));
+        }
+    }
+    Ok(out)
+}
+
+/// AUR packages to build again, limited to those the AUR still has.
+pub fn rebuild_targets(conf: &Config) -> Result<Vec<String>, String> {
+    let broken: Vec<String> = needs_rebuild(conf)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    if broken.is_empty() {
+        return Ok(broken);
+    }
+    let known = info(&broken)?;
+    Ok(broken
+        .into_iter()
+        .filter(|n| known.iter().any(|i| &i.name == n))
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "reads the real package database"]
+    fn rebuild_scan_runs() {
+        let conf = crate::load_config().unwrap();
+        let found = needs_rebuild(&conf).unwrap();
+        eprintln!("{found:?}");
+    }
+}

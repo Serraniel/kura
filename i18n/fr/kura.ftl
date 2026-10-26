@@ -272,6 +272,7 @@ confirm-aur = Compiler et installer ceci ? [o/N]
 aur-off = { $names } n'est pas dans les dépôts et l'AUR est désactivé. Pour l'activer : kura settings aur on
 aur-check-failed = Impossible de vérifier les mises à jour de l'AUR : { $reason }
 check-aur = Depuis l'AUR : { $ready } prêtes, { $waiting } en attente
+check-rebuild = Ces applications de l'AUR ont besoin d'une bibliothèque qu'une mise à jour a remplacée. kura update les recompile :
 aur-updates-title = Mises à jour depuis l'AUR :
 aur-waiting = { $count ->
     [one] Une mise à jour de l'AUR attend

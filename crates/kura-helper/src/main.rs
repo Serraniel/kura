@@ -327,6 +327,10 @@ fn check() -> Result<(), String> {
             }
             Err(e) => eprintln!("kura: AUR not checked: {e}"),
         }
+        match kura_alpm::aur::needs_rebuild(&conf) {
+            Ok(broken) => status.aur_rebuild = broken.len(),
+            Err(e) => eprintln!("kura: AUR packages not checked for missing libraries: {e}"),
+        }
     }
     write_status(Path::new(STATUS), &status).map_err(|e| e.to_string())?;
     eprintln!(

@@ -223,6 +223,7 @@ confirm-aur = これをビルドしてインストールしますか? [y/N]
 aur-off = { $names } はリポジトリにありません。また、AUR はオフになっています。オンにするには: kura settings aur on
 aur-check-failed = AUR のアップデートを確認できませんでした: { $reason }
 check-aur = AUR から: { $ready } 件準備完了、{ $waiting } 件待機中
+check-rebuild = これらの AUR アプリは、アップデートで置き換えられたライブラリを必要としています。kura update で再ビルドします:
 aur-updates-title = AUR からのアップデート:
 aur-waiting = 新しいバージョンの問題が先に見つかるよう、{ $count } 件の AUR アップデートは公開から { $days } 日経つまで待機します: { $names }
 confirm-aur-update = これらのアップデートをビルドしてインストールしますか? [y/N]
