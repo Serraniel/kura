@@ -18,6 +18,7 @@ cli-usage =
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
       security   Afficher les problèmes de sécurité connus des logiciels installés
+      snapshots  Afficher l'état des instantanés ; kura snapshots setup ajoute ce qui manque
       undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
@@ -219,10 +220,14 @@ snapshots-missing = Il manque :
 snapshots-step-install = Installer { $package }
 snapshots-step-config = Créer une configuration snapper pour /
 snapshots-step-enable = Activer { $unit }
+snapshots-setup-hint = Pour ajouter ce qui manque : kura snapshots setup
+snapshots-nothing = Rien à configurer.
+preview-actions = Réglages modifiés :
+confirm-snapshots = Configurer les instantanés ? [o/N]
 suggest-backup-kernel = Installer un noyau de secours
 suggest-backup-kernel-text = Si une mise à jour empêche un jour l’ordinateur de démarrer, le noyau de secours peut être choisi dans le menu de démarrage.
 suggest-snapshots = Activer les instantanés automatiques
-suggest-snapshots-text = Votre disque prend en charge les instantanés. Leur configuration arrivera dans une version ultérieure de kura.
+suggest-snapshots-text = Un instantané enregistre l'état du système avant chaque mise à jour, pour pouvoir revenir en arrière si quelque chose ne fonctionne plus. kura conserve ce qui est déjà configuré et n'ajoute que ce qui manque.
 suggest-mirrors = Choisir des serveurs de téléchargement plus rapides
 suggest-mirrors-text = kura teste les serveurs proches et utilise les plus rapides.
 suggest-cleanup =

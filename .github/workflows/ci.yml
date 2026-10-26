@@ -59,7 +59,10 @@ jobs:
     name: e2e
     runs-on: ubuntu-latest
     # A throwaway Arch system: kura installs and removes packages for real here.
-    container: archlinux:base-devel
+    container:
+      image: archlinux:base-devel
+      # Loop devices for the btrfs snapshot test.
+      options: --privileged
     steps:
       - name: Install toolchain and services
         run: pacman -Syu --noconfirm --needed rust clang lld git dbus polkit

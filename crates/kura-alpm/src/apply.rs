@@ -42,6 +42,8 @@ pub enum Event {
     CleaningUp,
     /// Signing keys are updated before the rest of the update.
     UpdatingKeyring,
+    /// A change that is not a package change.
+    Configuring { action: kura_core::action::Action },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -143,7 +145,9 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
                 })
                 .collect(),
         )),
-        PlanKind::Restore { .. } => None,
+        // Restores and snapshot setups have their own way in; see
+        // `apply_restore` and `kura_alpm::snapshots`.
+        PlanKind::Restore { .. } | PlanKind::Snapshots => None,
     }
 }
 
@@ -286,6 +290,7 @@ fn without(plan: &Plan, names: &[String]) -> Plan {
             .filter(|s| !names.iter().any(|n| n == s.package()))
             .cloned()
             .collect(),
+        actions: plan.actions.clone(),
     }
 }
 
@@ -532,21 +537,25 @@ mod tests {
         let mut a = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2")],
+            actions: Vec::new(),
         };
         let b = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2")],
+            actions: Vec::new(),
         };
         a.add_cleanup([("electron36", "36")]);
         assert!(same_change(&a, &b));
         let c = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "3")],
+            actions: Vec::new(),
         };
         assert!(!same_change(&a, &c));
         let d = Plan {
             kind: PlanKind::SystemUpdate,
             steps: vec![up("firefox", "2"), up("mesa", "2")],
+            actions: Vec::new(),
         };
         assert!(!same_change(&a, &d));
     }
@@ -560,6 +569,7 @@ mod tests {
                 up("firefox", "2"),
                 up("endeavouros-keyring", "3"),
             ],
+            actions: Vec::new(),
         };
         let keys = keyring_upgrades(&plan);
         assert_eq!(keys, ["archlinux-keyring", "endeavouros-keyring"]);
@@ -580,6 +590,7 @@ mod tests {
                     why: *why,
                 })
                 .collect(),
+            actions: Vec::new(),
         };
         let a = rm(&[
             ("gimp", RemovalReason::Requested),
@@ -607,6 +618,7 @@ mod tests {
                 },
                 up("mesa", "2"),
             ],
+            actions: Vec::new(),
         };
         assert_eq!(request_for(&install), Some(Request::Install(vec!["gimp".into()])));
         let remove = Plan {
@@ -623,6 +635,7 @@ mod tests {
                     why: RemovalReason::Orphan,
                 },
             ],
+            actions: Vec::new(),
         };
         assert_eq!(request_for(&remove), Some(Request::Remove(vec!["gimp".into()])));
         assert_eq!(

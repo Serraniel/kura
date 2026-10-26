@@ -31,6 +31,15 @@ user action
 A plan is a plain data structure. It can be serialised, shown, tested and
 replayed. The helper refuses anything that is not a valid plan.
 
+Before it runs a plan, the helper derives it again from the system and stops
+if the result differs from what the user approved. The user then sees the new
+preview.
+
+Besides package steps, a plan can carry actions (`kura_core::action`): fixed
+operations such as enabling a systemd unit or creating the snapper
+configuration. The helper runs only the actions it derived itself, never ones
+it received, and starts fixed programs with fixed arguments.
+
 ## Sources
 
 `Source` is a trait implemented by the pacman repositories and the AUR. Each

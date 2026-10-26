@@ -8,6 +8,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::action::Action;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tool {
     Snapper,
@@ -114,6 +116,49 @@ pub fn snapshots_mounted(mounts: &str) -> bool {
     mounts
         .lines()
         .any(|l| l.split_whitespace().nth(1) == Some("/.snapshots"))
+}
+
+/// A line of `/proc/mounts`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mount {
+    pub device: String,
+    pub fs: String,
+    pub options: String,
+}
+
+/// The last mount on `target`, as the kernel sees it.
+pub fn mount_entry(mounts: &str, target: &str) -> Option<Mount> {
+    mounts.lines().rev().find_map(|l| {
+        let mut cols = l.split_whitespace();
+        let device = cols.next()?;
+        if cols.next()? != target {
+            return None;
+        }
+        Some(Mount {
+            device: device.to_owned(),
+            fs: cols.next()?.to_owned(),
+            options: cols.next()?.to_owned(),
+        })
+    })
+}
+
+/// Splits missing steps into packages to install and actions to run.
+/// Packages no repository offers are left out, like `limine-snapper-sync`
+/// on plain Arch, where it is only in the AUR.
+pub fn split(steps: &[Step], available: impl Fn(&str) -> bool) -> (Vec<String>, Vec<Action>) {
+    let mut packages = Vec::new();
+    let mut actions = Vec::new();
+    for step in steps {
+        match step {
+            Step::Install(p) if available(p) => packages.push(p.clone()),
+            Step::Install(_) => {}
+            Step::CreateRootConfig { keep_mount } => actions.push(Action::SnapperRootConfig {
+                keep_mount: *keep_mount,
+            }),
+            Step::Enable(unit) => actions.push(Action::Enable { unit: unit.clone() }),
+        }
+    }
+    (packages, actions)
 }
 
 /// Compares the system with a complete setup.
@@ -290,6 +335,41 @@ mod tests {
             ..Facts::default()
         };
         assert_eq!(check(&ext4), Report::Unsupported);
+    }
+
+    #[test]
+    fn splits_packages_and_actions() {
+        let steps = [
+            Step::Install("snapper".into()),
+            Step::Install("limine-snapper-sync".into()),
+            Step::CreateRootConfig { keep_mount: true },
+            Step::Enable("snapper-cleanup.timer".into()),
+        ];
+        let (packages, actions) = split(&steps, |p| p != "limine-snapper-sync");
+        assert_eq!(packages, ["snapper"]);
+        assert_eq!(
+            actions,
+            [
+                Action::SnapperRootConfig { keep_mount: true },
+                Action::Enable {
+                    unit: "snapper-cleanup.timer".into()
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn finds_mounts() {
+        let mounts = "/dev/sda2 /.snapshots btrfs rw,subvol=/@old 0 0\n/dev/sda2 /.snapshots btrfs rw,subvolid=257,subvol=/@snapshots 0 0\n";
+        assert_eq!(
+            mount_entry(mounts, "/.snapshots"),
+            Some(Mount {
+                device: "/dev/sda2".into(),
+                fs: "btrfs".into(),
+                options: "rw,subvolid=257,subvol=/@snapshots".into(),
+            })
+        );
+        assert_eq!(mount_entry(mounts, "/home"), None);
     }
 
     #[test]

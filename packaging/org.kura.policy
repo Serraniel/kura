@@ -84,4 +84,19 @@
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.snapshots">
+    <description>Set up snapshots</description>
+    <description xml:lang="de">Snapshots einrichten</description>
+    <description xml:lang="fr">Configurer les instantanés</description>
+    <description xml:lang="ja">スナップショットの設定</description>
+    <message>Authentication is required to set up snapshots.</message>
+    <message xml:lang="de">Zum Einrichten von Snapshots ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour configurer les instantanés.</message>
+    <message xml:lang="ja">スナップショットを設定するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>

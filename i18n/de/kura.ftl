@@ -17,6 +17,7 @@ cli-usage =
       install    Eine App installieren: kura install <Name>
       remove     Eine App entfernen und was nur sie brauchte: kura remove <Name>
       security   Bekannte Sicherheitsprobleme installierter Software anzeigen
+      snapshots  Snapshot-Status anzeigen; kura snapshots setup ergänzt, was fehlt
       undo       Zu einem früheren Stand zurückkehren: kura undo [Nummer]
       version    Version von kura anzeigen
 cli-unknown-command = Unbekannter Befehl: { $command }
@@ -206,10 +207,14 @@ snapshots-missing = Es fehlt:
 snapshots-step-install = { $package } installieren
 snapshots-step-config = snapper-Konfiguration für / anlegen
 snapshots-step-enable = { $unit } einschalten
+snapshots-setup-hint = Um zu ergänzen, was fehlt: kura snapshots setup
+snapshots-nothing = Es gibt nichts einzurichten.
+preview-actions = Diese Einstellungen ändern sich:
+confirm-snapshots = Snapshots einrichten? [j/N]
 suggest-backup-kernel = Einen Ersatz-Kernel installieren
 suggest-backup-kernel-text = Falls ein Update den Computer einmal nicht mehr starten lässt, kann der Ersatz im Startmenü ausgewählt werden.
 suggest-snapshots = Automatische Snapshots einschalten
-suggest-snapshots-text = Ihre Festplatte unterstützt Snapshots. Das Einrichten kommt in einer späteren Version von kura.
+suggest-snapshots-text = Ein Snapshot sichert den Zustand des Systems vor jedem Update, damit Sie zurückkehren können, wenn etwas kaputtgeht. kura behält, was schon eingerichtet ist, und ergänzt nur, was fehlt.
 suggest-mirrors = Schnellere Download-Server auswählen
 suggest-mirrors-text = kura testet Server in Ihrer Nähe und verwendet die schnellsten.
 suggest-cleanup =

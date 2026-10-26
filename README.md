@@ -43,6 +43,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura orphans` | Lists packages nothing needs any more. |
 | `kura sbom` | Writes a list of all installed software (CycloneDX). |
 | `kura doctor` | A short system summary for problem reports. |
+| `kura snapshots [setup]` | Shows whether snapshots are taken before updates; `setup` adds what is missing. |
 
 The window (`kura-gui`) shows the same status, update preview, history and
 settings. It also lets you search for apps and install or remove them, warns

@@ -4,6 +4,7 @@
 //! Texts built from kura's data, shared by the command line and the window so
 //! both say the same thing.
 
+use kura_core::action::Action;
 use kura_core::history::Record;
 use kura_core::plan::Step;
 use kura_core::security::{Finding, Severity};
@@ -75,6 +76,14 @@ pub fn severity(l: &Localizer, s: Severity) -> String {
         Severity::High => "severity-high",
         Severity::Critical => "severity-critical",
     })
+}
+
+/// One line for a change that is not a package change.
+pub fn action(l: &Localizer, action: &Action) -> String {
+    match action {
+        Action::Enable { unit } => l.msg_args("snapshots-step-enable", &[("unit", unit.clone().into())]),
+        Action::SnapperRootConfig { .. } => l.msg("snapshots-step-config"),
+    }
 }
 
 fn tool_name(tool: Tool) -> &'static str {
@@ -206,6 +215,10 @@ mod tests {
     fn snapshot_states() {
         use kura_core::snapshots::Step;
         let en = l("en");
+        assert_eq!(
+            action(&en, &Action::SnapperRootConfig { keep_mount: true }),
+            "Create a snapper configuration for /"
+        );
         assert_eq!(
             snapshots(&en, &Report::Unsupported).0,
             "Not possible on this file system"
