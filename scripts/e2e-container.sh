@@ -84,6 +84,9 @@ grep -q '"checked"' /var/lib/kura/status.json
 kura history
 echo "e2e passed"
 
+# Search reaches the AUR.
+kura search paru | grep -q "From the AUR"
+
 # Snapshots: the root of this container is not btrfs, so nothing is offered.
 kura snapshots | grep -q "Not possible"
 kura snapshots setup | grep -q "Nothing to set up"

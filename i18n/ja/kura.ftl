@@ -14,6 +14,7 @@ cli-usage =
       mirrors    速いダウンロードサーバーを選びます
       orphans    どこからも必要とされていないパッケージを表示します
       sbom       インストール済みソフトウェアの一覧を書き出します (CycloneDX)
+      search     リポジトリと AUR でアプリを検索します: kura search <単語>
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
@@ -198,6 +199,13 @@ suggest-cleanup = 不要になったパッケージが { $count } 個ありま�
 suggest-cleanup-text = 次回のアップデートで削除されます。
 search-placeholder = アプリを検索 (例:「写真」「音楽」)
 search-none = アプリが見つかりませんでした。別の言葉で試してください。
+search-repos = リポジトリから:
+search-aur = AUR から (コミュニティが共有、このコンピューターでビルド):
+search-aur-failed = AUR を検索できませんでした: { $reason }
+aur-votes = { $count } 票
+aur-new = 新規
+aur-orphaned = メンテナーなし
+aur-out-of-date = 古いと報告済み
 gui-installed = インストール済み
 gui-remove = 削除
 gui-install-title = { $name } をインストール

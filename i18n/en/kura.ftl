@@ -13,6 +13,7 @@ cli-usage =
       mirrors    Choose fast download servers
       orphans    List packages that nothing needs any more
       sbom       Write a list of all installed software (CycloneDX)
+      search     Search apps in the repositories and the AUR: kura search <word>
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
@@ -225,6 +226,16 @@ suggest-cleanup =
 suggest-cleanup-text = They are removed with the next update.
 search-placeholder = Search apps, for example “photo” or “music”
 search-none = No apps found. Try a different word.
+search-repos = From the repositories:
+search-aur = From the AUR (shared by the community, built on this computer):
+search-aur-failed = The AUR could not be searched: { $reason }
+aur-votes = { $count ->
+    [one] { $count } vote
+   *[other] { $count } votes
+}
+aur-new = new
+aur-orphaned = no maintainer
+aur-out-of-date = marked out of date
 gui-installed = Installed
 gui-remove = Remove
 gui-install-title = Install { $name }

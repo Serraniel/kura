@@ -14,6 +14,7 @@ cli-usage =
       mirrors    Choisir des serveurs de téléchargement rapides
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
+      search     Chercher des applications dans les dépôts et l'AUR : kura search <mot>
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
@@ -238,6 +239,16 @@ suggest-cleanup =
 suggest-cleanup-text = Ils seront supprimés lors de la prochaine mise à jour.
 search-placeholder = Rechercher des applications, par exemple « photo » ou « musique »
 search-none = Aucune application trouvée. Essayez un autre mot.
+search-repos = Depuis les dépôts :
+search-aur = Depuis l'AUR (partagé par la communauté, compilé sur cet ordinateur) :
+search-aur-failed = Impossible de chercher dans l'AUR : { $reason }
+aur-votes = { $count ->
+    [one] { $count } vote
+   *[other] { $count } votes
+}
+aur-new = nouveau
+aur-orphaned = sans mainteneur
+aur-out-of-date = signalé comme obsolète
 gui-installed = Installé
 gui-remove = Supprimer
 gui-install-title = Installer { $name }
