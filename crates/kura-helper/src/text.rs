@@ -102,6 +102,40 @@ pub fn repair(l: &Localizer, repair: &kura_core::solver::Repair) -> String {
     format!("{out}\n{}", l.msg("solver-tested"))
 }
 
+/// Why AUR apps appear when the repositories are up to date: apps a
+/// library update broke, and updates that still wait.
+pub fn aur_context(l: &Localizer, conf: &kura_alpm::Config) -> String {
+    let mut lines = vec![l.msg("check-none")];
+    if let Ok(broken) = kura_alpm::aur::needs_rebuild(conf)
+        && !broken.is_empty()
+    {
+        let list: Vec<String> = broken
+            .iter()
+            .map(|(name, libs)| format!("{name} ({})", libs.join(", ")))
+            .collect();
+        lines.push(l.msg_args("aur-rebuild-why", &[("list", list.join(", ").into())]));
+    }
+    let settings = kura_alpm::aur::settings();
+    if let Ok(updates) = kura_alpm::aur::updates(conf, &settings, kura_alpm::background::now(), false) {
+        let waiting: Vec<&str> = updates
+            .iter()
+            .filter(|u| u.waits_until.is_some())
+            .map(|u| u.name.as_str())
+            .collect();
+        if !waiting.is_empty() {
+            lines.push(l.msg_args(
+                "aur-waiting",
+                &[
+                    ("count", waiting.len().into()),
+                    ("days", settings.aur_cooling_days.into()),
+                    ("names", waiting.join(", ").into()),
+                ],
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
 /// What to tell the user about a reply. `Changed` asks for a new review.
 pub fn reply(l: &Localizer, reply: &Reply) -> String {
     match reply {

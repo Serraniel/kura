@@ -305,11 +305,9 @@ pub fn resolve(
             if !first && !added {
                 continue;
             }
-            let deps = info
-                .depends
-                .iter()
-                .chain(&info.make_depends)
-                .chain(&info.check_depends);
+            // Test suites are skipped (`makepkg --nocheck`), so their
+            // dependencies are not installed.
+            let deps = info.depends.iter().chain(&info.make_depends);
             for dep in deps {
                 match satisfied(dep) {
                     Satisfied::Installed => {}

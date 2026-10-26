@@ -177,7 +177,7 @@ fn render(l: &Localizer, plan: &Plan, outcome: Option<&Outcome>, apps: &BTreeSet
         }
         let _ = writeln!(out, "\n{}", l.msg_args(title, &[("count", steps.len().into())]));
         for step in steps {
-            let detail = kura_i18n::present::step_detail(step);
+            let detail = kura_i18n::present::step_text(l, step);
             let _ = writeln!(out, "  {:width$}  {detail}", step.package());
         }
     };
@@ -202,9 +202,13 @@ fn render(l: &Localizer, plan: &Plan, outcome: Option<&Outcome>, apps: &BTreeSet
     let again: Vec<&Step> = plan.steps.iter().filter(|s| reinstall(&s)).collect();
     let apps: Vec<&Step> = groups.apps.iter().copied().filter(|s| !reinstall(&s)).collect();
     let system: Vec<&Step> = system.into_iter().filter(|s| !reinstall(&s)).collect();
+    let (tools, system): (Vec<&Step>, Vec<&Step>) = system
+        .into_iter()
+        .partition(|s| kura_i18n::present::is_build_tool(plan, s));
     section("check-group-apps", &apps);
     section("check-group-system", &system);
     section("check-group-reinstall", &again);
+    section("check-group-build-tools", &tools);
     section("check-group-replaced", &replaced);
     section("check-group-cleanup", &groups.cleanup);
     if !plan.actions.is_empty() {
@@ -538,6 +542,15 @@ fn aur_updates(l: &Localizer) -> Result<String, String> {
         return Ok(note);
     }
     say(&note);
+    if let Ok(broken) = kura_alpm::aur::needs_rebuild(&conf)
+        && !broken.is_empty()
+    {
+        let list: Vec<String> = broken
+            .iter()
+            .map(|(name, libs)| format!("{name} ({})", libs.join(", ")))
+            .collect();
+        say(&l.msg_args("aur-rebuild-why", &[("list", list.join(", ").into())]));
+    }
     let mut names: Vec<String> = ready.iter().map(|u| u.name.clone()).collect();
     for name in rebuild {
         if !names.contains(&name) {

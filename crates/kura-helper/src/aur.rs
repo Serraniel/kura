@@ -156,7 +156,9 @@ pub fn build_in_sandbox(base: &str, commit: &str) -> Result<(), String> {
     }
     run(
         "makepkg",
-        &["--noconfirm", "--noprogressbar", "--nocolor"],
+        // Without the package's test suite: it needs extra tools and is
+        // meant for the package's maintainer.
+        &["--noconfirm", "--noprogressbar", "--nocolor", "--nocheck"],
         &src,
         &env,
     )?;
@@ -362,8 +364,54 @@ fn build_all(
     }
     match failure {
         Some(message) => Err(ApplyError::Failed(message)),
-        None => Ok(()),
+        None => remove_build_tools(conf, approved, events),
     }
+}
+
+/// Removes repository packages the plan installed only for building: after
+/// the builds, nothing needs them any more.
+fn remove_build_tools(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
+    let installed_now: Vec<&str> = approved
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Install {
+                name,
+                reason: InstallReason::Dependency,
+                ..
+            } if !approved.builds.iter().any(|b| b.packages.contains(name)) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    let set = kura_alpm::installed(conf)?;
+    let orphans = set.orphans();
+    let unneeded: Vec<String> = installed_now
+        .into_iter()
+        .filter(|n| orphans.iter().any(|o| o == n))
+        .map(str::to_owned)
+        .collect();
+    if unneeded.is_empty() {
+        return Ok(());
+    }
+    let _ = events.send(Event::CleaningUp);
+    let steps = unneeded
+        .iter()
+        .filter_map(|n| {
+            set.get(n).map(|p| Step::Remove {
+                name: n.clone(),
+                version: p.version.clone(),
+                why: kura_core::plan::RemovalReason::Requested,
+            })
+        })
+        .collect();
+    let plan = Plan {
+        kind: PlanKind::Remove,
+        steps,
+        actions: Vec::new(),
+        builds: Vec::new(),
+    };
+    kura_alpm::apply::apply(conf, &plan, events)
+        .map_err(|e| ApplyError::Failed(format!("removing build tools: {e}")))
 }
 
 #[cfg(test)]
