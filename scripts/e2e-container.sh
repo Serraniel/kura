@@ -85,6 +85,8 @@ kura history
 echo "e2e passed"
 
 # A repository profile comes and goes, leaving pacman.conf as it was.
+# Real installs create pacman's local signing key; the Docker image has none.
+pacman-key --init
 cp /etc/pacman.conf /tmp/pacman.conf.before
 printf 'y\n' | kura profiles add chaotic-aur
 pacman-conf --repo-list | grep -qx chaotic-aur
