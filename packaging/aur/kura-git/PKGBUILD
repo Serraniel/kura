@@ -36,6 +36,7 @@ prepare() {
 build() {
   cd kura
   export CARGO_TARGET_DIR=target
+  export KURA_VERSION="$pkgver"
   cargo build --frozen --release --workspace
 }
 

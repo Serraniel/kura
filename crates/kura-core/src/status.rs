@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::security::Finding;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Status {
     /// Unix time of the check.
@@ -20,11 +22,16 @@ pub struct Status {
     /// Titles of Arch news items that concern the update.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub news: Vec<String>,
+    /// Known vulnerabilities in installed packages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub security: Vec<Finding>,
 }
 
 /// What the tray and the overview show, most important first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
+    /// An installed app or system part has a known vulnerability.
+    Security,
     /// The update needs attention: news to read or a problem to solve.
     NeedsAttention,
     UpdatesReady,
@@ -37,6 +44,8 @@ impl Status {
     pub fn state(&self) -> State {
         if self.checked == 0 {
             State::Unknown
+        } else if !self.security.is_empty() {
+            State::Security
         } else if self.blocked || !self.news.is_empty() {
             State::NeedsAttention
         } else if self.updates > 0 {
@@ -66,6 +75,17 @@ mod tests {
         s.news.clear();
         s.blocked = true;
         assert_eq!(s.state(), State::NeedsAttention);
+        s.security.push(crate::security::Finding {
+            advisory: "AVG-1".into(),
+            package: "ffmpeg".into(),
+            installed: "1".into(),
+            fixed: Some("2".into()),
+            severity: crate::security::Severity::High,
+            kind: "x".into(),
+            cves: vec![],
+            apps: vec!["kdenlive".into()],
+        });
+        assert_eq!(s.state(), State::Security);
     }
 
     #[test]

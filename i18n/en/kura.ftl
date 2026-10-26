@@ -10,11 +10,13 @@ cli-usage =
       check      Look for updates and show what would change
       doctor     Show a summary of this system for problem reports
       history    Show saved states of this system
+      mirrors    Choose fast download servers
       orphans    List packages that nothing needs any more
       sbom       Write a list of all installed software (CycloneDX)
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
       remove     Remove an app and what only it needed: kura remove <name>
+      security   Show known security problems of installed software
       undo       Go back to an earlier state: kura undo [number]
       version    Show the version of kura
 cli-unknown-command = Unknown command: { $command }
@@ -46,6 +48,14 @@ undo-limits = Settings and personal files are not changed. The next update bring
 undo-nothing = This is already the current state.
 undo-unknown = There is no saved state #{ $id }. kura history lists the saved states.
 confirm-undo = Go back to this state? [y/N]
+mirrors-running = Testing download servers near you…
+mirrors-done = { $count } fast download servers are now used. The previous list was kept as { $backup }.
+solver-found =
+    { $count ->
+        [one] kura found a solution: one old part that no app uses any more blocks the update. It is removed, everything else is updated.
+       *[other] kura found a solution: { $count } old parts that no app uses any more block the update. They are removed, everything else is updated.
+    }
+solver-tested = kura tested this solution without changing anything.
 error-check = Could not look for updates: { $reason }
 
 ## history
@@ -108,6 +118,28 @@ tray-open-hint = Click to open kura.
 notify-updates-body = Open kura to see what changes before installing.
 notify-attention-body = Open kura to see what to do. Nothing has been changed.
 notify-open = Open kura
+
+## Security
+
+security-one-app = { $app } has a known security problem
+security-more-apps =
+    { $count ->
+        [one] { $app } and one other app have a known security problem
+       *[other] { $app } and { $count } other apps have a known security problem
+    }
+security-system = The system has a known security problem
+security-fix = An update fixes it. Please install it soon.
+security-nofix = There is no fix yet. kura checks every day and tells you when there is one.
+security-none = No known security problems.
+security-running = Checking for known security problems…
+security-unavailable = The list of known security problems could not be loaded.
+security-detail = { $package } { $installed }: { $kind }
+security-fixed-in = Fixed in { $version }
+security-used-by = Used by: { $apps }
+severity-low = low risk
+severity-medium = medium risk
+severity-high = high risk
+severity-critical = critical risk
 
 ## doctor
 

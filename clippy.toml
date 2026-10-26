@@ -1,0 +1,2 @@
+# Product names that appear in documentation comments.
+doc-valid-idents = ["CachyOS", "EndeavourOS", "CycloneDX", "StatusNotifierItem", "KDE", "GNOME", ".."]

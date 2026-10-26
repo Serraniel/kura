@@ -7,8 +7,18 @@
 pub mod generation;
 pub mod history;
 pub mod locale;
+pub mod mirrors;
 pub mod news;
 pub mod package;
 pub mod plan;
+pub mod security;
+pub mod solver;
 pub mod status;
 pub mod version;
+
+/// kura's version: the release tag when built by the release pipeline or a
+/// package (`KURA_VERSION`), otherwise the workspace version.
+pub const VERSION: &str = match option_env!("KURA_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};

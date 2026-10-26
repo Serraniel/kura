@@ -30,6 +30,9 @@ pub enum Request {
     Install(Vec<String>),
     /// Remove these packages and what only they needed.
     Remove(Vec<String>),
+    /// Upgrade everything and remove these packages, as a repair proposed
+    /// by the problem solver.
+    Repair(Vec<String>),
 }
 
 impl Request {
@@ -38,6 +41,7 @@ impl Request {
             Request::Update => PlanKind::SystemUpdate,
             Request::Install(_) => PlanKind::Install,
             Request::Remove(_) => PlanKind::Remove,
+            Request::Repair(_) => PlanKind::Repair,
         }
     }
 }
@@ -156,6 +160,50 @@ pub fn prepare(
     })
 }
 
+/// Prepares a request; when an update is blocked, asks the problem solver for
+/// a repair and simulates it. Returns the outcome to show and the repair, if
+/// one was used.
+pub fn prepare_with_repair(
+    conf: &Config,
+    workdir: Option<&Path>,
+    request: &Request,
+    refresh: bool,
+) -> Result<(Outcome, Option<kura_core::solver::Repair>), Error> {
+    let outcome = prepare(conf, workdir, request, refresh)?;
+    let Err(problems) = &outcome.plan else {
+        return Ok((outcome, None));
+    };
+    if !matches!(request, Request::Update) {
+        return Ok((outcome, None));
+    }
+    let unsatisfied: Vec<kura_core::solver::Unsatisfied> = problems
+        .iter()
+        .filter_map(|p| match p {
+            Problem::UnsatisfiedDependency {
+                target, dependency, ..
+            } => Some(kura_core::solver::Unsatisfied {
+                target: target.clone(),
+                dependency: dependency.clone(),
+            }),
+            _ => None,
+        })
+        .collect();
+    if unsatisfied.len() != problems.len() {
+        return Ok((outcome, None));
+    }
+    let installed = crate::installed(conf)?;
+    let Some(repair) = kura_core::solver::propose(&unsatisfied, &installed) else {
+        return Ok((outcome, None));
+    };
+    // L1 simulation of the proposal; if it does not work, the original problem stands.
+    let repaired = prepare(conf, workdir, &Request::Repair(repair.remove.clone()), false)?;
+    if repaired.plan.is_ok() {
+        Ok((repaired, Some(repair)))
+    } else {
+        Ok((outcome, None))
+    }
+}
+
 pub(crate) fn flags(request: &Request) -> TransFlag {
     match request {
         // Like `pacman -Rs`: also remove dependencies nothing else needs.
@@ -210,6 +258,16 @@ pub(crate) fn build(
                 explicit.insert(name);
             }
         }
+        Request::Repair(names) => {
+            handle.sync_sysupgrade(false)?;
+            for name in names {
+                let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
+                    return Ok(blocked(vec![Problem::NotFound { name: name.clone() }]));
+                };
+                handle.trans_remove_pkg(pkg)?;
+                explicit.insert(name);
+            }
+        }
         Request::Remove(names) => {
             for name in names {
                 let Ok(pkg) = handle.localdb().pkg(name.as_str()) else {
@@ -254,6 +312,7 @@ pub(crate) fn build(
         let why = match request {
             Request::Remove(_) if explicit.contains(pkg.name()) => RemovalReason::Requested,
             Request::Remove(_) => RemovalReason::Orphan,
+            Request::Repair(_) if explicit.contains(pkg.name()) => RemovalReason::Repair,
             _ => RemovalReason::Replaced,
         };
         plan.steps.push(Step::Remove {

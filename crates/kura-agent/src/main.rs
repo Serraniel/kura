@@ -30,6 +30,10 @@ struct Look {
 fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
     let icon = if monochrome { "kura-symbolic" } else { "kura" };
     let (sni, title) = match status.state() {
+        State::Security => (
+            "NeedsAttention",
+            kura_i18n::present::security_headline(l, &status.security),
+        ),
         State::NeedsAttention => ("NeedsAttention", l.msg("tray-attention")),
         State::UpdatesReady => (
             "Active",
@@ -47,7 +51,9 @@ fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
 
 /// Whether a change from `before` to `after` is worth a notification.
 fn should_notify(before: &Status, after: &Status) -> bool {
+    let advisories = |s: &Status| s.security.iter().map(|f| f.advisory.clone()).collect::<Vec<_>>();
     match after.state() {
+        State::Security => advisories(before) != advisories(after),
         State::NeedsAttention => before.state() != State::NeedsAttention || before.news != after.news,
         State::UpdatesReady => after.updates > before.updates || before.state() != State::UpdatesReady,
         State::UpToDate | State::Unknown => false,
@@ -240,7 +246,10 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let has_tray = register(&conn, &name);
     watch_notification_clicks(&conn);
-    if status.state() == State::NeedsAttention || status.state() == State::UpdatesReady {
+    if matches!(
+        status.state(),
+        State::Security | State::NeedsAttention | State::UpdatesReady
+    ) {
         notify(
             &conn,
             &l,
@@ -293,7 +302,31 @@ mod tests {
             downloaded: true,
             blocked,
             news: news.iter().map(|s| (*s).to_owned()).collect(),
+            security: vec![],
         }
+    }
+
+    #[test]
+    fn security_comes_first() {
+        let l = en();
+        let mut s = status(3, &["news"], false);
+        s.security.push(kura_core::security::Finding {
+            advisory: "AVG-1".into(),
+            package: "ffmpeg".into(),
+            installed: "1".into(),
+            fixed: Some("2".into()),
+            severity: kura_core::security::Severity::High,
+            kind: "x".into(),
+            cves: vec![],
+            apps: vec!["kdenlive".into()],
+        });
+        let shown = look(&s, &l, false);
+        assert_eq!(
+            (shown.status, shown.tooltip.as_str()),
+            ("NeedsAttention", "kdenlive has a known security problem")
+        );
+        assert!(should_notify(&status(3, &["news"], false), &s));
+        assert!(!should_notify(&s, &s.clone()));
     }
 
     #[test]

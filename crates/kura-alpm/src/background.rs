@@ -19,6 +19,25 @@ use crate::{Config, Error};
 pub const STATUS: &str = "/var/lib/kura/status.json";
 pub const CHECK_DB: &str = "/var/lib/kura/checkdb";
 const NEWS_FEED: &str = "https://archlinux.org/feeds/news/";
+const TRACKER: &str = "https://security.archlinux.org/issues/all.json";
+
+/// Reads the Arch Security Tracker with curl. `None` when it cannot be loaded.
+pub fn fetch_advisories() -> Option<Vec<kura_core::security::Advisory>> {
+    let out = std::process::Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--max-time",
+            "60",
+            TRACKER,
+        ])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())?;
+    kura_core::security::parse_tracker(&String::from_utf8_lossy(&out.stdout)).ok()
+}
 
 /// Reads the Arch news feed with curl. `None` when it cannot be loaded.
 pub fn fetch_news() -> Option<Vec<Item>> {
@@ -66,6 +85,7 @@ pub fn check(
     download: bool,
     news: Option<&[Item]>,
     since: i64,
+    advisories: Option<&[kura_core::security::Advisory]>,
 ) -> Result<Status, Error> {
     let mut handle = open(conf, Some(workdir))?;
     handle.syncdbs_mut().update(false)?;
@@ -96,12 +116,17 @@ pub fn check(
                 .collect()
         })
         .unwrap_or_default();
+    let security = match advisories {
+        Some(list) => kura_core::security::scan(list, &crate::installed(conf)?),
+        None => Vec::new(),
+    };
     Ok(Status {
         checked: now(),
         updates: available.len(),
         downloaded,
         blocked,
         news,
+        security,
     })
 }
 
@@ -143,6 +168,7 @@ mod tests {
             downloaded: true,
             blocked: false,
             news: vec!["x".into()],
+            security: vec![],
         };
         write_status(&path, &s).unwrap();
         assert_eq!(read_status(&path), s);
@@ -163,7 +189,7 @@ mod tests {
     fn checks_in_a_container() {
         let conf = crate::load_config().unwrap();
         let dir = std::env::temp_dir().join(format!("kura-bg-{}", std::process::id()));
-        let status = check(&conf, &dir, true, None, 0).unwrap();
+        let status = check(&conf, &dir, true, None, 0, fetch_advisories().as_deref()).unwrap();
         assert!(status.checked > 0);
         assert!(!status.blocked);
         let _ = fs::remove_dir_all(dir);

@@ -32,6 +32,11 @@ for _ in $(seq 50); do
   sleep 0.2
 done
 
+# Choosing download servers rewrites the mirror list and keeps the old one.
+kura mirrors
+grep -q "chosen by kura" /etc/pacman.d/mirrorlist
+ls /etc/pacman.d/mirrorlist.kura-*
+
 # The background check writes a status and installs nothing.
 /usr/lib/kura/kura-helper check
 test -s /var/lib/kura/status.json
@@ -64,6 +69,9 @@ if pacman -Q figlet 2>/dev/null; then
   exit 1
 fi
 grep -q '"cause":"kura:restore"' /var/lib/kura/history.jsonl
+
+kura security
+grep -q '"checked"' /var/lib/kura/status.json
 
 kura history
 echo "e2e passed"

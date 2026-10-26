@@ -116,6 +116,28 @@ impl Helper {
         serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
     }
 
+    async fn rank_mirrors(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &zbus::Connection,
+    ) -> String {
+        self.last_activity.store(now(), Ordering::Relaxed);
+        let reply = match header.sender() {
+            Some(sender) if authorized(conn, sender.as_str(), "org.kura.mirrors").await => {
+                if self.busy.swap(true, Ordering::AcqRel) {
+                    Reply::Busy
+                } else {
+                    let reply = blocking::unblock(rank).await;
+                    self.busy.store(false, Ordering::Release);
+                    reply
+                }
+            }
+            _ => Reply::NotAuthorized,
+        };
+        self.last_activity.store(now(), Ordering::Relaxed);
+        serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
+    }
+
     #[zbus(signal)]
     async fn progress(emitter: &SignalEmitter<'_>, event: &str) -> zbus::Result<()>;
 }
@@ -186,18 +208,61 @@ fn serve() -> Result<(), String> {
     }
 }
 
+/// Today's date for file names, `YYYY-MM-DD`.
+fn today() -> String {
+    kura_sbom::rfc3339(u64::try_from(kura_alpm::background::now()).unwrap_or(0))[..10].to_owned()
+}
+
+fn rank() -> Reply {
+    match kura_alpm::mirrors::rank(Path::new(kura_alpm::mirrors::MIRRORLIST), &today()) {
+        Ok(r) => {
+            let _ = std::fs::write(MIRRORS_RANKED, today());
+            Reply::Mirrors {
+                count: r.count,
+                backup: r.backup.display().to_string(),
+            }
+        }
+        Err(e) => Reply::Failed {
+            message: e.to_string(),
+        },
+    }
+}
+
+/// Written after each ranking; the background check ranks again after 30 days.
+const MIRRORS_RANKED: &str = "/var/lib/kura/mirrors-ranked";
+
 /// Run by kura-check.timer: looks for updates, downloads them and writes the status.
 fn check() -> Result<(), String> {
-    use kura_alpm::background::{CHECK_DB, STATUS, check, fetch_news, news_since, now, write_status};
+    use kura_alpm::background::{
+        CHECK_DB, STATUS, check, fetch_advisories, fetch_news, news_since, now, write_status,
+    };
+    let stale = std::fs::metadata(MIRRORS_RANKED)
+        .and_then(|m| m.modified())
+        .map_or(true, |t| {
+            t.elapsed().unwrap_or_default() > Duration::from_secs(30 * 86_400)
+        });
+    if stale && let Reply::Failed { message } = rank() {
+        eprintln!("kura: mirrors not ranked: {message}");
+    }
     let conf = kura_alpm::load_config().map_err(|e| e.to_string())?;
     let news = fetch_news();
     let since = news_since(Path::new(JOURNAL), now());
-    let status =
-        check(&conf, Path::new(CHECK_DB), true, news.as_deref(), since).map_err(|e| e.to_string())?;
+    let advisories = fetch_advisories();
+    let status = check(
+        &conf,
+        Path::new(CHECK_DB),
+        true,
+        news.as_deref(),
+        since,
+        advisories.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
     write_status(Path::new(STATUS), &status).map_err(|e| e.to_string())?;
     eprintln!(
-        "kura: {} updates, downloaded: {}",
-        status.updates, status.downloaded
+        "kura: {} updates, downloaded: {}, security findings: {}",
+        status.updates,
+        status.downloaded,
+        status.security.len()
     );
     Ok(())
 }

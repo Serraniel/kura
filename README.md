@@ -26,9 +26,28 @@ pacman alongside kura.
 
 ## Install
 
-Not yet available. Once the first version is released, kura will be
-available from the AUR, from its own package repository, and as a package
-file on the releases page.
+Not yet released. Developers can build the `kura-git` package from
+[packaging/aur/kura-git](packaging/aur/kura-git/PKGBUILD) on a test machine.
+
+## What works today
+
+| Command | What it does |
+|---|---|
+| `kura check` | Shows which updates are available and what would change. Changes nothing. |
+| `kura update` | Shows the preview and Arch news that concern it, asks, then installs everything. |
+| `kura install <name>` / `kura remove <name>` | The same for single apps. |
+| `kura history` | Lists the saved states of the system. |
+| `kura undo [number]` | Goes back to an earlier state. |
+| `kura mirrors` | Picks fast, up-to-date download servers. |
+| `kura security` | Lists known security problems, named by the apps that use the affected part. |
+| `kura orphans` | Lists packages nothing needs any more. |
+| `kura sbom` | Writes a list of all installed software (CycloneDX). |
+| `kura doctor` | A short system summary for problem reports. |
+
+The window (`kura-gui`) shows the same status, update preview, history and
+settings. A tray icon (`kura-agent`) tells you when updates are ready or
+something needs attention. A daily background check downloads updates
+without installing them.
 
 ## Privacy
 

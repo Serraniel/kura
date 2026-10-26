@@ -1,0 +1,52 @@
+name: Release artefacts
+
+# Runs when release-please publishes a release. Attaches the binaries, a
+# CycloneDX SBOM of kura's own dependencies, checksums and signed build
+# provenance (CRA: SBOM and verifiable builds).
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  artefacts:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Install toolchain
+        run: pacman -Syu --noconfirm --needed rust clang lld git qt6-base qt6-declarative github-cli
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Build
+        run: KURA_VERSION="${TAG#v}" cargo build --release --locked --workspace
+      - name: Package binaries
+        run: |
+          name="kura-${TAG#v}-x86_64"
+          mkdir -p "dist/$name/bin"
+          cp target/release/kura target/release/kura-gui target/release/kura-helper target/release/kura-agent "dist/$name/bin/"
+          cp -r packaging LICENSES README.md "dist/$name/"
+          tar -C dist -cf - "$name" | zstd -19 -o "dist/$name.tar.zst"
+          rm -rf "dist/$name"
+      - name: SBOM of kura itself
+        run: |
+          cargo install --locked cargo-cyclonedx --version 0.5.9
+          ~/.cargo/bin/cargo-cyclonedx cyclonedx --format json --spec-version 1.5 --all
+          for f in crates/*/*.cdx.json; do cp "$f" "dist/$(basename "$(dirname "$f")")-${TAG#v}.cdx.json"; done
+      - name: Checksums
+        run: (cd dist && sha256sum * > SHA256SUMS)
+      - name: Build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

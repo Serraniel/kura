@@ -59,8 +59,20 @@ fn run(l: &Localizer) -> Result<String, String> {
     }
 
     match command.as_deref() {
-        Some("version") => Ok(format!("kura {}\n", env!("CARGO_PKG_VERSION"))),
+        Some("version") => Ok(format!("kura {}\n", kura_core::VERSION)),
         Some("check") => check(l),
+        Some("security") => security(l),
+        Some("mirrors") => {
+            eprintln!("{}", l.msg("mirrors-running"));
+            let reply = kura_helper::rank_mirrors()
+                .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+            let text = kura_helper::text::reply(l, &reply);
+            if matches!(reply, Reply::Mirrors { .. }) {
+                Ok(text + "\n")
+            } else {
+                Err(text)
+            }
+        }
         Some("undo") => undo(l, names.first().map(String::as_str)),
         Some("update") => change(l, &Request::Update, "confirm-update"),
         Some("install") if !names.is_empty() => change(l, &Request::Install(names), "confirm-install"),
@@ -122,7 +134,16 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let config = kura_alpm::load_config().map_err(fail)?;
     let refresh = !matches!(request, Request::Remove(_));
-    let outcome = kura_alpm::prepare::prepare(&config, Some(&check_dir()), request, refresh).map_err(fail)?;
+    let (outcome, repair) =
+        kura_alpm::prepare::prepare_with_repair(&config, Some(&check_dir()), request, refresh)
+            .map_err(fail)?;
+    if let Some(repair) = &repair {
+        say(&format!(
+            "{}\n{}\n",
+            l.msg_args("solver-found", &[("count", repair.remove.len().into())]),
+            l.msg("solver-tested")
+        ));
+    }
     let mut plan = match &outcome.plan {
         Err(problems) => {
             let mut out = l.msg("check-blocked") + "\n";
@@ -314,21 +335,54 @@ fn change(l: &Localizer, request: &Request, question_id: &str) -> Result<String,
                     render(l, &plan, Some(&outcome), &apps)
                 ));
             }
-            Reply::Blocked { problems } => {
-                let mut out = l.msg("check-blocked") + "\n";
-                for p in &problems {
-                    let _ = writeln!(out, "  {}", problem_text(l, p));
-                }
-                return Err(out);
-            }
-            Reply::NotAuthorized => return Err(l.msg("apply-not-authorized")),
-            Reply::Locked => return Err(l.msg("apply-locked")),
-            Reply::Busy => return Err(l.msg("apply-busy")),
-            Reply::Failed { message } => {
-                return Err(l.msg_args("apply-failed", &[("reason", message.into())]));
-            }
+            other => return Err(kura_helper::text::reply(l, &other)),
         }
     }
+}
+
+/// Known vulnerabilities, named by the apps that use the affected package.
+fn security(l: &Localizer) -> Result<String, String> {
+    eprintln!("{}", l.msg("security-running"));
+    let advisories =
+        kura_alpm::background::fetch_advisories().ok_or_else(|| l.msg("security-unavailable"))?;
+    let set = load(l)?;
+    let findings = kura_core::security::scan(&advisories, &set);
+    let mut out = kura_i18n::present::security_headline(l, &findings) + "\n";
+    for f in &findings {
+        let _ = writeln!(
+            out,
+            "\n  {} ({})\n    {}",
+            if f.apps.is_empty() {
+                l.msg("security-system")
+            } else {
+                f.apps.join(", ")
+            },
+            kura_i18n::present::severity(l, f.severity),
+            l.msg_args(
+                "security-detail",
+                &[
+                    ("package", f.package.clone().into()),
+                    ("installed", f.installed.clone().into()),
+                    ("kind", f.kind.clone().into()),
+                ]
+            ),
+        );
+        match &f.fixed {
+            Some(v) => {
+                let _ = writeln!(
+                    out,
+                    "    {} · {}",
+                    l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
+                    l.msg("security-fix")
+                );
+            }
+            None => {
+                let _ = writeln!(out, "    {}", l.msg("security-nofix"));
+            }
+        }
+        let _ = writeln!(out, "    {} {}", f.advisory, f.cves.join(" "));
+    }
+    Ok(out)
 }
 
 /// Goes back to an earlier generation, by default the one before the newest.
@@ -468,7 +522,7 @@ fn sbom(l: &Localizer, output: Option<&str>) -> Result<String, String> {
         &kura_sbom::RunInfo {
             serial: &serial,
             timestamp: &timestamp,
-            tool_version: env!("CARGO_PKG_VERSION"),
+            tool_version: kura_core::VERSION,
         },
     );
     let text = serde_json::to_string_pretty(&bom).map_err(|e| e.to_string())?;

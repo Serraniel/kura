@@ -11,11 +11,13 @@ cli-usage =
       check      Rechercher des mises à jour et montrer ce qui changerait
       doctor     Afficher un résumé de ce système pour les rapports de problème
       history    Afficher les états enregistrés du système
+      mirrors    Choisir des serveurs de téléchargement rapides
       orphans    Lister les paquets dont plus rien n’a besoin
       sbom       Écrire la liste de tous les logiciels installés (CycloneDX)
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
+      security   Afficher les problèmes de sécurité connus des logiciels installés
       undo       Revenir à un état antérieur : kura undo [numéro]
       version    Afficher la version de kura
 cli-unknown-command = Commande inconnue : { $command }
@@ -47,6 +49,14 @@ undo-limits = Les paramètres et les fichiers personnels ne sont pas modifiés. 
 undo-nothing = C’est déjà l’état actuel.
 undo-unknown = Il n’existe pas d’état enregistré n° { $id }. kura history liste les états enregistrés.
 confirm-undo = Revenir à cet état ? [o/N]
+mirrors-running = Test des serveurs de téléchargement proches…
+mirrors-done = { $count } serveurs de téléchargement rapides sont maintenant utilisés. L’ancienne liste a été conservée sous { $backup }.
+solver-found =
+    { $count ->
+        [one] kura a trouvé une solution : un ancien élément qu’aucune application n’utilise plus bloque la mise à jour. Il est supprimé, tout le reste est mis à jour.
+       *[other] kura a trouvé une solution : { $count } anciens éléments qu’aucune application n’utilise plus bloquent la mise à jour. Ils sont supprimés, tout le reste est mis à jour.
+    }
+solver-tested = kura a testé cette solution sans rien modifier.
 error-check = Impossible de rechercher des mises à jour : { $reason }
 
 ## history
@@ -121,6 +131,28 @@ tray-open-hint = Cliquez pour ouvrir kura.
 notify-updates-body = Ouvrez kura pour voir ce qui change avant l’installation.
 notify-attention-body = Ouvrez kura pour voir ce qu’il faut faire. Rien n’a été modifié.
 notify-open = Ouvrir kura
+
+## Security
+
+security-one-app = { $app } a un problème de sécurité connu
+security-more-apps =
+    { $count ->
+        [one] { $app } et une autre application ont un problème de sécurité connu
+       *[other] { $app } et { $count } autres applications ont un problème de sécurité connu
+    }
+security-system = Le système a un problème de sécurité connu
+security-fix = Une mise à jour le corrige. Veuillez l’installer bientôt.
+security-nofix = Il n’existe pas encore de correctif. kura vérifie chaque jour et vous prévient dès qu’il y en a un.
+security-none = Aucun problème de sécurité connu.
+security-running = Recherche des problèmes de sécurité connus…
+security-unavailable = La liste des problèmes de sécurité connus n’a pas pu être chargée.
+security-detail = { $package } { $installed } : { $kind }
+security-fixed-in = Corrigé dans { $version }
+security-used-by = Utilisé par : { $apps }
+severity-low = risque faible
+severity-medium = risque moyen
+severity-high = risque élevé
+severity-critical = risque critique
 
 ## doctor
 

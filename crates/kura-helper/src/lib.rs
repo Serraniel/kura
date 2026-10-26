@@ -43,6 +43,11 @@ pub enum Reply {
     Failed {
         message: String,
     },
+    /// New download servers are in use; the old list was kept as `backup`.
+    Mirrors {
+        count: usize,
+        backup: String,
+    },
 }
 
 /// The polkit action that guards a kind of plan.
@@ -75,6 +80,9 @@ pub fn cause_for(kind: PlanKind) -> String {
 pub trait Helper {
     /// Runs an approved plan (JSON) and returns a [`Reply`] (JSON).
     fn apply(&self, plan: &str) -> zbus::Result<String>;
+
+    /// Chooses fast, up-to-date download servers and returns a [`Reply`] (JSON).
+    fn rank_mirrors(&self) -> zbus::Result<String>;
 
     /// Progress of the running plan, as a JSON [`Event`].
     #[zbus(signal)]
@@ -137,6 +145,15 @@ pub fn apply(plan: &Plan, mut on_event: impl FnMut(Event)) -> Result<Reply, Clie
             }
         }
     }
+}
+
+/// Asks the helper to rank the download servers.
+pub fn rank_mirrors() -> Result<Reply, ClientError> {
+    let conn = zbus::blocking::connection::Builder::system()?
+        .method_timeout(Duration::from_secs(600))
+        .build()?;
+    let text = HelperProxyBlocking::new(&conn)?.rank_mirrors()?;
+    serde_json::from_str(&text).map_err(|e| ClientError::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
