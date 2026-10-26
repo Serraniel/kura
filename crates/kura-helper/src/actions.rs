@@ -32,6 +32,32 @@ fn run_program(program: &str, args: &[&str]) -> Result<(), String> {
 
 const PACMAN_CONF: &str = "/etc/pacman.conf";
 
+/// Makes the boot loader start `kernel` by default.
+fn set_default_kernel(kernel: &str) -> Result<(), String> {
+    let grub_cfg = fs::read_to_string("/boot/grub/grub.cfg").unwrap_or_default();
+    if let Some(id) = kura_core::kernels::grub_entry_id(&grub_cfg, kernel) {
+        return run_program("grub-set-default", &[&id]);
+    }
+    let entries: Vec<(String, String)> = ["/boot", "/efi", "/boot/efi"]
+        .iter()
+        .flat_map(|esp| {
+            fs::read_dir(Path::new(esp).join("loader/entries"))
+                .into_iter()
+                .flatten()
+                .flatten()
+        })
+        .filter_map(|e| {
+            Some((
+                e.file_name().to_string_lossy().into_owned(),
+                fs::read_to_string(e.path()).ok()?,
+            ))
+        })
+        .collect();
+    let entry = kura_core::kernels::sdboot_entry(&entries, kernel)
+        .ok_or_else(|| format!("no boot entry for {kernel}"))?;
+    run_program("bootctl", &["set-default", &format!("{entry}.conf")])
+}
+
 /// Changes `pacman.conf` after keeping a copy of the old file next to it.
 fn edit_pacman_conf(change: impl FnOnce(&str) -> String) -> Result<(), String> {
     let path = Path::new(PACMAN_CONF);
@@ -75,6 +101,7 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
             kura_alpm::apply::install_from_repo(repo, packages, events).map_err(|e| e.to_string())
         }
         Action::RegenerateGrub => run_program("grub-mkconfig", &["-o", "/boot/grub/grub.cfg"]),
+        Action::SetDefaultKernel { kernel } => set_default_kernel(kernel),
         Action::SetArchitecture { value } => {
             edit_pacman_conf(|c| kura_core::pacman_conf::set_option(c, "Architecture", value))
         }
@@ -209,11 +236,23 @@ pub fn apply_profile(conf: &Config, approved: &Plan, events: &Sender<Event>) -> 
 /// derives itself; the running kernel and the last kernel are never removed.
 /// After an install, DKMS modules that were not built are reported.
 pub fn apply_kernel(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
-    if approved.actions != kura_alpm::kernels::boot_actions(conf) {
+    let kernel = approved
+        .steps
+        .iter()
+        .find_map(|s| match s {
+            Step::Install { name, .. } | Step::Remove { name, .. } if kura_core::health::is_kernel(name) => {
+                Some(name.clone())
+            }
+            _ => None,
+        })
+        .ok_or_else(|| ApplyError::Failed("no kernel in a kernel plan".into()))?;
+    let adding = approved.steps.iter().any(|s| matches!(s, Step::Install { .. }));
+    if approved.actions != kura_alpm::kernels::boot_actions(conf, &kernel, adding) {
         return Err(ApplyError::Failed(
             "unexpected boot menu change in a kernel plan".into(),
         ));
     }
+    let previous = kura_alpm::kernels::running_package();
     let added: Vec<&str> = approved
         .steps
         .iter()
@@ -265,6 +304,13 @@ pub fn apply_kernel(conf: &Config, approved: &Plan, events: &Sender<Event>) -> R
             action: action.clone(),
         });
         run(action, conf, events).map_err(ApplyError::Failed)?;
+    }
+    if adding {
+        // Remember it, to offer removing the old kernel once the new one started.
+        let record = serde_json::json!({"added": kernel, "previous": previous});
+        let _ = fs::write(kura_alpm::kernels::ADDED, record.to_string());
+    } else if kura_alpm::kernels::replaced_kernel().is_some_and(|(_, old)| old == kernel) {
+        let _ = fs::remove_file(kura_alpm::kernels::ADDED);
     }
     for kernel in added {
         let missing = kura_alpm::kernels::missing_dkms(kernel);

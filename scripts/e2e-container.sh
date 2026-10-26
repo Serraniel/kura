@@ -127,6 +127,8 @@ printf 'y\n' | kura kernels add linux-lts
 pacman -Q linux-lts
 if kura kernels remove linux-lts; then exit 1; fi
 pacman -Q linux-lts
+# kura remembers the kernel it added, to offer removing the old one later.
+grep -q '"added":"linux-lts"' /var/lib/kura/kernel-added.json
 
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"

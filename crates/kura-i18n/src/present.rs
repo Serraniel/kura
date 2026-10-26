@@ -134,6 +134,9 @@ pub fn action(l: &Localizer, action: &Action) -> String {
             l.msg_args("action-install-from", &[("files", packages.join(", ").into())])
         }
         Action::RegenerateGrub => l.msg("action-regenerate-grub"),
+        Action::SetDefaultKernel { kernel } => {
+            l.msg_args("action-default-kernel", &[("name", kernel.clone().into())])
+        }
         Action::SetArchitecture { value } if value == "auto" => l.msg("action-arch-generic"),
         Action::SetArchitecture { value } => l.msg_args("action-arch", &[("arch", value.clone().into())]),
     }
