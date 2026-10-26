@@ -97,6 +97,28 @@ cmp /etc/pacman.conf /tmp/pacman.conf.before
 if pacman -Q chaotic-keyring; then exit 1; fi
 if pacman-key --list-keys EF925EA60F33D0CB85C44AD13056513887B78AEB; then exit 1; fi
 
+# CachyOS: add it, switch every package, go back, and nothing is left.
+if grep -qw avx2 /proc/cpuinfo; then
+  cp /etc/pacman.conf /tmp/pacman.conf.before-cachyos
+  printf 'y\nn\n' | kura profiles add cachyos
+  pacman-conf --repo-list | grep -q '^cachyos-core-v[34]$'
+  # A crash leaves a core dump with a backtrace in the log.
+  pacman -S --noconfirm --needed gdb
+  echo /tmp/core.%p >/proc/sys/kernel/core_pattern || true
+  ulimit -c unlimited
+  if ! printf 'y\n' | kura profiles switch cachyos; then
+    for core in /tmp/core.*; do
+      gdb -batch -ex 'thread apply all bt' "$(command -v kura)" "$core" || true
+    done
+    exit 1
+  fi
+  test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -gt 0
+  printf 'y\ny\n' | kura profiles remove cachyos
+  cmp /etc/pacman.conf /tmp/pacman.conf.before-cachyos
+  test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -eq 0
+  if pacman -Q cachyos-keyring; then exit 1; fi
+fi
+
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"
 

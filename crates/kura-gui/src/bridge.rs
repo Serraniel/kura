@@ -520,15 +520,54 @@ fn prepare_profile_preview(profile: &'static kura_core::profiles::Profile) -> Re
     let l = Localizer::from_env();
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let conf = kura_alpm::load_config().map_err(fail)?;
-    let plan = kura_alpm::profiles::prepare(&conf, profile).map_err(fail)?;
+    let add = !kura_alpm::profiles::is_active(profile);
+    if add && kura_core::profiles::level(profile, kura_alpm::profiles::cpu_level()).is_none() {
+        return Err(l.msg_args("profile-cpu", &[("name", profile.id.into())]));
+    }
+    let (plan, estimate) =
+        kura_alpm::profiles::prepare(&conf, Some(&kura_alpm::background::check_dir()), profile, true)
+            .map_err(fail)?;
     let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    let mut headline = l.msg(&format!("profile-{}-text", profile.id));
+    if let Some(outcome) = &estimate
+        && let Ok(switch) = &outcome.plan
+    {
+        let id = if add {
+            "profile-switch-estimate"
+        } else {
+            "profile-switch-back-estimate"
+        };
+        let line = l.msg_args(
+            id,
+            &[
+                ("count", switch.steps.len().into()),
+                ("download", l.size(outcome.download_size).into()),
+            ],
+        );
+        headline = format!("{headline}\n{line}");
+    }
     Ok(Prepared {
         preview: preview_groups(&l, &plan, &apps).to_string(),
         news: "[]".into(),
         summary: String::new(),
-        headline: l.msg(&format!("profile-{}-text", profile.id)),
+        headline,
         plan,
     })
+}
+
+/// Runs in a background thread: switching installed packages to the active
+/// profile's builds, or back to the generic ones.
+fn prepare_switch_preview(back: bool) -> Result<Prepared, String> {
+    let request = if back {
+        Request::Switch(None)
+    } else {
+        let level = kura_core::profiles::ALL
+            .iter()
+            .find_map(|p| kura_alpm::profiles::active_level(p).filter(|l| l.architecture.is_some()))
+            .ok_or_else(|| Localizer::from_env().msg("check-none"))?;
+        Request::Switch(Some(level.repos.iter().map(|(n, _)| (*n).to_owned()).collect()))
+    };
+    prepare_preview(&request)
 }
 
 /// Runs in a background thread: what setting up snapshots would change.
@@ -888,6 +927,12 @@ impl qobject::Kura {
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
         let qt = self.qt_thread();
+        // After a profile with optimised builds changes, the switch follows.
+        let switch_after = (plan.kind == kura_core::plan::PlanKind::Profile)
+            .then(|| kura_core::profiles::known(&plan.actions))
+            .flatten()
+            .filter(|(_, level, _)| level.architecture.is_some())
+            .map(|(_, _, add)| !add);
         std::thread::spawn(move || {
             let l = Localizer::from_env();
             let events = qt.clone();
@@ -922,7 +967,12 @@ impl qobject::Kura {
                 // A changed system needs a fresh preview before anything else.
                 let profiles = profiles_value(&this.localizer).to_string();
                 this.as_mut().set_profiles_json(QString::from(&profiles));
-                if fresh.is_some() {
+                if let Some(back) = switch_after.filter(|_| !failed) {
+                    let title = this.localizer.msg("profile-switch-title");
+                    let label = this.localizer.msg("gui-switch");
+                    this.as_mut()
+                        .start_preview(move || prepare_switch_preview(back), &title, &label);
+                } else if fresh.is_some() {
                     this.as_mut().prepare_update();
                 } else {
                     this.as_mut().refresh();

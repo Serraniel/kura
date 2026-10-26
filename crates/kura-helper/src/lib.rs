@@ -56,7 +56,7 @@ pub enum Reply {
 /// The polkit action that guards a kind of plan.
 pub fn action_for(kind: PlanKind) -> &'static str {
     match kind {
-        PlanKind::SystemUpdate | PlanKind::Repair => "org.kura.update",
+        PlanKind::SystemUpdate | PlanKind::Repair | PlanKind::Switch { .. } => "org.kura.update",
         PlanKind::Install => "org.kura.install",
         PlanKind::Remove => "org.kura.remove",
         PlanKind::Restore { .. } => "org.kura.restore",
@@ -77,6 +77,7 @@ pub fn cause_for(kind: PlanKind) -> String {
         PlanKind::Snapshots => "snapshots",
         PlanKind::AurInstall => "aur-install",
         PlanKind::Profile => "profile",
+        PlanKind::Switch { .. } => "switch",
     };
     format!("kura:{kind}")
 }

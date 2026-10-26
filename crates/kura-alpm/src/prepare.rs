@@ -37,6 +37,11 @@ pub enum Request {
     /// Upgrade everything and install what satisfies these dependencies,
     /// marked as dependencies: the repository part of an AUR install.
     Dependencies(Vec<String>),
+    /// Upgrade everything and reinstall packages from other builds: with
+    /// repositories, generic builds those repositories have (for example
+    /// CachyOS's builds for newer processors); without, every package built
+    /// for a newer processor goes back to the generic build.
+    Switch(Option<Vec<String>>),
 }
 
 impl Request {
@@ -47,6 +52,9 @@ impl Request {
             Request::Remove(_) => PlanKind::Remove,
             Request::Repair(_) => PlanKind::Repair,
             Request::Dependencies(_) => PlanKind::AurInstall,
+            Request::Switch(target) => PlanKind::Switch {
+                back: target.is_none(),
+            },
         }
     }
 }
@@ -253,6 +261,35 @@ fn with_language_packs(handle: &Alpm, request: &Request, locales: &[Locale]) -> 
     Request::Install(all)
 }
 
+/// A build for any x86-64 processor, as Arch builds them.
+fn is_generic(pkg: &alpm::Package) -> bool {
+    matches!(pkg.arch(), Some("x86_64" | "any")) && !pkg.packager().unwrap_or_default().contains("CachyOS")
+}
+
+/// Adds the reinstalls of a switch to the transaction (see [`Request::Switch`]).
+fn add_switches(handle: &Alpm, target: Option<&[String]>) {
+    for old in handle.localdb().pkgs() {
+        let reinstall = match target {
+            Some(repos) => {
+                is_generic(old)
+                    && handle
+                        .syncdbs()
+                        .iter()
+                        .find(|db| db.pkg(old.name()).is_ok())
+                        .is_some_and(|db| repos.iter().any(|r| r == db.name()))
+            }
+            None => !is_generic(old),
+        };
+        if !reinstall || handle.trans_add().iter().any(|p| p.name() == old.name()) {
+            continue;
+        }
+        if let Some(new) = handle.syncdbs().iter().find_map(|db| db.pkg(old.name()).ok()) {
+            // A package that cannot be added keeps its build; the switch goes on.
+            let _ = handle.trans_add_pkg(new);
+        }
+    }
+}
+
 /// Adds packages from the repositories, by name or, with `satisfy`, by
 /// dependency (`pacman>6.1`). Returns the problem when one cannot be added.
 fn add_installs(handle: &Alpm, names: &[String], satisfy: bool) -> Option<Problem> {
@@ -358,6 +395,11 @@ pub(crate) fn build(
                 return Ok(blocked(vec![problem]));
             }
             explicit.extend(names.iter().map(String::as_str));
+        }
+        Request::Switch(target) => {
+            // Going back may mean older versions than the optimised builds.
+            handle.sync_sysupgrade(target.is_none())?;
+            add_switches(handle, target.as_deref());
         }
         Request::Dependencies(deps) => {
             handle.sync_sysupgrade(false)?;

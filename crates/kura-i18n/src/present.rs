@@ -127,6 +127,14 @@ pub fn action(l: &Localizer, action: &Action) -> String {
         }
         Action::AddRepo { name, .. } => l.msg_args("action-add-repo", &[("name", name.clone().into())]),
         Action::RemoveRepo { name } => l.msg_args("action-remove-repo", &[("name", name.clone().into())]),
+        Action::AddRepoServer { name, .. } => {
+            l.msg_args("action-bootstrap-repo", &[("name", name.clone().into())])
+        }
+        Action::InstallFromRepo { packages, .. } => {
+            l.msg_args("action-install-from", &[("files", packages.join(", ").into())])
+        }
+        Action::SetArchitecture { value } if value == "auto" => l.msg("action-arch-generic"),
+        Action::SetArchitecture { value } => l.msg_args("action-arch", &[("arch", value.clone().into())]),
     }
 }
 

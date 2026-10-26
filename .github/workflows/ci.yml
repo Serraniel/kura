@@ -40,8 +40,9 @@ jobs:
       - name: Test with coverage
         run: |
           cargo llvm-cov --workspace --locked --no-report
-          # The real-database test needs an installed system; the container has one.
-          cargo llvm-cov --workspace --locked --no-report -- --ignored
+          # The real-database tests need an installed system; the container has
+          # one. They change it, so they run one after another.
+          cargo llvm-cov --workspace --locked --no-report -- --ignored --test-threads=1
           cargo llvm-cov report --summary-only | tee coverage.txt
           cargo llvm-cov report --json --summary-only --output-path coverage.json
       - name: Coverage gate (core crates at least 90 %)
