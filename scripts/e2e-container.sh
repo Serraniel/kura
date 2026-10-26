@@ -107,6 +107,9 @@ if grep -qw avx2 /proc/cpuinfo; then
   echo /tmp/core.%p >/proc/sys/kernel/core_pattern || true
   ulimit -c unlimited
   if ! printf 'y\n' | kura profiles switch cachyos; then
+    pacman-conf Architecture
+    /lib/ld-linux-x86-64.so.2 --help | grep -i "x86-64-v" || true
+    pacman -Syuw --noconfirm 2>&1 | grep -iv "downloading\|^ " | head -20 || true
     for core in /tmp/core.*; do
       gdb -batch -ex 'thread apply all bt' "$(command -v kura)" "$core" || true
     done
