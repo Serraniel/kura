@@ -117,6 +117,21 @@ fn dir_size(dir: &Path) -> u64 {
 }
 
 /// Hook files by name; a file in a later directory replaces one with the same name.
+/// The text of every pacman hook, a later directory replacing a hook with
+/// the same name.
+pub(crate) fn hook_texts(conf: &Config) -> Vec<String> {
+    let mut files = BTreeMap::new();
+    for dir in crate::hook_dirs(conf) {
+        for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+            files.insert(entry.file_name(), entry.path());
+        }
+    }
+    files
+        .values()
+        .filter_map(|p| fs::read_to_string(p).ok())
+        .collect()
+}
+
 fn hooks(conf: &Config) -> BTreeSet<snapshots::Tool> {
     let mut files = BTreeMap::new();
     for dir in crate::hook_dirs(conf) {
@@ -154,7 +169,7 @@ fn snapper_configs() -> Vec<snapshots::Config> {
         .collect()
 }
 
-fn bootloader() -> Option<Bootloader> {
+pub(crate) fn bootloader() -> Option<Bootloader> {
     let exists = |p: &str| Path::new(p).exists();
     if exists("/boot/grub/grub.cfg") {
         Some(Bootloader::Grub)

@@ -63,6 +63,7 @@ pub fn action_for(kind: PlanKind) -> &'static str {
         PlanKind::Snapshots => "org.kura.snapshots",
         PlanKind::AurInstall => "org.kura.aur",
         PlanKind::Profile => "org.kura.profiles",
+        PlanKind::Kernel => "org.kura.kernels",
     }
 }
 
@@ -77,6 +78,7 @@ pub fn cause_for(kind: PlanKind) -> String {
         PlanKind::Snapshots => "snapshots",
         PlanKind::AurInstall => "aur-install",
         PlanKind::Profile => "profile",
+        PlanKind::Kernel => "kernel",
         PlanKind::Switch { .. } => "switch",
     };
     format!("kura:{kind}")

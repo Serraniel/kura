@@ -18,6 +18,7 @@ cli-usage =
       search     Chercher des applications dans les dépôts et l'AUR : kura search <mot>
       update     Installer toutes les mises à jour (avec un aperçu d’abord)
       install    Installer une application : kura install <nom>
+      kernels    Afficher les noyaux, en ajouter ou en retirer : kura kernels [add|remove <nom>]
       remove     Supprimer une application et ce dont elle seule avait besoin : kura remove <nom>
       report     Afficher un rapport de problème et, si vous le souhaitez, l'ouvrir sur GitHub : kura report [ce qui s'est passé]
       security   Afficher les problèmes de sécurité connus des logiciels installés
@@ -233,6 +234,16 @@ health-disk-used = { $used } utilisés sur { $total }
 health-cache = Anciens fichiers de mise à jour : { $size }
 health-kernels = Noyaux
 health-kernel-running = en cours d’utilisation
+kernels-title = Noyaux : le cœur du système. Plusieurs peuvent être installés ; vous en choisissez un au démarrage.
+kernels-usage = Utilisation : kura kernels [add|remove <nom>]
+kernel-keep-running = { $name } est en cours d'utilisation. Démarrez d'abord l'ordinateur avec un autre noyau.
+kernel-keep-last = { $name } est le seul noyau. L'ordinateur ne pourrait pas démarrer sans lui.
+kernel-linux = Le noyau stable le plus récent d'Arch Linux.
+kernel-linux-lts = Support à long terme : change rarement. Un bon deuxième noyau si un nouveau pose problème.
+kernel-linux-zen = Réglé pour le bureau et les jeux, un peu plus réactif.
+kernel-linux-hardened = Protection renforcée contre les attaques. Certaines applications et certains jeux peuvent ne pas fonctionner.
+kernel-linux-cachyos = Le noyau de CachyOS, réglé pour la vitesse.
+kernel-linux-cachyos-lts = Le noyau à long terme de CachyOS.
 health-suggestions = Suggestions
 health-snapshots = Instantanés
 snapshots-on = Pris avant chaque mise à jour par { $tool }
@@ -251,6 +262,7 @@ action-remove-repo = Retirer le dépôt { $name }
 action-bootstrap-repo = Ajouter le dépôt { $name } avec son serveur principal, pour obtenir son trousseau et ses listes de miroirs
 action-arch = Utiliser des paquets compilés pour { $arch }
 action-arch-generic = Utiliser à nouveau les paquets pour tous les processeurs x86-64
+action-regenerate-grub = Mettre à jour le menu de démarrage
 profiles-title = Dépôts supplémentaires que kura peut ajouter et retirer :
 profile-on = ajouté
 profile-off = non ajouté

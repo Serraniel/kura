@@ -119,6 +119,12 @@ if grep -qw avx2 /proc/cpuinfo; then
   if pacman -Q cachyos-keyring; then exit 1; fi
 fi
 
+# Kernels: one can be added; the only kernel is never removed.
+printf 'y\n' | kura kernels add linux-lts
+pacman -Q linux-lts
+if kura kernels remove linux-lts; then exit 1; fi
+pacman -Q linux-lts
+
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"
 

@@ -11,6 +11,7 @@ pub mod apply;
 pub mod aur;
 pub mod background;
 pub mod history;
+pub mod kernels;
 pub mod mirrors;
 pub mod prepare;
 pub mod profiles;

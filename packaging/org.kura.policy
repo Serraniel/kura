@@ -144,4 +144,19 @@
       <allow_active>auth_admin</allow_active>
     </defaults>
   </action>
+  <action id="org.kura.kernels">
+    <description>Install or remove kernels</description>
+    <description xml:lang="de">Kernel installieren oder entfernen</description>
+    <description xml:lang="fr">Installer ou retirer des noyaux</description>
+    <description xml:lang="ja">カーネルのインストールと削除</description>
+    <message>Authentication is required to install or remove kernels.</message>
+    <message xml:lang="de">Zum Installieren oder Entfernen von Kerneln ist eine Anmeldung erforderlich.</message>
+    <message xml:lang="fr">Une authentification est nécessaire pour installer ou retirer des noyaux.</message>
+    <message xml:lang="ja">カーネルをインストールまたは削除するには認証が必要です。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
 </policyconfig>
