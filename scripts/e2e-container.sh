@@ -102,11 +102,16 @@ if grep -qw avx2 /proc/cpuinfo; then
   cp /etc/pacman.conf /tmp/pacman.conf.before-cachyos
   printf 'y\nn\n' | kura profiles add cachyos
   pacman-conf --repo-list | grep -q '^cachyos-core-v[34]$'
-  # Run under gdb so a crash leaves a backtrace in the log.
+  # A crash leaves a core dump with a backtrace in the log.
   pacman -S --noconfirm --needed gdb
-  printf 'y\n' >/tmp/yes
-  gdb -batch -return-child-result -ex 'set args profiles switch cachyos < /tmp/yes' \
-    -ex run -ex 'thread apply all bt' "$(command -v kura)"
+  echo /tmp/core.%p >/proc/sys/kernel/core_pattern || true
+  ulimit -c unlimited
+  if ! printf 'y\n' | kura profiles switch cachyos; then
+    for core in /tmp/core.*; do
+      gdb -batch -ex 'thread apply all bt' "$(command -v kura)" "$core" || true
+    done
+    exit 1
+  fi
   test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -gt 0
   printf 'y\ny\n' | kura profiles remove cachyos
   cmp /etc/pacman.conf /tmp/pacman.conf.before-cachyos

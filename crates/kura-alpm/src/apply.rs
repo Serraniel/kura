@@ -354,7 +354,11 @@ pub fn apply(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(
 
     if matches!(
         request,
-        Request::Update | Request::Install(_) | Request::Repair(_)
+        Request::Update
+            | Request::Install(_)
+            | Request::Repair(_)
+            | Request::Dependencies(_)
+            | Request::Switch(_)
     ) {
         let _ = events.send(Event::Refreshing);
         handle.syncdbs_mut().update(false)?;
