@@ -18,6 +18,7 @@ cli-usage =
       search     Search apps in the repositories and the AUR: kura search <word>
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
+      info       Details about a package, with trust signals for the AUR: kura info <name>
       kernels    Show kernels, add or remove one: kura kernels [add|remove <name>]
       remove     Remove an app and what only it needed: kura remove <name>
       report     Show a problem report and, if you want, open it on GitHub: kura report [what happened]
@@ -312,6 +313,16 @@ aur-votes = { $count ->
 aur-new = new
 aur-orphaned = no maintainer
 aur-out-of-date = marked out of date
+info-source = Comes from
+info-version = Version
+info-description = Description
+info-signals = Votes and warnings
+info-popularity = Popularity
+info-maintainer = Maintainer
+info-first = First uploaded
+info-changed = Last changed
+info-website = Website
+info-files = Build files
 aur-mixed = Some of these come from the AUR. Install those separately: kura install { $names }
 aur-build-list = Built on this computer from the AUR:
 aur-notice = AUR packages are shared by other users and are not checked by Arch Linux. kura builds them in a separate, restricted environment.

@@ -36,6 +36,7 @@ Not yet released. Developers can build the `kura-git` package from
 | `kura check` | Shows which updates are available and what would change. Changes nothing. |
 | `kura update` | Shows the preview and Arch news that concern it, asks, then installs everything. On btrfs it first tries the update in a throwaway snapshot and stops if it fails there. AUR updates follow once they are a few days old (3 by default), so problems in new versions can show up first. AUR apps that a library update broke are built again. |
 | `kura install <name>` / `kura remove <name>` | The same for single apps. Apps only the AUR has are built on this computer in a restricted environment, several at once. |
+| `kura info <name>` | Details about a package. For AUR packages also votes, popularity, maintainer, first upload, last change and where the build files are. |
 | `kura search <word>` | Finds apps in the repositories and the AUR. AUR results show votes and warnings. |
 | `kura history` | Lists the saved states of the system. |
 | `kura undo [number]` | Goes back to an earlier state. |

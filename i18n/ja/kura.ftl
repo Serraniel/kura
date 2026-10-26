@@ -19,6 +19,7 @@ cli-usage =
       search     リポジトリと AUR でアプリを検索します: kura search <単語>
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
+      info       パッケージの詳細 (AUR は信頼の目安付き): kura info <名前>
       kernels    カーネルを表示・追加・削除します: kura kernels [add|remove <名前>]
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
       report     問題レポートを表示し、必要なら GitHub で開きます: kura report [起きたこと]
@@ -276,6 +277,16 @@ aur-votes = { $count } 票
 aur-new = 新規
 aur-orphaned = メンテナーなし
 aur-out-of-date = 古いと報告済み
+info-source = 提供元
+info-version = バージョン
+info-description = 説明
+info-signals = 票と注意
+info-popularity = 人気度
+info-maintainer = メンテナー
+info-first = 最初の公開
+info-changed = 最終更新
+info-website = ウェブサイト
+info-files = ビルドファイル
 aur-mixed = 一部は AUR から提供されています。それらは別にインストールしてください: kura install { $names }
 aur-build-list = AUR からこのコンピューターでビルドするもの:
 aur-notice = AUR のパッケージは他のユーザーが共有しているもので、Arch Linux による確認は受けていません。kura は分離された制限付きの環境でビルドします。
