@@ -344,7 +344,16 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
             l.msg("solver-tested")
         )
     });
-    let headline = if let Some(text) = solved {
+    // AUR updates come after the repository update, in their own preview.
+    let aur_ready = if matches!(request, Request::Update) {
+        aur_ready(&conf)
+    } else {
+        Vec::new()
+    };
+    if matches!(request, Request::Update) && outcome.available.is_empty() && !aur_ready.is_empty() {
+        return prepare_aur_preview(&aur_ready);
+    }
+    let mut headline = if let Some(text) = solved {
         text
     } else if !matches!(request, Request::Update) {
         String::new()
@@ -353,6 +362,12 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     } else {
         l.msg_args("check-found", &[("count", outcome.available.len().into())])
     };
+    if !aur_ready.is_empty() {
+        headline = format!(
+            "{headline}\n{}",
+            l.msg_args("gui-aur-after", &[("count", aur_ready.len().into())])
+        );
+    }
     Ok(Prepared {
         preview: preview_groups(&l, &plan, &apps).to_string(),
         news: news.to_string(),
@@ -410,6 +425,20 @@ fn search_value(l: &Localizer, query: &str, aur: bool) -> Value {
         }));
     }
     Value::Array(out)
+}
+
+/// AUR packages whose update is past the cooling period.
+fn aur_ready(conf: &kura_alpm::Config) -> Vec<String> {
+    let settings = kura_alpm::aur::settings();
+    if !settings.aur {
+        return Vec::new();
+    }
+    kura_alpm::aur::updates(conf, &settings, kura_alpm::background::now(), false)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|u| u.waits_until.is_none())
+        .map(|u| u.name)
+        .collect()
 }
 
 /// Runs in a background thread: what building `names` from the AUR changes.
@@ -906,7 +935,8 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
                     l.msg("suggest-cleanup-text"),
                 ),
             };
-            json!({"id": id, "title": title, "text": text})
+            let install = kura_core::health::kernel_packages("linux-lts", info.facts.dkms).join(" ");
+            json!({"id": id, "title": title, "text": text, "install": install})
         })
         .collect();
     json!({"facts": facts, "kernels": kernels, "suggestions": suggestions})
