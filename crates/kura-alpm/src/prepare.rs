@@ -224,7 +224,7 @@ pub fn prepare_with_repair(
         return Ok((outcome, None));
     }
     let installed = crate::installed(conf)?;
-    let Some(repair) = kura_core::solver::propose(&unsatisfied, &installed) else {
+    let Some(repair) = kura_core::solver::propose(&unsatisfied, &installed, &load_flows()) else {
         return Ok((outcome, None));
     };
     // L1 simulation of the proposal; if it does not work, the original problem stands.
@@ -345,6 +345,20 @@ fn packs_of<'h>(handle: &'h Alpm, names: &[String]) -> Vec<&'h alpm::Package> {
                     .any(|n| n == d.name() && kura_core::langpacks::is_pack_of(n, p.name()))
             })
         })
+        .collect()
+}
+
+/// Where the package installs the flows.
+pub const FLOWS: &str = "/usr/share/kura/flows";
+
+/// Every valid flow shipped with kura. Broken files are skipped.
+pub fn load_flows() -> Vec<kura_core::flows::Flow> {
+    std::fs::read_dir(FLOWS)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "toml"))
+        .filter_map(|e| kura_core::flows::parse(&std::fs::read_to_string(e.path()).ok()?).ok())
         .collect()
 }
 

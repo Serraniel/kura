@@ -131,11 +131,7 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     )
     .map_err(fail)?;
     if let Some(repair) = &repair {
-        say(&format!(
-            "{}\n{}\n",
-            l.msg_args("solver-found", &[("count", repair.remove.len().into())]),
-            l.msg("solver-tested")
-        ));
+        say(&(kura_helper::text::repair(l, repair) + "\n"));
     }
     let mut plan = match &outcome.plan {
         Err(problems) => {

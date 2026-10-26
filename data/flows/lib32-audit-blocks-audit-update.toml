@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# A real update failure on CachyOS: lib32-audit held audit at an older
+# version. Removing the 32-bit libraries let the update through; the normal
+# versions stayed.
+
+id = "lib32-audit-blocks-audit-update"
+version = 1
+
+[name]
+en = "Remove outdated 32-bit system libraries"
+de = "Veraltete 32-Bit-Systembibliotheken entfernen"
+fr = "Retirer des bibliothèques système 32 bits obsolètes"
+ja = "古い 32 ビットのシステムライブラリを削除"
+
+[description]
+en = "The 32-bit versions of audit, pam and libcap block the update. Nothing on this computer needs them, so they are removed. The normal versions stay."
+de = "Die 32-Bit-Versionen von audit, pam und libcap blockieren das Update. Nichts auf diesem Computer braucht sie, deshalb werden sie entfernt. Die normalen Versionen bleiben installiert."
+fr = "Les versions 32 bits d'audit, pam et libcap bloquent la mise à jour. Rien sur cet ordinateur n'en a besoin, elles sont donc retirées. Les versions normales restent."
+ja = "audit、pam、libcap の 32 ビット版がアップデートを妨げています。このコンピューターでは不要なため削除します。通常版はそのまま残ります。"
+
+[match]
+error = "unsatisfied-dependency"
+blocked = ["audit"]
+installed = { lib32-audit = "*" }
+
+[repair]
+remove = ["lib32-audit", "lib32-pam", "lib32-libcap"]
+keep = ["audit", "pam", "libcap"]
+only-if-unneeded = true
