@@ -52,6 +52,9 @@ if kura install yay-bin; then exit 1; fi
 kura settings aur on
 kura settings aur-wait 0
 kura settings | grep -q "0 days"
+kura settings auto-security on
+kura settings | grep -q "Install security fixes automatically: on"
+kura settings auto-security off
 
 # An AUR update: make the installed pfetch look older, then update.
 db=$(echo /var/lib/pacman/local/pfetch-*)

@@ -80,6 +80,7 @@ history-downgraded = { $count } auf ältere Version zurückgesetzt
 history-removed = { $count } entfernt
 history-start = Ausgangsstand: { $count } Pakete
 history-outside = (außerhalb von kura geändert)
+history-auto-security = (Sicherheitskorrekturen, automatisch installiert)
 list-separator = {", "}
 
 ## Applying changes
@@ -124,6 +125,11 @@ tray-open-hint = Klicken, um kura zu öffnen.
 notify-updates-body = Öffnen Sie kura, um vor der Installation zu sehen, was sich ändert.
 notify-attention-body = Öffnen Sie kura, um zu sehen, was zu tun ist. Es wurde nichts verändert.
 notify-open = kura öffnen
+notify-auto-security-title = Sicherheitsupdates wurden installiert
+notify-auto-security-body = { $count ->
+    [one] Sie beheben ein bekanntes Sicherheitsproblem.
+   *[other] Sie beheben { $count } bekannte Sicherheitsprobleme.
+} Jede Änderung steht im Verlauf von kura, und Sie können dort zurückkehren.
 
 ## Security
 
@@ -270,7 +276,9 @@ settings-days = { $days ->
    *[other] { $days } Tage
 }
 settings-saved = Gespeichert.
-settings-usage = Aufruf: kura settings [aur on|off] [aur-wait <0–14>]
+settings-auto-security = Sicherheitskorrekturen automatisch installieren
+gui-auto-security-hint = Wenn ein Update ein bekanntes Sicherheitsproblem behebt, installiert kura es ohne Rückfrage, aber nur, wenn der Probelauf kein Problem gefunden hat und keine Arch-Nachricht es betrifft. Danach erhalten Sie eine Meldung und können im Verlauf zurückkehren.
+settings-usage = Aufruf: kura settings [aur on|off] [aur-wait <0–14>] [auto-security on|off]
 report-intro = Dieser Bericht enthält keinen Benutzernamen, Computernamen und keinen persönlichen Ordner. Bitte lesen Sie ihn, bevor Sie ihn teilen:
 confirm-report = Als vorausgefüllten Problembericht auf GitHub im Browser öffnen? [j/N]
 report-opened = Falls sich kein Browser geöffnet hat, kopieren Sie diese Adresse: { $url }

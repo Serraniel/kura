@@ -31,11 +31,22 @@ pub struct Status {
     /// AUR updates still in their cooling period.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub aur_waiting: usize,
+    /// When kura last installed security updates on its own (Unix time).
+    #[serde(default, skip_serializing_if = "is_zero_time")]
+    pub auto_installed: i64,
+    /// How many known vulnerabilities that update fixed.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub auto_fixed: usize,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde passes a reference
 fn is_zero(n: &usize) -> bool {
     *n == 0
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde passes a reference
+fn is_zero_time(t: &i64) -> bool {
+    *t == 0
 }
 
 /// What the tray and the overview show, most important first.

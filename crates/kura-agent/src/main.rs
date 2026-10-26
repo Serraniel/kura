@@ -37,7 +37,10 @@ fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
         State::NeedsAttention => ("NeedsAttention", l.msg("tray-attention")),
         State::UpdatesReady => (
             "Active",
-            l.msg_args("tray-updates", &[("count", status.updates.into())]),
+            l.msg_args(
+                "tray-updates",
+                &[("count", (status.updates + status.aur_updates).into())],
+            ),
         ),
         State::UpToDate => ("Passive", l.msg("tray-uptodate")),
         State::Unknown => ("Passive", l.msg("tray-unknown")),
@@ -49,13 +52,24 @@ fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
     }
 }
 
+/// Tells the user that kura installed security updates on its own, as
+/// they allowed in the settings.
+fn notify_auto_installed(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, fixed: usize) {
+    let title = l.msg("notify-auto-security-title");
+    let body = l.msg_args("notify-auto-security-body", &[("count", fixed.into())]);
+    send(conn, l, look, &title, &body);
+}
+
 /// Whether a change from `before` to `after` is worth a notification.
 fn should_notify(before: &Status, after: &Status) -> bool {
     let advisories = |s: &Status| s.security.iter().map(|f| f.advisory.clone()).collect::<Vec<_>>();
     match after.state() {
         State::Security => advisories(before) != advisories(after),
         State::NeedsAttention => before.state() != State::NeedsAttention || before.news != after.news,
-        State::UpdatesReady => after.updates > before.updates || before.state() != State::UpdatesReady,
+        State::UpdatesReady => {
+            after.updates + after.aur_updates > before.updates + before.aur_updates
+                || before.state() != State::UpdatesReady
+        }
         State::UpToDate | State::Unknown => false,
     }
 }
@@ -185,6 +199,10 @@ fn notify(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, state: 
     } else {
         l.msg("notify-updates-body")
     };
+    send(conn, l, look, &look.tooltip, &body);
+}
+
+fn send(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, title: &str, body: &str) {
     let actions = vec!["default".to_owned(), l.msg("notify-open")];
     let hints: HashMap<&str, Value<'_>> = HashMap::from([("desktop-entry", Value::from("org.kura.app"))]);
     let _ = conn.call_method(
@@ -196,8 +214,8 @@ fn notify(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, state: 
             "kura",
             0u32,
             look.icon.as_str(),
-            look.tooltip.as_str(),
-            body.as_str(),
+            title,
+            body,
             actions,
             hints,
             -1i32,
@@ -271,6 +289,9 @@ fn main() -> Result<(), String> {
         settings = new_settings;
         let fresh = kura_alpm::background::read_status(status_path);
         let new_look = look(&fresh, &l, settings.tray_monochrome);
+        if fresh.auto_installed > status.auto_installed {
+            notify_auto_installed(&conn, &l, &new_look, fresh.auto_fixed);
+        }
         if should_notify(&status, &fresh) {
             notify(&conn, &l, &new_look, fresh.state());
         }
@@ -362,5 +383,9 @@ mod tests {
         assert!(should_notify(&five, &news));
         assert!(!should_notify(&news, &news.clone()));
         assert!(should_notify(&news, &status(5, &["linux", "nvidia"], false)));
+        let mut aur = three.clone();
+        aur.aur_updates = 2;
+        assert!(should_notify(&three, &aur));
+        assert_eq!(look(&aur, &en(), false).tooltip, "5 updates are ready");
     }
 }

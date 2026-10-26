@@ -16,6 +16,9 @@ pub struct Settings {
     pub aur: bool,
     /// Days an AUR update waits before it joins the normal update (0–14).
     pub aur_cooling_days: u32,
+    /// Install updates that fix a known vulnerability without asking, when
+    /// nothing in the update needs attention. Off unless the user turns it on.
+    pub auto_security: bool,
 }
 
 impl Default for Settings {
@@ -23,6 +26,7 @@ impl Default for Settings {
         Self {
             aur: true,
             aur_cooling_days: 3,
+            auto_security: false,
         }
     }
 }
@@ -56,7 +60,7 @@ mod tests {
             Settings::parse(r#"{"aur": false}"#),
             Settings {
                 aur: false,
-                aur_cooling_days: 3
+                ..Settings::default()
             }
         );
         assert_eq!(
@@ -65,6 +69,6 @@ mod tests {
         );
         assert_eq!(Settings::parse(r#"{"aur": "yes"}"#), Settings::default());
         let json = serde_json::to_string(&Settings::default()).unwrap();
-        assert_eq!(json, r#"{"aur":true,"aur_cooling_days":3}"#);
+        assert_eq!(json, r#"{"aur":true,"aur_cooling_days":3,"auto_security":false}"#);
     }
 }

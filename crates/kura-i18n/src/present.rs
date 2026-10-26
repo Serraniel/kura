@@ -39,8 +39,10 @@ pub fn record_text(l: &Localizer, record: &Record) -> String {
     .map(|(id, n)| l.msg_args(id, &[("count", n.into())]))
     .collect();
     let mut text = parts.join(&l.msg("list-separator"));
-    if record.cause.as_deref() == Some("pacman") {
-        text = format!("{text} {}", l.msg("history-outside"));
+    match record.cause.as_deref() {
+        Some("pacman") => text = format!("{text} {}", l.msg("history-outside")),
+        Some("kura:auto-security") => text = format!("{text} {}", l.msg("history-auto-security")),
+        _ => {}
     }
     text
 }

@@ -141,6 +141,30 @@ pub fn affected_apps(findings: &[Finding]) -> BTreeSet<&str> {
         .collect()
 }
 
+/// Findings the plan fixes: it upgrades the package to the fixed version
+/// or a newer one.
+pub fn fixed_by<'a>(findings: &'a [Finding], plan: &crate::plan::Plan) -> Vec<&'a Finding> {
+    findings
+        .iter()
+        .filter(|f| {
+            let Some(fixed) = &f.fixed else { return false };
+            plan.steps.iter().any(|s| match s {
+                crate::plan::Step::Upgrade { name, to, .. } => {
+                    name == &f.package && crate::version::vercmp(to, fixed) != std::cmp::Ordering::Less
+                }
+                _ => false,
+            })
+        })
+        .collect()
+}
+
+/// Whether kura may install the update on its own: the user turned it on,
+/// the update fixes a known vulnerability, the simulation found no problem
+/// and no Arch news item concerns it.
+pub fn auto_install(enabled: bool, status: &crate::status::Status, fixes: usize) -> bool {
+    enabled && fixes > 0 && !status.blocked && status.news.is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,5 +246,53 @@ mod tests {
     #[test]
     fn broken_json_is_an_error() {
         assert!(parse_tracker("[{").is_err());
+    }
+
+    #[test]
+    fn automatic_installs_need_a_fix_and_a_clean_update() {
+        use crate::plan::{Plan, PlanKind, Step};
+        let finding = |package: &str, fixed: Option<&str>| Finding {
+            advisory: "AVG-1".into(),
+            package: package.into(),
+            installed: "1.0-1".into(),
+            fixed: fixed.map(Into::into),
+            severity: Severity::High,
+            kind: "arbitrary code execution".into(),
+            cves: Vec::new(),
+            apps: Vec::new(),
+        };
+        let mut plan = Plan::new(PlanKind::SystemUpdate);
+        plan.steps.push(Step::Upgrade {
+            name: "openssl".into(),
+            from: "3.0-1".into(),
+            to: "3.1-1".into(),
+        });
+        let findings = [
+            finding("openssl", Some("3.1-1")),
+            finding("openssl", Some("3.2-1")),
+            finding("curl", Some("8.0-1")),
+            finding("openssl", None),
+        ];
+        let fixes = fixed_by(&findings, &plan);
+        assert_eq!(fixes.len(), 1);
+        assert_eq!(fixes[0].fixed.as_deref(), Some("3.1-1"));
+
+        let clean = crate::status::Status {
+            checked: 1,
+            ..crate::status::Status::default()
+        };
+        assert!(auto_install(true, &clean, 1));
+        assert!(!auto_install(false, &clean, 1));
+        assert!(!auto_install(true, &clean, 0));
+        let news = crate::status::Status {
+            news: vec!["manual step".into()],
+            ..clean.clone()
+        };
+        assert!(!auto_install(true, &news, 1));
+        let blocked = crate::status::Status {
+            blocked: true,
+            ..clean
+        };
+        assert!(!auto_install(true, &blocked, 1));
     }
 }
