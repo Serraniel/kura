@@ -18,6 +18,7 @@ cli-usage =
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
+      report     問題レポートを表示し、必要なら GitHub で開きます: kura report [起きたこと]
       security   インストール済みソフトウェアの既知のセキュリティ問題を表示します
       settings   設定を表示・変更します: kura settings aur on|off、kura settings aur-wait <日数>
       snapshots  スナップショットの状態を表示します。kura snapshots setup で不足分を追加します
@@ -228,6 +229,11 @@ settings-off = オフ
 settings-days = { $days } 日
 settings-saved = 保存しました。
 settings-usage = 使い方: kura settings [aur on|off] [aur-wait <0–14>]
+report-intro = このレポートにはユーザー名、コンピューター名、ホームフォルダーは含まれていません。共有する前に内容を確認してください:
+confirm-report = 入力済みの問題レポートとして GitHub をブラウザーで開きますか? [y/N]
+report-opened = ブラウザーが開かない場合は、このアドレスをコピーしてください: { $url }
+gui-report = この問題を報告
+gui-report-open = GitHub で開く
 gui-installed = インストール済み
 gui-remove = 削除
 gui-install-title = { $name } をインストール

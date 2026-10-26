@@ -9,6 +9,7 @@
 
 pub mod actions;
 pub mod aur;
+pub mod report;
 pub mod text;
 
 use std::sync::mpsc;
