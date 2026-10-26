@@ -191,6 +191,7 @@ pub fn collect(conf: &Config) -> Result<Info, Error> {
         snapshots: matches!(snapshots, Report::Complete | Report::OtherTool(_)),
         orphans: set.orphans().len(),
         mirrors_ranked: Path::new("/var/lib/kura/mirrors-ranked").exists(),
+        dkms: set.get("dkms").is_some(),
     };
     Ok(Info {
         cpu: hardware::cpu_model(&read("/proc/cpuinfo")),
