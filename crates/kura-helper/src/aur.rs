@@ -67,15 +67,21 @@ pub fn build(build: &AurBuild, threads: usize) -> Result<Vec<PathBuf>, String> {
     if !out.status.success() {
         return Err(format!("{}:\n{}", build.base, tail(&out.stderr)));
     }
+    // Only files below the build directory, whatever the sandbox printed.
+    // With DynamicUser it really is /var/lib/private/kura-build.
+    let root = std::fs::canonicalize(BUILD_ROOT).map_err(|e| format!("{BUILD_ROOT}: {e}"))?;
     let files: Vec<PathBuf> = String::from_utf8_lossy(&out.stdout)
         .lines()
-        .map(PathBuf::from)
-        // Only files below the build directory, whatever the sandbox printed.
-        .filter(|p| p.starts_with(BUILD_ROOT) && !p.components().any(|c| c.as_os_str() == ".."))
-        .filter(|p| p.is_file())
+        .filter_map(|l| std::fs::canonicalize(l).ok())
+        .filter(|p| p.starts_with(&root) && p.is_file())
         .collect();
     if files.is_empty() {
-        return Err(format!("{}: makepkg built no packages", build.base));
+        return Err(format!(
+            "{}: makepkg built no packages\n{}\n{}",
+            build.base,
+            String::from_utf8_lossy(&out.stdout).trim(),
+            tail(&out.stderr)
+        ));
     }
     Ok(files)
 }
