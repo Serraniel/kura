@@ -81,7 +81,7 @@ pub static CACHYOS: Profile = Profile {
                 ("cachyos-extra-v4", "/etc/pacman.d/cachyos-v4-mirrorlist"),
                 ("cachyos", "/etc/pacman.d/cachyos-mirrorlist"),
             ],
-            architecture: Some("x86_64 x86_64_v4"),
+            architecture: Some("x86_64 x86_64_v3 x86_64_v4"),
             packages: &["cachyos-v4-mirrorlist"],
         },
         Level {
