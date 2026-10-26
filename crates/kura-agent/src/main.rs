@@ -7,7 +7,7 @@
 //! `StatusNotifierItem` (the tray protocol of Plasma and most desktops). When no
 //! tray exists, notifications are the only output. Clicking opens the window.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -58,6 +58,31 @@ fn notify_auto_installed(conn: &zbus::blocking::Connection, l: &Localizer, look:
     let title = l.msg("notify-auto-security-title");
     let body = l.msg_args("notify-auto-security-body", &[("count", fixed.into())]);
     send(conn, l, look, &title, &body);
+}
+
+/// The PCI devices present now, by their sysfs names.
+fn pci_devices() -> BTreeSet<String> {
+    std::fs::read_dir("/sys/bus/pci/devices")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
+/// Driver suggestions that are new compared to `known`.
+fn new_drivers(known: &[kura_core::drivers::Suggestion]) -> Vec<kura_core::drivers::Suggestion> {
+    let Ok(conf) = kura_alpm::load_config() else {
+        return Vec::new();
+    };
+    let Ok(set) = kura_alpm::installed(&conf) else {
+        return Vec::new();
+    };
+    kura_alpm::system::drivers(&conf, &set)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|d| !known.contains(d))
+        .collect()
 }
 
 /// Whether a change from `before` to `after` is worth a notification.
@@ -277,8 +302,27 @@ fn main() -> Result<(), String> {
     }
 
     let mut seen = modified(status_path);
+    // New hardware: a driver suggestion that was not there before is worth a message.
+    let mut devices = pci_devices();
+    let mut drivers = new_drivers(&[]);
     loop {
         std::thread::sleep(POLL);
+        let now_devices = pci_devices();
+        if now_devices != devices {
+            devices = now_devices;
+            let fresh = new_drivers(&drivers);
+            for d in &fresh {
+                let (title, text) = kura_i18n::present::driver(&l, d);
+                send(
+                    &conn,
+                    &l,
+                    &look(&status, &l, settings.tray_monochrome),
+                    &title,
+                    &text,
+                );
+            }
+            drivers.extend(fresh);
+        }
         let now = modified(status_path);
         let new_settings = read_settings();
         let settings_changed = new_settings.tray_monochrome != settings.tray_monochrome;
