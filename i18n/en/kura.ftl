@@ -240,6 +240,11 @@ suggest-cleanup =
        *[other] { $count } packages are no longer needed
     }
 suggest-cleanup-text = They are removed with the next update.
+driver-microcode = Processor fixes from { $vendor }
+driver-microcode-text = { $vendor } publishes fixes for processor bugs, including security problems. They load at every start. Every computer with a { $vendor } processor should have them.
+driver-graphics = Graphics driver for { $vendor }
+driver-graphics-text = Lets games, videos and the desktop use your graphics card fully.
+doctor-drivers = Suggested for this hardware:
 search-placeholder = Search apps, for example “photo” or “music”
 search-none = No apps found. Try a different word.
 search-repos = From the repositories:

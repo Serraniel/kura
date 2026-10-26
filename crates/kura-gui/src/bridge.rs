@@ -947,6 +947,16 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
             json!({"id": id, "title": title, "text": text, "install": install})
         })
         .collect();
+    // Drivers first: they matter most for a computer that just got Linux.
+    let suggestions: Vec<Value> = info
+        .drivers
+        .iter()
+        .map(|d| {
+            let (title, text) = present::driver(l, d);
+            json!({"id": "driver", "title": title, "text": text, "install": d.packages.join(" ")})
+        })
+        .chain(suggestions)
+        .collect();
     json!({"facts": facts, "kernels": kernels, "suggestions": suggestions})
 }
 

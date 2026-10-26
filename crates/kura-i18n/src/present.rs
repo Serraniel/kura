@@ -94,6 +94,21 @@ pub fn aur_signals(l: &Localizer, info: &aur::Info, now: i64) -> String {
     parts.join(" · ")
 }
 
+/// Title and explanation of a driver suggestion.
+pub fn driver(l: &Localizer, s: &kura_core::drivers::Suggestion) -> (String, String) {
+    let vendor = [("vendor", s.vendor.into())];
+    match s.kind {
+        kura_core::drivers::Kind::Microcode => (
+            l.msg_args("driver-microcode", &vendor),
+            l.msg_args("driver-microcode-text", &vendor),
+        ),
+        kura_core::drivers::Kind::Graphics => (
+            l.msg_args("driver-graphics", &vendor),
+            l.msg("driver-graphics-text"),
+        ),
+    }
+}
+
 /// One line for a change that is not a package change.
 pub fn action(l: &Localizer, action: &Action) -> String {
     match action {
@@ -285,6 +300,22 @@ mod tests {
             aur_signals(&l("en"), &info, now),
             "1 vote · new · no maintainer · marked out of date"
         );
+    }
+
+    #[test]
+    fn driver_texts() {
+        let s = kura_core::drivers::Suggestion {
+            kind: kura_core::drivers::Kind::Graphics,
+            vendor: "NVIDIA",
+            packages: vec!["nvidia-open-dkms".into()],
+        };
+        assert_eq!(driver(&l("en"), &s).0, "Graphics driver for NVIDIA");
+        let m = kura_core::drivers::Suggestion {
+            kind: kura_core::drivers::Kind::Microcode,
+            vendor: "AMD",
+            packages: vec!["amd-ucode".into()],
+        };
+        assert_eq!(driver(&l("de"), &m).0, "Prozessor-Korrekturen von AMD");
     }
 
     #[test]

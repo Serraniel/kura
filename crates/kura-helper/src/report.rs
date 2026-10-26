@@ -58,6 +58,14 @@ pub fn summary(l: &Localizer) -> Result<String, String> {
             let _ = writeln!(out, "  {step}");
         }
     }
+    let drivers = kura_alpm::system::drivers(&conf, &set).unwrap_or_default();
+    if !drivers.is_empty() {
+        let _ = writeln!(out, "\n{}", l.msg("doctor-drivers"));
+        for d in &drivers {
+            let (title, _) = kura_i18n::present::driver(l, d);
+            let _ = writeln!(out, "  {title}: kura install {}", d.packages.join(" "));
+        }
+    }
     Ok(out)
 }
 

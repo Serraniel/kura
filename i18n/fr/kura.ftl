@@ -253,6 +253,11 @@ suggest-cleanup =
        *[other] { $count } paquets ne sont plus nécessaires
     }
 suggest-cleanup-text = Ils seront supprimés lors de la prochaine mise à jour.
+driver-microcode = Correctifs du processeur de { $vendor }
+driver-microcode-text = { $vendor } publie des correctifs pour les défauts de ses processeurs, y compris des problèmes de sécurité. Ils sont chargés à chaque démarrage. Tout ordinateur avec un processeur { $vendor } devrait les avoir.
+driver-graphics = Pilote graphique pour { $vendor }
+driver-graphics-text = Permet aux jeux, aux vidéos et au bureau d'utiliser pleinement votre carte graphique.
+doctor-drivers = Recommandé pour ce matériel :
 search-placeholder = Rechercher des applications, par exemple « photo » ou « musique »
 search-none = Aucune application trouvée. Essayez un autre mot.
 search-repos = Depuis les dépôts :

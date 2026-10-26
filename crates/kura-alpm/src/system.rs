@@ -31,10 +31,51 @@ pub struct Info {
     pub running: String,
     pub facts: Facts,
     pub snapshots: Report,
+    pub drivers: Vec<kura_core::drivers::Suggestion>,
 }
 
 fn read(path: &str) -> String {
     fs::read_to_string(path).unwrap_or_default()
+}
+
+/// Graphics cards by their PCI ids, from sysfs.
+fn gpus() -> Vec<kura_core::drivers::Gpu> {
+    let Ok(cards) = fs::read_dir("/sys/bus/pci/devices") else {
+        return Vec::new();
+    };
+    cards
+        .flatten()
+        .filter_map(|d| {
+            let dev = d.path();
+            let read = |f: &str| fs::read_to_string(dev.join(f)).ok();
+            if !read("class")?.trim().starts_with("0x03") {
+                return None;
+            }
+            Some(kura_core::drivers::Gpu {
+                vendor: hardware::hex_id(&read("vendor")?)?,
+                device: hardware::hex_id(&read("device")?)?,
+            })
+        })
+        .collect()
+}
+
+/// Drivers and processor fixes the hardware would benefit from.
+pub fn drivers(conf: &Config, set: &PackageSet) -> Result<Vec<kura_core::drivers::Suggestion>, Error> {
+    let handle = crate::handle(conf)?;
+    let facts = kura_core::drivers::Facts {
+        cpu: Some(kura_core::drivers::cpu_vendor(&read("/proc/cpuinfo"))),
+        gpus: gpus(),
+        installed: set.iter().map(|p| p.name.clone()).collect(),
+        multilib: handle.syncdbs().iter().any(|db| db.name() == "multilib"),
+        kernels: set
+            .iter()
+            .filter(|p| is_kernel(&p.name))
+            .map(|p| p.name.clone())
+            .collect(),
+    };
+    Ok(kura_core::drivers::suggest(&facts, |p| {
+        handle.syncdbs().iter().any(|db| db.pkg(p).is_ok())
+    }))
 }
 
 fn graphics() -> Vec<String> {
@@ -203,6 +244,7 @@ pub fn collect(conf: &Config) -> Result<Info, Error> {
         running: read("/proc/sys/kernel/osrelease").trim().to_owned(),
         facts,
         snapshots,
+        drivers: drivers(conf, &set)?,
     })
 }
 
