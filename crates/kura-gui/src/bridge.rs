@@ -285,7 +285,7 @@ fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value 
     let group = |id: &str, steps: &[&Step]| {
         json!({
             "title": l.msg_args(id, &[("count", steps.len().into())]),
-            "items": steps.iter().map(|s| json!({"name": s.package(), "detail": present::step_detail(s)})).collect::<Vec<_>>(),
+            "items": steps.iter().map(|s| json!({"name": s.package(), "detail": present::step_text(l, s)})).collect::<Vec<_>>(),
         })
     };
     let reinstall = |s: &&&Step| {
@@ -300,10 +300,14 @@ fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value 
     let again: Vec<&Step> = plan.steps.iter().filter(|s| reinstall(&s)).collect();
     let apps: Vec<&Step> = groups.apps.iter().copied().filter(|s| !reinstall(&s)).collect();
     let system: Vec<&Step> = system.into_iter().filter(|s| !reinstall(&s)).collect();
+    let (tools, system): (Vec<&Step>, Vec<&Step>) = system
+        .into_iter()
+        .partition(|s| kura_i18n::present::is_build_tool(plan, s));
     let all = [
         ("check-group-apps", apps.as_slice()),
         ("check-group-system", system.as_slice()),
         ("check-group-reinstall", again.as_slice()),
+        ("check-group-build-tools", tools.as_slice()),
         ("check-group-replaced", replaced.as_slice()),
         ("check-group-cleanup", groups.cleanup.as_slice()),
     ];
@@ -388,7 +392,13 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
         Vec::new()
     };
     if matches!(request, Request::Update) && outcome.available.is_empty() && !aur_ready.is_empty() {
-        return prepare_aur_preview(&aur_ready);
+        let mut prepared = prepare_aur_preview(&aur_ready)?;
+        prepared.headline = format!(
+            "{}\n{}",
+            kura_helper::text::aur_context(&l, &conf),
+            prepared.headline
+        );
+        return Ok(prepared);
     }
     let mut headline = if let Some(text) = solved {
         text

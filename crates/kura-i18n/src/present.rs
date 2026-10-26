@@ -57,6 +57,25 @@ pub fn step_detail(step: &Step) -> String {
     }
 }
 
+/// The detail column of a step, in words where symbols would mislead: a
+/// package built again at the same version says so.
+pub fn step_text(l: &Localizer, step: &Step) -> String {
+    match step {
+        Step::Upgrade { from, to, .. } if from == to => {
+            l.msg_args("detail-rebuild", &[("version", to.clone().into())])
+        }
+        _ => step_detail(step),
+    }
+}
+
+/// Whether a step installs a repository package only needed to build AUR
+/// packages in this plan.
+pub fn is_build_tool(plan: &kura_core::plan::Plan, step: &Step) -> bool {
+    plan.kind == kura_core::plan::PlanKind::AurInstall
+        && matches!(step, Step::Install { name, reason: kura_core::package::InstallReason::Dependency, .. }
+            if !plan.builds.iter().any(|b| b.packages.contains(name)))
+}
+
 /// One sentence naming what is affected, by the apps the user knows.
 pub fn security_headline(l: &Localizer, findings: &[Finding]) -> String {
     let apps = kura_core::security::affected_apps(findings);
