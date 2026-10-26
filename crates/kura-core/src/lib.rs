@@ -12,6 +12,7 @@ pub mod generation;
 pub mod hardware;
 pub mod health;
 pub mod history;
+pub mod kernels;
 pub mod langpacks;
 pub mod locale;
 pub mod mirrors;

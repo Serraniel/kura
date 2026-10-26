@@ -18,6 +18,7 @@ cli-usage =
       search     リポジトリと AUR でアプリを検索します: kura search <単語>
       update     すべてのアップデートをインストールします (先にプレビューを表示します)
       install    アプリをインストールします: kura install <名前>
+      kernels    カーネルを表示・追加・削除します: kura kernels [add|remove <名前>]
       remove     アプリと、そのアプリだけが使っていたものを削除します: kura remove <名前>
       report     問題レポートを表示し、必要なら GitHub で開きます: kura report [起きたこと]
       security   インストール済みソフトウェアの既知のセキュリティ問題を表示します
@@ -44,6 +45,7 @@ change-blocked = 変更を準備できません:
 problem-unsatisfied = { $target } には { $dependency } が必要ですが、もう提供されていません。
 problem-conflict = { $first } と { $second } は同時にインストールできません。
 problem-arch = 別の種類のプロセッサー向けにビルドされています: { $packages }
+problem-arch-unnamed = 一部のパッケージは別の種類のプロセッサー向けにビルドされています。
 problem-not-found = { $name } という名前のパッケージは見つかりませんでした。
 problem-not-restorable = { $name } { $version } を元に戻せません。AUR から入手したか、このコンピューターでビルドしたもので、パッケージキャッシュにファイルが残っていません。
 undo-title = { $when } の状態 #{ $id } に戻します:
@@ -191,6 +193,16 @@ health-disk-used = { $total } 中 { $used } を使用
 health-cache = 古いアップデートファイル: { $size }
 health-kernels = カーネル
 health-kernel-running = 使用中
+kernels-title = カーネル: システムの中核です。複数インストールでき、起動時に選べます。
+kernels-usage = 使い方: kura kernels [add|remove <名前>]
+kernel-keep-running = { $name } は現在使用中です。先に別のカーネルでコンピューターを起動してください。
+kernel-keep-last = { $name } は唯一のカーネルです。これがないとコンピューターは起動できません。
+kernel-linux = Arch Linux の最新の安定版カーネル。
+kernel-linux-lts = 長期サポート版。変更が少なく、新しいカーネルに問題があるときの予備に最適です。
+kernel-linux-zen = デスクトップやゲーム向けに調整され、反応が少し速くなります。
+kernel-linux-hardened = 攻撃への保護を強化。一部のアプリやゲームは動作しない場合があります。
+kernel-linux-cachyos = 速度重視で調整された CachyOS のカーネル。
+kernel-linux-cachyos-lts = CachyOS の長期サポート版カーネル。
 health-suggestions = 提案
 health-snapshots = スナップショット
 snapshots-on = アップデートの前に毎回 { $tool } が作成
@@ -209,6 +221,7 @@ action-remove-repo = リポジトリ { $name } を削除
 action-bootstrap-repo = 鍵束とミラーリストを取得するため、リポジトリ { $name } をメインサーバーで追加
 action-arch = { $arch } 向けにビルドされたパッケージを使用
 action-arch-generic = すべての x86-64 プロセッサー向けのパッケージに戻す
+action-regenerate-grub = 起動メニューを更新
 profiles-title = kura が追加・削除できる追加のリポジトリ:
 profile-on = 追加済み
 profile-off = 未追加

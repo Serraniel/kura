@@ -17,6 +17,7 @@ cli-usage =
       search     Search apps in the repositories and the AUR: kura search <word>
       update     Install all updates (shows a preview first)
       install    Install an app: kura install <name>
+      kernels    Show kernels, add or remove one: kura kernels [add|remove <name>]
       remove     Remove an app and what only it needed: kura remove <name>
       report     Show a problem report and, if you want, open it on GitHub: kura report [what happened]
       security   Show known security problems of installed software
@@ -47,6 +48,7 @@ change-blocked = The change cannot be prepared:
 problem-unsatisfied = { $target } needs { $dependency }, which is no longer available.
 problem-conflict = { $first } and { $second } cannot be installed together.
 problem-arch = Built for a different processor type: { $packages }
+problem-arch-unnamed = Some packages are built for a different processor type.
 problem-not-found = No package named { $name } was found.
 problem-not-restorable = kura cannot bring back { $name } { $version }: it came from the AUR or was built on this computer, and the file is no longer in the package cache.
 undo-title = Going back to state #{ $id } from { $when }:
@@ -220,6 +222,16 @@ health-disk-used = { $used } of { $total } used
 health-cache = Old update files: { $size }
 health-kernels = Kernels
 health-kernel-running = in use
+kernels-title = Kernels: the core of the system. Several can be installed; you pick one when the computer starts.
+kernels-usage = Usage: kura kernels [add|remove <name>]
+kernel-keep-running = { $name } is running right now. Start the computer with another kernel first.
+kernel-keep-last = { $name } is the only kernel. The computer could not start without it.
+kernel-linux = The newest stable kernel from Arch Linux.
+kernel-linux-lts = Long-term support: changes rarely. A good second kernel to start from if a new one has a problem.
+kernel-linux-zen = Tuned for desktops and games, a little more responsive.
+kernel-linux-hardened = Extra protection against attacks. Some apps and games may not work with it.
+kernel-linux-cachyos = CachyOS's kernel, tuned for speed.
+kernel-linux-cachyos-lts = CachyOS's long-term support kernel.
 health-suggestions = Suggestions
 health-snapshots = Snapshots
 snapshots-on = Taken before every update by { $tool }
@@ -238,6 +250,7 @@ action-remove-repo = Remove the repository { $name }
 action-bootstrap-repo = Add the repository { $name } with its main server, to get its keyring and mirror lists
 action-arch = Use packages built for { $arch }
 action-arch-generic = Use the builds for every x86-64 processor again
+action-regenerate-grub = Update the boot menu
 profiles-title = Extra repositories kura can add and take away again:
 profile-on = added
 profile-off = not added

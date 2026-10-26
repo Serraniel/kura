@@ -503,10 +503,10 @@ pub(crate) fn problems(e: &alpm::PrepareError<'_>) -> Vec<Problem> {
                 reason: c.reason().to_string(),
             })
             .collect(),
-        Some(PrepareData::PkgInvalidArch(list)) => {
-            vec![Problem::InvalidArchitecture {
-                packages: list.iter().map(|p| p.name().to_owned()).collect(),
-            }]
+        // libalpm fills this list with strings, while the alpm crate types it
+        // as packages; reading it as packages crashes (issue #96).
+        Some(PrepareData::PkgInvalidArch(_)) => {
+            vec![Problem::InvalidArchitecture { packages: Vec::new() }]
         }
         None => vec![Problem::Other {
             message: e.to_string(),

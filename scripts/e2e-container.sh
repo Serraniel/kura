@@ -107,6 +107,9 @@ if grep -qw avx2 /proc/cpuinfo; then
   echo /tmp/core.%p >/proc/sys/kernel/core_pattern || true
   ulimit -c unlimited
   if ! printf 'y\n' | kura profiles switch cachyos; then
+    pacman-conf Architecture
+    /lib/ld-linux-x86-64.so.2 --help | grep -i "x86-64-v" || true
+    pacman -Syuw --noconfirm 2>&1 | grep -iv "downloading\|^ " | head -20 || true
     for core in /tmp/core.*; do
       gdb -batch -ex 'thread apply all bt' "$(command -v kura)" "$core" || true
     done
@@ -118,6 +121,12 @@ if grep -qw avx2 /proc/cpuinfo; then
   test "$(pacman -Qi | grep -c '^Architecture *: x86_64_v[34]')" -eq 0
   if pacman -Q cachyos-keyring; then exit 1; fi
 fi
+
+# Kernels: one can be added; the only kernel is never removed.
+printf 'y\n' | kura kernels add linux-lts
+pacman -Q linux-lts
+if kura kernels remove linux-lts; then exit 1; fi
+pacman -Q linux-lts
 
 # Search reaches the AUR.
 kura search paru | grep -q "From the AUR"

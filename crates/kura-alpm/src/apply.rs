@@ -153,7 +153,7 @@ pub fn request_for(plan: &Plan) -> Option<Request> {
         )),
         // Restores and snapshot setups have their own way in; see
         // `apply_restore` and `kura_alpm::snapshots`.
-        PlanKind::Restore { .. } | PlanKind::Snapshots | PlanKind::Profile => None,
+        PlanKind::Restore { .. } | PlanKind::Snapshots | PlanKind::Profile | PlanKind::Kernel => None,
         PlanKind::Switch { back: true } => Some(Request::Switch(None)),
         PlanKind::Switch { back: false } => {
             // The repositories of the profile that is in pacman.conf now.

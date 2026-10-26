@@ -133,6 +133,7 @@ pub fn action(l: &Localizer, action: &Action) -> String {
         Action::InstallFromRepo { packages, .. } => {
             l.msg_args("action-install-from", &[("files", packages.join(", ").into())])
         }
+        Action::RegenerateGrub => l.msg("action-regenerate-grub"),
         Action::SetArchitecture { value } if value == "auto" => l.msg("action-arch-generic"),
         Action::SetArchitecture { value } => l.msg_args("action-arch", &[("arch", value.clone().into())]),
     }

@@ -17,6 +17,7 @@ cli-usage =
       search     Apps in den Paketquellen und im AUR suchen: kura search <Wort>
       update     Alle Updates installieren (zeigt vorher eine Vorschau)
       install    Eine App installieren: kura install <Name>
+      kernels    Kernel anzeigen, hinzufügen oder entfernen: kura kernels [add|remove <Name>]
       remove     Eine App entfernen und was nur sie brauchte: kura remove <Name>
       report     Problembericht anzeigen und auf Wunsch auf GitHub öffnen: kura report [was passiert ist]
       security   Bekannte Sicherheitsprobleme installierter Software anzeigen
@@ -47,6 +48,7 @@ change-blocked = Die Änderung kann nicht vorbereitet werden:
 problem-unsatisfied = { $target } benötigt { $dependency }, das nicht mehr verfügbar ist.
 problem-conflict = { $first } und { $second } können nicht gemeinsam installiert werden.
 problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
+problem-arch-unnamed = Einige Pakete sind für einen anderen Prozessortyp gebaut.
 problem-not-found = Es wurde kein Paket namens { $name } gefunden.
 problem-not-restorable = kura kann { $name } { $version } nicht zurückholen: Es stammt aus dem AUR oder wurde auf diesem Computer gebaut, und die Datei ist nicht mehr im Paket-Cache.
 undo-title = Zurück zum Stand #{ $id } von { $when }:
@@ -220,6 +222,16 @@ health-disk-used = { $used } von { $total } belegt
 health-cache = Alte Update-Dateien: { $size }
 health-kernels = Kernel
 health-kernel-running = in Verwendung
+kernels-title = Kernel: der Kern des Systems. Mehrere können installiert sein; beim Start wählen Sie einen aus.
+kernels-usage = Aufruf: kura kernels [add|remove <Name>]
+kernel-keep-running = { $name } läuft gerade. Starten Sie den Computer zuerst mit einem anderen Kernel.
+kernel-keep-last = { $name } ist der einzige Kernel. Ohne ihn könnte der Computer nicht starten.
+kernel-linux = Der neueste stabile Kernel von Arch Linux.
+kernel-linux-lts = Langzeitunterstützung: ändert sich selten. Ein guter zweiter Kernel, falls ein neuer ein Problem hat.
+kernel-linux-zen = Für Desktop und Spiele abgestimmt, reagiert etwas schneller.
+kernel-linux-hardened = Zusätzlicher Schutz vor Angriffen. Manche Apps und Spiele laufen damit nicht.
+kernel-linux-cachyos = Der Kernel von CachyOS, auf Geschwindigkeit abgestimmt.
+kernel-linux-cachyos-lts = Der Langzeit-Kernel von CachyOS.
 health-suggestions = Vorschläge
 health-snapshots = Snapshots
 snapshots-on = Vor jedem Update durch { $tool }
@@ -238,6 +250,7 @@ action-remove-repo = Paketquelle { $name } entfernen
 action-bootstrap-repo = Paketquelle { $name } mit ihrem Hauptserver hinzufügen, um Schlüsselbund und Serverlisten zu laden
 action-arch = Pakete verwenden, die für { $arch } gebaut sind
 action-arch-generic = Wieder die Pakete für alle x86-64-Prozessoren verwenden
+action-regenerate-grub = Startmenü aktualisieren
 profiles-title = Zusätzliche Paketquellen, die kura hinzufügen und wieder entfernen kann:
 profile-on = hinzugefügt
 profile-off = nicht hinzugefügt

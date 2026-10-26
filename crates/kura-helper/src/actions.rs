@@ -74,6 +74,7 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
         Action::InstallFromRepo { repo, packages } => {
             kura_alpm::apply::install_from_repo(repo, packages, events).map_err(|e| e.to_string())
         }
+        Action::RegenerateGrub => run_program("grub-mkconfig", &["-o", "/boot/grub/grub.cfg"]),
         Action::SetArchitecture { value } => {
             edit_pacman_conf(|c| kura_core::pacman_conf::set_option(c, "Architecture", value))
         }
@@ -202,4 +203,77 @@ pub fn apply_profile(conf: &Config, approved: &Plan, events: &Sender<Event>) -> 
         kura_alpm::apply::apply(conf, &packages, events)?;
     }
     run_all(after)
+}
+
+/// Installs or removes a kernel. The boot menu work must be what the helper
+/// derives itself; the running kernel and the last kernel are never removed.
+/// After an install, DKMS modules that were not built are reported.
+pub fn apply_kernel(conf: &Config, approved: &Plan, events: &Sender<Event>) -> Result<(), ApplyError> {
+    if approved.actions != kura_alpm::kernels::boot_actions(conf) {
+        return Err(ApplyError::Failed(
+            "unexpected boot menu change in a kernel plan".into(),
+        ));
+    }
+    let added: Vec<&str> = approved
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Install { name, .. } if kura_core::health::is_kernel(name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    let removed: Vec<&str> = approved
+        .steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::Remove { name, .. } if kura_core::health::is_kernel(name) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect();
+    if !removed.is_empty() {
+        let installed: Vec<String> = kura_alpm::installed(conf)?
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        let running = kura_alpm::kernels::running_package();
+        for kernel in &removed {
+            if kura_core::kernels::can_remove(kernel, &installed, running.as_deref()).is_err() {
+                return Err(ApplyError::Failed(format!("{kernel} must stay")));
+            }
+        }
+    }
+    let packages = Plan {
+        kind: if added.is_empty() {
+            PlanKind::Remove
+        } else {
+            PlanKind::Install
+        },
+        steps: approved.steps.clone(),
+        actions: Vec::new(),
+        builds: Vec::new(),
+    };
+    kura_alpm::apply::apply(conf, &packages, events).map_err(|e| match e {
+        ApplyError::Changed(mut plan) => {
+            plan.kind = PlanKind::Kernel;
+            plan.actions.clone_from(&approved.actions);
+            ApplyError::Changed(plan)
+        }
+        other => other,
+    })?;
+    for action in &approved.actions {
+        let _ = events.send(Event::Configuring {
+            action: action.clone(),
+        });
+        run(action, conf, events).map_err(ApplyError::Failed)?;
+    }
+    for kernel in added {
+        let missing = kura_alpm::kernels::missing_dkms(kernel);
+        if !missing.is_empty() {
+            return Err(ApplyError::Failed(format!(
+                "{kernel}: DKMS did not build {}; start the computer with your old kernel",
+                missing.join(", ")
+            )));
+        }
+    }
+    Ok(())
 }

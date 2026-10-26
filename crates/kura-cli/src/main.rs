@@ -78,6 +78,7 @@ fn run(l: &Localizer) -> Result<String, String> {
         Some("settings") => settings(l, &names),
         Some("report") => Ok(report(l, &names.join(" "))),
         Some("profiles") => profiles(l, &names),
+        Some("kernels") => kernels(l, &names),
         Some("install") if !names.is_empty() => install(l, names),
         Some("remove") if !names.is_empty() => change(l, &Request::Remove(names), "confirm-remove"),
         Some("history") => kura_helper::report::history(l),
@@ -530,6 +531,72 @@ fn report(l: &Localizer, what: &str) -> String {
         .stderr(std::process::Stdio::null())
         .spawn();
     l.msg_args("report-opened", &[("url", url.into())]) + "\n"
+}
+
+/// Lists kernels, or adds or removes one next to the others.
+fn kernels(l: &Localizer, args: &[String]) -> Result<String, String> {
+    let fail = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let conf = kura_alpm::load_config().map_err(fail)?;
+    let set = load(l)?;
+    let installed: Vec<String> = set.iter().map(|p| p.name.clone()).collect();
+    let running = kura_alpm::kernels::running_package();
+    let (add, kernel) = match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        [] => {
+            let mut out = l.msg("kernels-title") + "\n";
+            for k in kura_core::kernels::KNOWN {
+                let state = if running.as_deref() == Some(*k) {
+                    format!("  ({})", l.msg("health-kernel-running"))
+                } else if set.get(k).is_some() {
+                    format!("  ({})", l.msg("gui-installed"))
+                } else if !kura_alpm::in_repos(&conf, k).map_err(fail)? {
+                    continue;
+                } else {
+                    String::new()
+                };
+                let _ = writeln!(out, "\n  {k}{state}\n  {}", l.msg(&format!("kernel-{k}")));
+            }
+            return Ok(out);
+        }
+        ["add", k] => (true, *k),
+        ["remove", k] => (false, *k),
+        _ => return Err(l.msg("kernels-usage") + "\n"),
+    };
+    if !kura_core::health::is_kernel(kernel) {
+        return Err(l.msg("kernels-usage") + "\n");
+    }
+    if !add {
+        match kura_core::kernels::can_remove(kernel, &installed, running.as_deref()) {
+            Err(kura_core::kernels::Keep::Running) => {
+                return Err(l.msg_args("kernel-keep-running", &[("name", kernel.into())]) + "\n");
+            }
+            Err(kura_core::kernels::Keep::Last) => {
+                return Err(l.msg_args("kernel-keep-last", &[("name", kernel.into())]) + "\n");
+            }
+            Ok(()) => {}
+        }
+    }
+    eprintln!("{}", l.msg("check-running"));
+    let check = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
+    let outcome = kura_alpm::kernels::prepare(&conf, Some(&kura_alpm::background::check_dir()), kernel, add)
+        .map_err(check)?;
+    let plan = match &outcome.plan {
+        Ok(plan) => plan.clone(),
+        Err(problems) => {
+            let mut out = l.msg("change-blocked") + "\n";
+            for p in problems {
+                let _ = writeln!(out, "  {}", problem_text(l, p));
+            }
+            return Err(out);
+        }
+    };
+    let apps = kura_alpm::apps(&conf).map_err(fail)?;
+    say(&format!(
+        "{}\n{}",
+        l.msg("preview-title"),
+        render(l, &plan, Some(&outcome), &apps)
+    ));
+    let question = if add { "confirm-install" } else { "confirm-remove" };
+    confirm_and_apply(l, plan, &outcome, &apps, question)
 }
 
 /// The built-in repository profiles and whether they are added.

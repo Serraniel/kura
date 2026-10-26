@@ -59,6 +59,9 @@ pub enum Action {
     SetArchitecture {
         value: String,
     },
+    /// Write GRUB's boot menu again (`grub-mkconfig`), when no pacman hook
+    /// does it after kernels change.
+    RegenerateGrub,
 }
 
 #[cfg(test)]
