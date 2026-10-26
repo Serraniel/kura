@@ -38,8 +38,11 @@ Consequences:
 - Qt 6 / QML with Kirigami for the interface, bridged with `cxx-qt`. Kirigami
   follows the desktop's colours, icons, fonts and dark mode.
 - libalpm through the `alpm` crate.
-- AUR access through `raur` and `aur-depends`. kura builds AUR packages
-  itself. yay or paru are not required.
+- AUR access through a small client of kura's own: the AUR RPC through
+  `curl`, like the other network requests, and dependency resolution and
+  build order in `kura-core`. kura builds AUR packages itself. yay or paru
+  are not required. (Changed 2026-10-26: `raur` and `aur-depends` would add
+  an async HTTP stack.)
 - Localisation with Project Fluent.
 
 ## Processes and privileges
@@ -47,8 +50,8 @@ Consequences:
 | Process | Runs as | Job |
 |---|---|---|
 | `kura` | user | the window |
-| `kura-agent` | user, autostarted | tray icon, notifications, udev hardware events, AUR builds |
-| `kura-helper` | root, D-Bus activated | the only process that changes the system; authorised through polkit |
+| `kura-agent` | user, autostarted | tray icon, notifications, udev hardware events |
+| `kura-helper` | root, D-Bus activated | the only process that changes the system; authorised through polkit; builds AUR packages in a sandbox |
 | `kura-check.timer` | root | periodic update and vulnerability checks |
 
 No root process runs permanently. The GUI never runs as root.
@@ -125,6 +128,13 @@ next update brings the new versions back, so going back is a temporary fix.
   (configurable 0–14). The period restarts when the maintainer changes.
   Security updates and explicit user requests skip it.
 - Trust signals are shown (votes, age, maintainer, out-of-date flag).
+- kura-helper builds AUR packages itself, as a throwaway unprivileged user
+  (`systemd-run` with `DynamicUser`) without access to anyone's home. The
+  plan names each package base and the exact git commit shown in the
+  preview. Package files built by the user's session are never installed,
+  because during the "password once per session" window any process of
+  that user could hand the helper a crafted package. (Changed 2026-10-26:
+  builds were planned in `kura-agent`.)
 - Builds run in parallel. kura resolves the full dependency graph first,
   fetches all sources at once, installs all needed build dependencies from
   the repositories in one transaction, and builds independent packages at

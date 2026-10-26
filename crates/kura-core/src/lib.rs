@@ -5,6 +5,7 @@
 //! can be tested without root or a pacman database.
 
 pub mod action;
+pub mod aur;
 pub mod generation;
 pub mod hardware;
 pub mod health;
