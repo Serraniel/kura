@@ -33,6 +33,9 @@ pub mod qobject {
         // Between 0 and 1, or below 0 while nothing can be measured.
         #[qproperty(f64, progress_value, cxx_name = "progressValue")]
         #[qproperty(QString, progress_detail, cxx_name = "progressDetail")]
+        // The details panel: what kura did, line by line, and whether it shows.
+        #[qproperty(QString, log_text, cxx_name = "logText")]
+        #[qproperty(bool, show_log, cxx_name = "showLog")]
         /// `[{"title": .., "items": [{"name": .., "detail": ..}]}]`
         #[qproperty(QString, preview_json, cxx_name = "previewJson")]
         /// `[{"title": .., "link": ..}]`
@@ -139,6 +142,11 @@ pub mod qobject {
         #[cxx_name = "changeTrialRuns"]
         fn change_trial_runs(self: Pin<&mut Kura>, on: bool);
 
+        // Shows or hides the details panel and remembers the choice.
+        #[qinvokable]
+        #[cxx_name = "toggleLog"]
+        fn toggle_log(self: Pin<&mut Kura>);
+
         // Previews installing a bundle.
         #[qinvokable]
         #[cxx_name = "prepareBundle"]
@@ -192,6 +200,9 @@ pub struct KuraRust {
     progress_text: QString,
     progress_value: f64,
     progress_detail: QString,
+    log_text: QString,
+    show_log: bool,
+    log: Vec<String>,
     preview_json: QString,
     news_json: QString,
     summary_text: QString,
@@ -231,6 +242,12 @@ impl Default for KuraRust {
             progress_text: QString::default(),
             progress_value: -1.0,
             progress_detail: QString::default(),
+            log_text: QString::default(),
+            show_log: read_settings()
+                .get("log_panel")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            log: Vec::new(),
             preview_json: QString::from("[]"),
             news_json: QString::from("[]"),
             summary_text: QString::default(),
@@ -343,6 +360,23 @@ struct Prepared {
     headline: String,
 }
 
+/// The local time zone's offset from UTC in seconds, from `date`.
+fn local_offset() -> i64 {
+    std::process::Command::new("date")
+        .arg("+%z")
+        .output()
+        .ok()
+        .and_then(|o| {
+            let z = String::from_utf8_lossy(&o.stdout).trim().to_owned();
+            let sign = if z.starts_with('-') { -1 } else { 1 };
+            let digits = z.trim_start_matches(['+', '-']);
+            let h: i64 = digits.get(..2)?.parse().ok()?;
+            let m: i64 = digits.get(2..4)?.parse().ok()?;
+            Some(sign * (h * 3600 + m * 60))
+        })
+        .unwrap_or(0)
+}
+
 /// Seconds since 1970, for progress estimates.
 fn seconds() -> f64 {
     std::time::SystemTime::now()
@@ -358,14 +392,20 @@ fn forward_progress(
     std::thread::spawn(move || {
         let l = Localizer::from_env();
         let mut tracker = kura_core::progress::Tracker::default();
+        let mut seen = BTreeSet::new();
         for event in rx {
             let now = seconds();
             kura_helper::text::track(&mut tracker, &event, now);
             let value = tracker.fraction().unwrap_or(-1.0);
             let detail = kura_helper::text::progress(&l, &tracker, now);
+            let line = kura_helper::text::event(&l, &event);
+            let fresh = seen.insert(line.clone());
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_progress_value(value);
                 this.as_mut().set_progress_detail(QString::from(&detail));
+                if fresh {
+                    this.as_mut().append_log(&line);
+                }
             });
         }
     })
@@ -931,6 +971,7 @@ impl qobject::Kura {
         self.as_mut().set_preview_json(QString::from("[]"));
         self.as_mut().set_news_json(QString::from("[]"));
         self.as_mut().set_progress_text(QString::from(&running));
+        self.as_mut().append_log(&format!("{title}: {running}"));
         let qt = self.qt_thread();
         std::thread::spawn(move || {
             let (tx, rx) = std::sync::mpsc::channel();
@@ -950,11 +991,14 @@ impl qobject::Kura {
                         this.as_mut().set_preview_json(QString::from(&p.preview));
                         this.as_mut().set_news_json(QString::from(&p.news));
                         this.as_mut().set_summary_text(QString::from(&p.summary));
+                        this.as_mut().append_log(&p.headline);
+                        this.as_mut().append_log(&p.summary);
                         this.as_mut().set_progress_text(QString::from(&p.headline));
                         this.as_mut().set_can_install(has_changes);
                         this.as_mut().rust_mut().pending = Some(p.plan);
                     }
                     Err(text) => {
+                        this.as_mut().append_log(&text);
                         this.as_mut().set_message(QString::from(&text));
                         this.as_mut().set_failed(true);
                         this.as_mut().set_progress_text(QString::default());
@@ -1044,6 +1088,7 @@ impl qobject::Kura {
                 Err(e) => l.msg_args("error-helper", &[("reason", e.to_string().into())]),
             };
             let _ = qt.queue(move |mut this| {
+                this.as_mut().append_log(&text);
                 this.as_mut().set_message(QString::from(&text));
                 this.as_mut().set_busy(false);
                 this.as_mut().refresh_health();
@@ -1143,16 +1188,22 @@ impl qobject::Kura {
             let l = Localizer::from_env();
             let events = qt.clone();
             let mut tracker = kura_core::progress::Tracker::default();
+            let mut last_line = String::new();
             let result = kura_helper::apply(&plan, |event| {
                 let line = kura_helper::text::event(&l, &event);
                 let now = seconds();
                 kura_helper::text::track(&mut tracker, &event, now);
                 let value = tracker.fraction().unwrap_or(-1.0);
                 let detail = kura_helper::text::progress(&l, &tracker, now);
+                let fresh = last_line != line;
+                last_line.clone_from(&line);
                 let _ = events.queue(move |mut this| {
                     this.as_mut().set_progress_text(QString::from(&line));
                     this.as_mut().set_progress_value(value);
                     this.as_mut().set_progress_detail(QString::from(&detail));
+                    if fresh {
+                        this.as_mut().append_log(&line);
+                    }
                 });
             });
             let (text, fresh, failed) = match result {
@@ -1174,6 +1225,7 @@ impl qobject::Kura {
                 ),
             };
             let _ = qt.queue(move |mut this| {
+                this.as_mut().append_log(&text);
                 this.as_mut().set_message(QString::from(&text));
                 this.as_mut().set_failed(failed);
                 this.as_mut().set_progress_value(-1.0);
@@ -1207,6 +1259,41 @@ impl qobject::Kura {
                 }
             });
         });
+    }
+
+    fn toggle_log(mut self: Pin<&mut Self>) {
+        let on = !*self.show_log();
+        let mut settings = read_settings();
+        settings["log_panel"] = Value::Bool(on);
+        let dir = config_dir();
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::write(dir.join("settings.json"), settings.to_string());
+        }
+        self.as_mut().set_show_log(on);
+    }
+
+    /// Adds a line with the time to the details panel.
+    fn append_log(mut self: Pin<&mut Self>, line: &str) {
+        const KEEP: usize = 1000;
+        if line.trim().is_empty() {
+            return;
+        }
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let offset = local_offset();
+        let t = (secs.cast_signed() + offset).rem_euclid(86_400);
+        let stamp = format!("{:02}:{:02}:{:02}", t / 3600, t / 60 % 60, t % 60);
+        let text = {
+            let mut rust = self.as_mut().rust_mut();
+            for part in line.lines() {
+                rust.log.push(format!("{stamp}  {part}"));
+            }
+            let extra = rust.log.len().saturating_sub(KEEP);
+            rust.log.drain(..extra);
+            rust.log.join("\n")
+        };
+        self.as_mut().set_log_text(QString::from(&text));
     }
 
     fn set_tray_monochrome(mut self: Pin<&mut Self>, on: bool) {
