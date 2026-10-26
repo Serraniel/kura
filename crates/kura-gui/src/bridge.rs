@@ -649,17 +649,13 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
         "",
         l.msg_args("health-cache", &[("size", l.size(info.cache).into())])
     ]));
+    let (snapshots, missing) = kura_i18n::present::snapshots(l, &info.snapshots);
+    facts.push(json!([l.msg("health-snapshots"), snapshots]));
     let kernels: Vec<Value> = info
         .kernels
         .iter()
         .map(|(name, version)| {
-            let running = info
-                .running
-                .starts_with(&version.replace(".arch", "-arch").replace('-', "."))
-                || info
-                    .running
-                    .replace('-', ".")
-                    .starts_with(&version.replace('-', "."));
+            let running = kura_core::health::is_running(version, &info.running);
             json!({"name": name, "version": version, "running": running})
         })
         .collect();
@@ -672,11 +668,13 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
                     l.msg("suggest-backup-kernel"),
                     l.msg("suggest-backup-kernel-text"),
                 ),
-                kura_core::health::Suggestion::Snapshots => (
-                    "snapshots",
-                    l.msg("suggest-snapshots"),
-                    l.msg("suggest-snapshots-text"),
-                ),
+                kura_core::health::Suggestion::Snapshots => {
+                    let mut text = l.msg("suggest-snapshots-text");
+                    if !missing.is_empty() {
+                        text = format!("{text}\n{} {}", l.msg("snapshots-missing"), missing.join(", "));
+                    }
+                    ("snapshots", l.msg("suggest-snapshots"), text)
+                }
                 kura_core::health::Suggestion::Mirrors => {
                     ("mirrors", l.msg("suggest-mirrors"), l.msg("suggest-mirrors-text"))
                 }

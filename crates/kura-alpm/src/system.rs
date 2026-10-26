@@ -3,12 +3,15 @@
 
 //! Facts for the system health page and the package search. Only reads.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use kura_core::hardware;
 use kura_core::health::{Facts, is_kernel};
+use kura_core::package::PackageSet;
+use kura_core::snapshots::{self, Bootloader, Report};
 
 use crate::{Config, Error};
 
@@ -27,6 +30,7 @@ pub struct Info {
     /// `uname -r` of the running kernel.
     pub running: String,
     pub facts: Facts,
+    pub snapshots: Report,
 }
 
 fn read(path: &str) -> String {
@@ -71,6 +75,101 @@ fn dir_size(dir: &Path) -> u64 {
     })
 }
 
+/// Hook files by name; a file in a later directory replaces one with the same name.
+fn hooks(conf: &Config) -> BTreeSet<snapshots::Tool> {
+    let mut files = BTreeMap::new();
+    for dir in crate::hook_dirs(conf) {
+        for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+            files.insert(entry.file_name(), entry.path());
+        }
+    }
+    files
+        .values()
+        .filter_map(|p| snapshots::hook_tool(&fs::read_to_string(p).ok()?))
+        .collect()
+}
+
+/// Configurations named in `/etc/conf.d/snapper`, or all files in
+/// `/etc/snapper/configs` when that list is missing.
+fn snapper_configs() -> Vec<snapshots::Config> {
+    let dir = Path::new("/etc/snapper/configs");
+    let mut names = snapshots::config_names(&read("/etc/conf.d/snapper"));
+    if names.is_empty() {
+        names = fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+    }
+    names
+        .into_iter()
+        .map(|name| snapshots::Config {
+            subvolume: fs::read_to_string(dir.join(&name))
+                .ok()
+                .and_then(|c| snapshots::config_subvolume(&c)),
+            name,
+        })
+        .collect()
+}
+
+fn bootloader() -> Option<Bootloader> {
+    let exists = |p: &str| Path::new(p).exists();
+    if exists("/boot/grub/grub.cfg") {
+        Some(Bootloader::Grub)
+    } else if [
+        "/boot/limine.conf",
+        "/boot/limine/limine.conf",
+        "/efi/limine/limine.conf",
+    ]
+    .iter()
+    .any(|p| exists(p))
+    {
+        Some(Bootloader::Limine)
+    } else if ["/boot/loader/loader.conf", "/efi/loader/loader.conf"]
+        .iter()
+        .any(|p| exists(p))
+    {
+        Some(Bootloader::SystemdBoot)
+    } else {
+        None
+    }
+}
+
+/// Units enabled through a `.wants` link in `/etc/systemd/system`.
+fn enabled_units(names: &[&str]) -> BTreeSet<String> {
+    let dirs: Vec<_> = fs::read_dir("/etc/systemd/system")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "wants"))
+        .collect();
+    names
+        .iter()
+        .filter(|n| dirs.iter().any(|d| d.join(n).exists()))
+        .map(|n| (*n).to_owned())
+        .collect()
+}
+
+/// What the snapshot setup has and lacks.
+pub fn snapshot_report(conf: &Config, set: &PackageSet, mounts: &str) -> Report {
+    const PACKAGES: [&str; 4] = ["snapper", "snap-pac", "grub-btrfs", "limine-snapper-sync"];
+    snapshots::check(&snapshots::Facts {
+        root_fs: hardware::root_fs(mounts).unwrap_or_default(),
+        snapshots_mounted: snapshots::snapshots_mounted(mounts),
+        packages: PACKAGES
+            .iter()
+            .filter(|p| set.get(p).is_some())
+            .map(|p| (*p).to_owned())
+            .collect(),
+        configs: snapper_configs(),
+        hooks: hooks(conf),
+        bootloader: bootloader(),
+        units: enabled_units(&["snapper-cleanup.timer", "grub-btrfsd.service"]),
+    })
+}
+
 /// Collects everything the health page needs.
 pub fn collect(conf: &Config) -> Result<Info, Error> {
     let set = crate::installed(conf)?;
@@ -84,10 +183,12 @@ pub fn collect(conf: &Config) -> Result<Info, Error> {
         .output()
         .ok()
         .and_then(|o| hardware::df_usage(&String::from_utf8_lossy(&o.stdout)));
+    let mounts = read("/proc/mounts");
+    let snapshots = snapshot_report(conf, &set, &mounts);
     let facts = Facts {
         kernels: kernels.iter().map(|(n, _)| n.clone()).collect(),
-        root_fs: hardware::root_fs(&read("/proc/mounts")).unwrap_or_default(),
-        snapper: Path::new("/etc/snapper/configs/root").exists(),
+        root_fs: hardware::root_fs(&mounts).unwrap_or_default(),
+        snapshots: matches!(snapshots, Report::Complete | Report::OtherTool(_)),
         orphans: set.orphans().len(),
         mirrors_ranked: Path::new("/var/lib/kura/mirrors-ranked").exists(),
     };
@@ -100,6 +201,7 @@ pub fn collect(conf: &Config) -> Result<Info, Error> {
         kernels,
         running: read("/proc/sys/kernel/osrelease").trim().to_owned(),
         facts,
+        snapshots,
     })
 }
 

@@ -7,6 +7,7 @@
 use kura_core::history::Record;
 use kura_core::plan::Step;
 use kura_core::security::{Finding, Severity};
+use kura_core::snapshots::{self, Report, Tool};
 
 use crate::Localizer;
 
@@ -74,6 +75,51 @@ pub fn severity(l: &Localizer, s: Severity) -> String {
         Severity::High => "severity-high",
         Severity::Critical => "severity-critical",
     })
+}
+
+fn tool_name(tool: Tool) -> &'static str {
+    match tool {
+        Tool::Snapper => "Snapper",
+        Tool::Timeshift => "Timeshift",
+    }
+}
+
+/// The state of snapshots in one line, and what is missing.
+pub fn snapshots(l: &Localizer, report: &Report) -> (String, Vec<String>) {
+    match report {
+        Report::Unsupported => (l.msg("snapshots-unsupported"), Vec::new()),
+        Report::OtherTool(tool) => (
+            l.msg_args("snapshots-on", &[("tool", tool_name(*tool).into())]),
+            Vec::new(),
+        ),
+        Report::Complete => (
+            l.msg_args("snapshots-on", &[("tool", tool_name(Tool::Snapper).into())]),
+            Vec::new(),
+        ),
+        Report::Missing(steps) => {
+            let fresh = steps.contains(&snapshots::Step::Install("snapper".into()));
+            let lines = steps
+                .iter()
+                .map(|s| match s {
+                    snapshots::Step::Install(p) => {
+                        l.msg_args("snapshots-step-install", &[("package", p.clone().into())])
+                    }
+                    snapshots::Step::CreateRootConfig { .. } => l.msg("snapshots-step-config"),
+                    snapshots::Step::Enable(u) => {
+                        l.msg_args("snapshots-step-enable", &[("unit", u.clone().into())])
+                    }
+                })
+                .collect();
+            (
+                l.msg(if fresh {
+                    "snapshots-off"
+                } else {
+                    "snapshots-partial"
+                }),
+                lines,
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -154,6 +200,41 @@ mod tests {
             cves: vec![],
             apps: apps.iter().map(|s| (*s).to_owned()).collect(),
         }
+    }
+
+    #[test]
+    fn snapshot_states() {
+        use kura_core::snapshots::Step;
+        let en = l("en");
+        assert_eq!(
+            snapshots(&en, &Report::Unsupported).0,
+            "Not possible on this file system"
+        );
+        assert_eq!(
+            snapshots(&en, &Report::Complete).0,
+            "Taken before every update by Snapper"
+        );
+        assert_eq!(
+            snapshots(&en, &Report::OtherTool(Tool::Timeshift)).0,
+            "Taken before every update by Timeshift"
+        );
+        let fresh = Report::Missing(vec![
+            Step::Install("snapper".into()),
+            Step::CreateRootConfig { keep_mount: false },
+            Step::Enable("snapper-cleanup.timer".into()),
+        ]);
+        let (state, missing) = snapshots(&en, &fresh);
+        assert_eq!(state, "Not set up");
+        assert_eq!(
+            missing,
+            [
+                "Install snapper",
+                "Create a snapper configuration for /",
+                "Turn on snapper-cleanup.timer"
+            ]
+        );
+        let partial = Report::Missing(vec![Step::Install("snap-pac".into())]);
+        assert_eq!(snapshots(&en, &partial).0, "Partly set up");
     }
 
     #[test]
