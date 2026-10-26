@@ -10,8 +10,8 @@ See [decisions.md](decisions.md) for the reasons behind this layout.
 | `kura-alpm` | library | libalpm adapter: reads databases, prepares and commits transactions. |
 | `kura-i18n` | library | Fluent loader and locale handling, shared by all binaries. |
 | `kura-sbom` | library + CLI | CycloneDX SBOM from the local package database. |
-| `kura-helper` | binary, root | D-Bus service with polkit checks. Runs plans. Nothing else. |
-| `kura-agent` | binary, user | tray icon, notifications, udev, AUR builds. |
+| `kura-helper` | binary, root | D-Bus service with polkit checks. Runs plans, including sandboxed AUR builds. Nothing else. |
+| `kura-agent` | binary, user | tray icon, notifications, udev. |
 | `kura-cli` | binary `kura` | command line interface. |
 | `kura-gui` | binary `kura-gui` | Qt/QML/Kirigami interface. |
 
