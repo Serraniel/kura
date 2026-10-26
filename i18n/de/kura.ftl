@@ -48,6 +48,7 @@ change-blocked = Die Änderung kann nicht vorbereitet werden:
 problem-unsatisfied = { $target } benötigt { $dependency }, das nicht mehr verfügbar ist.
 problem-conflict = { $first } und { $second } können nicht gemeinsam installiert werden.
 problem-arch = Für einen anderen Prozessortyp gebaut: { $packages }
+problem-arch-unnamed = Einige Pakete sind für einen anderen Prozessortyp gebaut.
 problem-not-found = Es wurde kein Paket namens { $name } gefunden.
 problem-not-restorable = kura kann { $name } { $version } nicht zurückholen: Es stammt aus dem AUR oder wurde auf diesem Computer gebaut, und die Datei ist nicht mehr im Paket-Cache.
 undo-title = Zurück zum Stand #{ $id } von { $when }:

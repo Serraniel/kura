@@ -25,6 +25,7 @@ pub fn problem(l: &Localizer, p: &Problem) -> String {
             "problem-conflict",
             &[("first", first.clone().into()), ("second", second.clone().into())],
         ),
+        Problem::InvalidArchitecture { packages } if packages.is_empty() => l.msg("problem-arch-unnamed"),
         Problem::InvalidArchitecture { packages } => {
             l.msg_args("problem-arch", &[("packages", packages.join(", ").into())])
         }

@@ -45,6 +45,7 @@ change-blocked = 変更を準備できません:
 problem-unsatisfied = { $target } には { $dependency } が必要ですが、もう提供されていません。
 problem-conflict = { $first } と { $second } は同時にインストールできません。
 problem-arch = 別の種類のプロセッサー向けにビルドされています: { $packages }
+problem-arch-unnamed = 一部のパッケージは別の種類のプロセッサー向けにビルドされています。
 problem-not-found = { $name } という名前のパッケージは見つかりませんでした。
 problem-not-restorable = { $name } { $version } を元に戻せません。AUR から入手したか、このコンピューターでビルドしたもので、パッケージキャッシュにファイルが残っていません。
 undo-title = { $when } の状態 #{ $id } に戻します:

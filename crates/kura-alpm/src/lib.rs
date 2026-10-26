@@ -38,7 +38,14 @@ pub enum Error {
 
 /// Reads the system's pacman configuration.
 pub fn load_config() -> Result<Config, Error> {
-    Config::new().map_err(|e| Error::Config(e.to_string()))
+    let mut conf = Config::new().map_err(|e| Error::Config(e.to_string()))?;
+    // `Architecture = x86_64 x86_64_v3` may arrive as one value.
+    conf.architecture = conf
+        .architecture
+        .iter()
+        .flat_map(|a| a.split_whitespace().map(str::to_owned))
+        .collect();
+    Ok(conf)
 }
 
 /// A libalpm handle set up like pacman would set it up.
