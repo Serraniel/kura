@@ -173,6 +173,7 @@ gui-tray-mono-hint = パネルのほかのアイコンと合わせます。
 gui-aur = AUR のソフトウェア
 gui-aur-hint = AUR には他のユーザーが共有するソフトウェアがあります。Arch Linux による確認は受けていません。kura はこのコンピューター上の分離された制限付きの環境でビルドします。
 gui-aur-wait-hint = 問題が先に見つかるよう、AUR の新しいバージョンはこの期間待ってからインストールされます。アプリを手動でインストールすると、常に最新バージョンになります。
+gui-aur-after = この後、AUR のアップデート { $count } 件が準備できています。もう一度確認するとビルドできます。
 gui-last-check = 最終確認: { $when }。
 nav-health = システムの状態
 nav-software = ソフトウェア

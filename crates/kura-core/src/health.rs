@@ -16,6 +16,8 @@ pub struct Facts {
     pub orphans: usize,
     /// kura chose the download servers.
     pub mirrors_ranked: bool,
+    /// DKMS is installed, so new kernels need their headers to build modules.
+    pub dkms: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +45,16 @@ pub fn is_kernel(package: &str) -> bool {
 pub fn is_running(version: &str, uname: &str) -> bool {
     let without_release = version.rsplit_once('-').map_or(version, |(v, _)| v);
     !uname.is_empty() && uname.replace('-', ".").starts_with(without_release)
+}
+
+/// Packages that install `kernel`: with its headers when DKMS builds
+/// modules (for example for NVIDIA graphics) for every kernel.
+pub fn kernel_packages(kernel: &str, dkms: bool) -> Vec<String> {
+    let mut out = vec![kernel.to_owned()];
+    if dkms {
+        out.push(format!("{kernel}-headers"));
+    }
+    out
 }
 
 /// Suggestions, most important first.
@@ -79,6 +91,7 @@ mod tests {
             snapshots: false,
             orphans: 39,
             mirrors_ranked: false,
+            dkms: false,
         };
         assert_eq!(
             suggestions(&facts),
@@ -99,6 +112,7 @@ mod tests {
             snapshots: false,
             orphans: 0,
             mirrors_ranked: true,
+            dkms: false,
         };
         assert_eq!(suggestions(&facts), Vec::<Suggestion>::new());
         let snap = Facts {
@@ -107,6 +121,15 @@ mod tests {
             ..facts
         };
         assert_eq!(suggestions(&snap), Vec::<Suggestion>::new());
+    }
+
+    #[test]
+    fn headers_only_with_dkms() {
+        assert_eq!(kernel_packages("linux-lts", false), ["linux-lts"]);
+        assert_eq!(
+            kernel_packages("linux-lts", true),
+            ["linux-lts", "linux-lts-headers"]
+        );
     }
 
     #[test]

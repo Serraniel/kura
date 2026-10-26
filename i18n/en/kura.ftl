@@ -199,6 +199,10 @@ gui-tray-mono-hint = Matches the other icons in the panel.
 gui-aur = Software from the AUR
 gui-aur-hint = The AUR has software that other users share. It is not checked by Arch Linux. kura builds it on this computer in a separate, restricted environment.
 gui-aur-wait-hint = New AUR versions wait this long before kura installs them, so problems can show up first. Installing an app by hand always takes the newest version.
+gui-aur-after = { $count ->
+    [one] After this, one update from the AUR is ready. Review again to build it.
+   *[other] After this, { $count } updates from the AUR are ready. Review again to build them.
+}
 gui-last-check = Last checked { $when }.
 nav-health = System health
 nav-software = Software

@@ -212,6 +212,10 @@ gui-tray-mono-hint = S’accorde avec les autres icônes du tableau de bord.
 gui-aur = Logiciels de l'AUR
 gui-aur-hint = L'AUR contient des logiciels partagés par d'autres utilisateurs. Arch Linux ne les vérifie pas. kura les compile sur cet ordinateur dans un environnement séparé et restreint.
 gui-aur-wait-hint = Les nouvelles versions de l'AUR attendent ce délai avant que kura les installe, pour que les problèmes apparaissent d'abord. Installer une application à la main prend toujours la version la plus récente.
+gui-aur-after = { $count ->
+    [one] Ensuite, une mise à jour de l'AUR est prête. Vérifiez à nouveau pour la compiler.
+   *[other] Ensuite, { $count } mises à jour de l'AUR sont prêtes. Vérifiez à nouveau pour les compiler.
+}
 gui-last-check = Dernière vérification : { $when }.
 nav-health = État du système
 nav-software = Logiciels
