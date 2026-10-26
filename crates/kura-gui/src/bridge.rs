@@ -5,6 +5,9 @@
 //! background threads and reports back through the Qt event loop, so the
 //! window never freezes. Changes go through kura-helper only.
 
+// cxx-qt's generated setter for the progress value compares floats exactly.
+#![allow(clippy::float_cmp)]
+
 #[cxx_qt::bridge]
 pub mod qobject {
     unsafe extern "C++" {
@@ -27,6 +30,9 @@ pub mod qobject {
         #[qproperty(QString, last_check, cxx_name = "lastCheck")]
         #[qproperty(bool, busy)]
         #[qproperty(QString, progress_text, cxx_name = "progressText")]
+        // Between 0 and 1, or below 0 while nothing can be measured.
+        #[qproperty(f64, progress_value, cxx_name = "progressValue")]
+        #[qproperty(QString, progress_detail, cxx_name = "progressDetail")]
         /// `[{"title": .., "items": [{"name": .., "detail": ..}]}]`
         #[qproperty(QString, preview_json, cxx_name = "previewJson")]
         /// `[{"title": .., "link": ..}]`
@@ -184,6 +190,8 @@ pub struct KuraRust {
     last_check: QString,
     busy: bool,
     progress_text: QString,
+    progress_value: f64,
+    progress_detail: QString,
     preview_json: QString,
     news_json: QString,
     summary_text: QString,
@@ -221,6 +229,8 @@ impl Default for KuraRust {
             last_check: QString::default(),
             busy: false,
             progress_text: QString::default(),
+            progress_value: -1.0,
+            progress_detail: QString::default(),
             preview_json: QString::from("[]"),
             news_json: QString::from("[]"),
             summary_text: QString::default(),
@@ -331,6 +341,34 @@ struct Prepared {
     news: String,
     summary: String,
     headline: String,
+}
+
+/// Seconds since 1970, for progress estimates.
+fn seconds() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_secs_f64())
+}
+
+/// Shows download progress of a preview while it is prepared.
+fn forward_progress(
+    rx: std::sync::mpsc::Receiver<kura_alpm::apply::Event>,
+    qt: cxx_qt::CxxQtThread<qobject::Kura>,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let l = Localizer::from_env();
+        let mut tracker = kura_core::progress::Tracker::default();
+        for event in rx {
+            let now = seconds();
+            kura_helper::text::track(&mut tracker, &event, now);
+            let value = tracker.fraction().unwrap_or(-1.0);
+            let detail = kura_helper::text::progress(&l, &tracker, now);
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_progress_value(value);
+                this.as_mut().set_progress_detail(QString::from(&detail));
+            });
+        }
+    })
 }
 
 /// Runs in a background thread.
@@ -895,8 +933,15 @@ impl qobject::Kura {
         self.as_mut().set_progress_text(QString::from(&running));
         let qt = self.qt_thread();
         std::thread::spawn(move || {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let forward = forward_progress(rx, qt.clone());
+            kura_alpm::prepare::report_progress_to(Some(tx));
             let result = prepare();
+            kura_alpm::prepare::report_progress_to(None);
+            let _ = forward.join();
             let _ = qt.queue(move |mut this| {
+                this.as_mut().set_progress_value(-1.0);
+                this.as_mut().set_progress_detail(QString::default());
                 match result {
                     Ok(p) => {
                         let has_changes = !p.plan.steps.is_empty()
@@ -1097,9 +1142,18 @@ impl qobject::Kura {
         std::thread::spawn(move || {
             let l = Localizer::from_env();
             let events = qt.clone();
+            let mut tracker = kura_core::progress::Tracker::default();
             let result = kura_helper::apply(&plan, |event| {
                 let line = kura_helper::text::event(&l, &event);
-                let _ = events.queue(move |mut this| this.as_mut().set_progress_text(QString::from(&line)));
+                let now = seconds();
+                kura_helper::text::track(&mut tracker, &event, now);
+                let value = tracker.fraction().unwrap_or(-1.0);
+                let detail = kura_helper::text::progress(&l, &tracker, now);
+                let _ = events.queue(move |mut this| {
+                    this.as_mut().set_progress_text(QString::from(&line));
+                    this.as_mut().set_progress_value(value);
+                    this.as_mut().set_progress_detail(QString::from(&detail));
+                });
             });
             let (text, fresh, failed) = match result {
                 Ok(reply) => {
@@ -1122,6 +1176,8 @@ impl qobject::Kura {
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_message(QString::from(&text));
                 this.as_mut().set_failed(failed);
+                this.as_mut().set_progress_value(-1.0);
+                this.as_mut().set_progress_detail(QString::default());
                 this.as_mut().set_busy(false);
                 this.as_mut().set_progress_text(QString::default());
                 this.as_mut().set_preview_json(QString::from("[]"));

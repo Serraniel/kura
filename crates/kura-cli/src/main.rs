@@ -130,14 +130,33 @@ fn prepare(l: &Localizer, request: &Request) -> Result<(Plan, Outcome, BTreeSet<
     let fail = |e: kura_alpm::Error| l.msg_args("error-check", &[("reason", e.to_string().into())]);
     let config = kura_alpm::load_config().map_err(fail)?;
     let refresh = !matches!(request, Request::Remove(_));
-    let (outcome, repair) = kura_alpm::prepare::prepare_with_repair(
+    // Download progress of the package lists while preparing.
+    let (tx, rx) = std::sync::mpsc::channel();
+    kura_alpm::prepare::report_progress_to(Some(tx));
+    let lang = l.language();
+    let drawer = std::thread::spawn(move || {
+        let l = Localizer::new(
+            &kura_core::locale::Locale::parse(&lang)
+                .into_iter()
+                .collect::<Vec<_>>(),
+        );
+        let mut tracker = kura_core::progress::Tracker::default();
+        for event in rx {
+            kura_helper::text::track(&mut tracker, &event, seconds());
+            status(&l, &tracker);
+        }
+        clear_status();
+    });
+    let prepared = kura_alpm::prepare::prepare_with_repair(
         &config,
         Some(&kura_alpm::background::check_dir()),
         request,
         refresh,
         &user_locales(),
-    )
-    .map_err(fail)?;
+    );
+    kura_alpm::prepare::report_progress_to(None);
+    let _ = drawer.join();
+    let (outcome, repair) = prepared.map_err(fail)?;
     if let Some(repair) = &repair {
         say(&(kura_helper::text::repair(l, repair) + "\n"));
     }
@@ -327,11 +346,44 @@ fn confirm(l: &Localizer, question_id: &str) -> bool {
 /// same file many times.
 fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
     let mut seen = BTreeSet::new();
+    let mut tracker = kura_core::progress::Tracker::default();
     move |event| {
         let line = kura_helper::text::event(l, &event);
         if seen.insert(line.clone()) {
+            clear_status();
             say(&line);
         }
+        kura_helper::text::track(&mut tracker, &event, seconds());
+        status(l, &tracker);
+    }
+}
+
+fn seconds() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_secs_f64())
+}
+
+/// A progress line that rewrites itself, only on a terminal.
+fn status(l: &Localizer, tracker: &kura_core::progress::Tracker) {
+    use std::io::IsTerminal as _;
+    let Some(fraction) = tracker.fraction() else {
+        return;
+    };
+    if !std::io::stderr().is_terminal() {
+        return;
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let filled = (fraction.clamp(0.0, 1.0) * 20.0).round() as usize;
+    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(20 - filled));
+    let detail = kura_helper::text::progress(l, tracker, seconds());
+    let _ = write!(std::io::stderr(), "\r\x1b[K  {bar}  {detail}");
+}
+
+fn clear_status() {
+    use std::io::IsTerminal as _;
+    if std::io::stderr().is_terminal() {
+        let _ = write!(std::io::stderr(), "\r\x1b[K");
     }
 }
 

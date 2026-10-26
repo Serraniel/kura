@@ -240,6 +240,20 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                     }
                 }
+                // Measured progress where kura can measure it: downloads,
+                // packages installed, apps built.
+                Controls.ProgressBar {
+                    Layout.fillWidth: true
+                    visible: kura.busy && kura.progressValue >= 0
+                    from: 0
+                    to: 1
+                    value: Math.max(0, kura.progressValue)
+                }
+                Controls.Label {
+                    visible: kura.busy && kura.progressDetail.length > 0
+                    text: kura.progressDetail
+                    color: Kirigami.Theme.disabledTextColor
+                }
 
                 Kirigami.InlineMessage {
                     Layout.fillWidth: true

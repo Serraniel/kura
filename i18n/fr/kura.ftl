@@ -121,6 +121,12 @@ confirm-remove = Supprimer ceci ? [o/N]
 confirm-yes = o
 apply-cancelled = Rien n’a été modifié.
 apply-refreshing = Actualisation des listes de paquets…
+progress-of = { $done } sur { $total }
+progress-under-minute = moins d'une minute restante
+progress-minutes = { $minutes ->
+    [one] environ une minute restante
+   *[other] environ { $minutes } minutes restantes
+}
 apply-trial = Essai de la mise à jour dans une copie du système…
 apply-trial-failed = La mise à jour a échoué dans une copie du système, kura n'a donc rien modifié. Raison : { $reason }
 apply-downloading = Téléchargement de { $file }

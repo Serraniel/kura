@@ -108,6 +108,12 @@ confirm-remove = Das entfernen? [j/N]
 confirm-yes = j
 apply-cancelled = Es wurde nichts verändert.
 apply-refreshing = Paketlisten werden aktualisiert …
+progress-of = { $done } von { $total }
+progress-under-minute = weniger als eine Minute übrig
+progress-minutes = { $minutes ->
+    [one] noch etwa eine Minute
+   *[other] noch etwa { $minutes } Minuten
+}
 apply-trial = Das Update wird zuerst in einer Kopie des Systems ausprobiert…
 apply-trial-failed = Das Update ist in einer Kopie des Systems fehlgeschlagen, daher hat kura nichts geändert. Grund: { $reason }
 apply-downloading = { $file } wird heruntergeladen

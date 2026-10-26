@@ -108,6 +108,12 @@ confirm-remove = Remove this? [y/N]
 confirm-yes = y
 apply-cancelled = Nothing was changed.
 apply-refreshing = Refreshing the package lists…
+progress-of = { $done } of { $total }
+progress-under-minute = less than a minute left
+progress-minutes = { $minutes ->
+    [one] about one minute left
+   *[other] about { $minutes } minutes left
+}
 apply-trial = Trying the update in a copy of the system first…
 apply-trial-failed = The update failed in a copy of the system, so kura changed nothing. Reason: { $reason }
 apply-downloading = Downloading { $file }
