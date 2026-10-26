@@ -427,18 +427,26 @@ fn search_value(l: &Localizer, query: &str, aur: bool) -> Value {
     Value::Array(out)
 }
 
-/// AUR packages whose update is past the cooling period.
+/// AUR packages whose update is past the cooling period, and those that a
+/// library update broke, which are built again right away.
 fn aur_ready(conf: &kura_alpm::Config) -> Vec<String> {
     let settings = kura_alpm::aur::settings();
     if !settings.aur {
         return Vec::new();
     }
-    kura_alpm::aur::updates(conf, &settings, kura_alpm::background::now(), false)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|u| u.waits_until.is_none())
-        .map(|u| u.name)
-        .collect()
+    let mut names: Vec<String> =
+        kura_alpm::aur::updates(conf, &settings, kura_alpm::background::now(), false)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|u| u.waits_until.is_none())
+            .map(|u| u.name)
+            .collect();
+    for name in kura_alpm::aur::rebuild_targets(conf).unwrap_or_default() {
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
 }
 
 /// Runs in a background thread: what building `names` from the AUR changes.

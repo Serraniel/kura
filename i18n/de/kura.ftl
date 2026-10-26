@@ -259,6 +259,7 @@ confirm-aur = Das bauen und installieren? [j/N]
 aur-off = { $names } ist nicht in den Paketquellen, und das AUR ist ausgeschaltet. Zum Einschalten: kura settings aur on
 aur-check-failed = AUR-Updates konnten nicht geprüft werden: { $reason }
 check-aur = Aus dem AUR: { $ready } bereit, { $waiting } warten noch
+check-rebuild = Diese Apps aus dem AUR brauchen eine Bibliothek, die ein Update ersetzt hat. kura update baut sie neu:
 aur-updates-title = Updates aus dem AUR:
 aur-waiting = { $count ->
     [one] Ein AUR-Update wartet

@@ -271,6 +271,14 @@ fn check(l: &Localizer) -> Result<String, String> {
                 );
             }
         }
+        if let Ok(broken) = kura_alpm::aur::needs_rebuild(&conf)
+            && !broken.is_empty()
+        {
+            let _ = writeln!(out, "\n{}", l.msg("check-rebuild"));
+            for (name, libs) in &broken {
+                let _ = writeln!(out, "  {name}  ({})", libs.join(", "));
+            }
+        }
     }
     Ok(out)
 }
@@ -464,6 +472,8 @@ fn aur_updates(l: &Localizer) -> Result<String, String> {
     let updates = kura_alpm::aur::updates(&conf, &settings, kura_alpm::background::now(), false)
         .map_err(|reason| l.msg_args("aur-check-failed", &[("reason", reason.into())]))?;
     let (ready, waiting): (Vec<_>, Vec<_>) = updates.iter().partition(|u| u.waits_until.is_none());
+    // Packages broken by a library update are built again right away.
+    let rebuild = kura_alpm::aur::rebuild_targets(&conf).unwrap_or_default();
     let mut note = String::new();
     if !waiting.is_empty() {
         let names: Vec<&str> = waiting.iter().map(|u| u.name.as_str()).collect();
@@ -476,11 +486,16 @@ fn aur_updates(l: &Localizer) -> Result<String, String> {
             ],
         ) + "\n";
     }
-    if ready.is_empty() {
+    if ready.is_empty() && rebuild.is_empty() {
         return Ok(note);
     }
     say(&note);
-    let names: Vec<String> = ready.iter().map(|u| u.name.clone()).collect();
+    let mut names: Vec<String> = ready.iter().map(|u| u.name.clone()).collect();
+    for name in rebuild {
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
     aur_change(l, &conf, &names, false, "aur-updates-title", "confirm-aur-update")
 }
 

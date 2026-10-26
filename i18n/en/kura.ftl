@@ -259,6 +259,7 @@ confirm-aur = Build and install this? [y/N]
 aur-off = { $names } is not in the repositories, and the AUR is turned off. To turn it on: kura settings aur on
 aur-check-failed = AUR updates could not be checked: { $reason }
 check-aur = From the AUR: { $ready } ready, { $waiting } still waiting
+check-rebuild = These apps from the AUR need a library that an update replaced. kura update builds them again:
 aur-updates-title = Updates from the AUR:
 aur-waiting = { $count ->
     [one] One AUR update waits

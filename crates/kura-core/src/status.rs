@@ -31,6 +31,9 @@ pub struct Status {
     /// AUR updates still in their cooling period.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub aur_waiting: usize,
+    /// AUR packages that need a library which is gone and must be built again.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub aur_rebuild: usize,
     /// When kura last installed security updates on its own (Unix time).
     #[serde(default, skip_serializing_if = "is_zero_time")]
     pub auto_installed: i64,
@@ -68,7 +71,7 @@ impl Status {
             State::Unknown
         } else if !self.security.is_empty() {
             State::Security
-        } else if self.blocked || !self.news.is_empty() {
+        } else if self.blocked || !self.news.is_empty() || self.aur_rebuild > 0 {
             State::NeedsAttention
         } else if self.updates > 0 || self.aur_updates > 0 {
             State::UpdatesReady
@@ -100,6 +103,9 @@ mod tests {
         s.news.push("linux needs a manual step".into());
         assert_eq!(s.state(), State::NeedsAttention);
         s.news.clear();
+        s.aur_rebuild = 1;
+        assert_eq!(s.state(), State::NeedsAttention);
+        s.aur_rebuild = 0;
         s.blocked = true;
         assert_eq!(s.state(), State::NeedsAttention);
         s.security.push(crate::security::Finding {
