@@ -29,6 +29,9 @@ cli-usage =
       undo       以前の状態に戻します: kura undo [番号]
       version    kura のバージョンを表示します
 cli-unknown-command = 不明なコマンドです: { $command }
+pacman-partial = 後のインストールで古いパッケージと新しいパッケージが混ざるため、kura はアップデートせずにパッケージ一覧だけを更新することはしません。kura -Syu または kura update を使ってください。
+pacman-clean = kura は以前の状態に戻せるよう、古いパッケージファイルを保持しています。システムの状態ページに表示されます。
+pacman-usage = kura は -Syu、-S <名前>、-R <名前>、-Ss <単語>、-Si <名前>、-Q、-Qi <名前>、-Qs <単語> を理解します。その他は kura --help を参照してください。
 cli-missing-command = コマンドが指定されていません。
 
 ## check

@@ -13,6 +13,8 @@ use std::collections::BTreeSet;
 use kura_alpm::apply::Event;
 use kura_alpm::prepare::{Outcome, Problem, Request};
 use kura_core::package::PackageSet;
+
+mod pacman_mode;
 use kura_core::plan::Plan;
 use kura_core::plan::{RemovalReason, Step};
 use kura_helper::Reply;
@@ -35,6 +37,11 @@ fn main() -> ExitCode {
 
 fn run(l: &Localizer) -> Result<String, String> {
     use lexopt::prelude::*;
+
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(op) = pacman_mode::parse(&args) {
+        return pacman(l, op);
+    }
 
     let mut parser = lexopt::Parser::from_env();
     let mut command: Option<String> = None;
@@ -921,6 +928,27 @@ fn info(l: &Localizer, name: &str) -> Result<String, String> {
         let _ = writeln!(out, "  {k}{}  {v}", " ".repeat(pad));
     }
     Ok(out)
+}
+
+/// Runs a pacman-style command through kura's own commands.
+fn pacman(l: &Localizer, op: pacman_mode::Op) -> Result<String, String> {
+    use pacman_mode::Op;
+    match op {
+        Op::Update => update(l),
+        Op::Install(names) => install(l, names),
+        Op::Remove(names) => change(l, &Request::Remove(names), "confirm-remove"),
+        Op::Search(term) => search(l, &term),
+        Op::Info(name) => info(l, &name),
+        Op::List(names) => {
+            let set = load(l)?;
+            let mut out = String::new();
+            for p in set.iter().filter(|p| names.is_empty() || names.contains(&p.name)) {
+                let _ = writeln!(out, "{} {}", p.name, p.version);
+            }
+            Ok(out)
+        }
+        Op::Refused(id) => Err(l.msg(id) + "\n"),
+    }
 }
 
 /// Searches the repositories, then the AUR.
