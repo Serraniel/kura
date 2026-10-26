@@ -150,6 +150,12 @@ Kirigami.ApplicationWindow {
         Kirigami.ScrollablePage {
             title: kura.tr("nav-overview")
 
+            // Shown while kura reads in the background; the page stays usable.
+            header: Controls.ProgressBar {
+                indeterminate: true
+                visible: kura.refreshing
+            }
+
             ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
 
@@ -373,6 +379,12 @@ Kirigami.ApplicationWindow {
 
         Kirigami.ScrollablePage {
             title: kura.tr("nav-history")
+
+            // Shown while kura reads in the background; the page stays usable.
+            header: Controls.ProgressBar {
+                indeterminate: true
+                visible: kura.refreshing
+            }
             property var records: JSON.parse(kura.historyJson)
 
             ListView {
@@ -514,6 +526,12 @@ Kirigami.ApplicationWindow {
 
         Kirigami.ScrollablePage {
             title: kura.tr("nav-health")
+
+            // Shown while kura reads in the background; the page stays usable.
+            header: Controls.ProgressBar {
+                indeterminate: true
+                visible: kura.healthLoading
+            }
             property var health: JSON.parse(kura.healthJson)
 
             ColumnLayout {

@@ -36,6 +36,9 @@ pub mod qobject {
         // The details panel: what kura did, line by line, and whether it shows.
         #[qproperty(QString, log_text, cxx_name = "logText")]
         #[qproperty(bool, show_log, cxx_name = "showLog")]
+        // Status and history, and the health page, are being read.
+        #[qproperty(bool, refreshing)]
+        #[qproperty(bool, health_loading, cxx_name = "healthLoading")]
         /// `[{"title": .., "items": [{"name": .., "detail": ..}]}]`
         #[qproperty(QString, preview_json, cxx_name = "previewJson")]
         /// `[{"title": .., "link": ..}]`
@@ -202,6 +205,8 @@ pub struct KuraRust {
     progress_detail: QString,
     log_text: QString,
     show_log: bool,
+    refreshing: bool,
+    health_loading: bool,
     log: Vec<String>,
     preview_json: QString,
     news_json: QString,
@@ -247,6 +252,8 @@ impl Default for KuraRust {
                 .get("log_panel")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            refreshing: false,
+            health_loading: false,
             log: Vec::new(),
             preview_json: QString::from("[]"),
             news_json: QString::from("[]"),
@@ -358,6 +365,122 @@ struct Prepared {
     news: String,
     summary: String,
     headline: String,
+}
+
+/// Runs in a background thread: going back to generation `target`.
+fn prepare_restore_preview(target: u64) -> Result<Prepared, String> {
+    let l = Localizer::from_env();
+    let db = |e: kura_alpm::Error| l.msg_args("error-database", &[("reason", e.to_string().into())]);
+    let journal = kura_alpm::history::load(Path::new(kura_alpm::history::JOURNAL)).map_err(db)?;
+    let conf = kura_alpm::load_config().map_err(db)?;
+    let unknown = || l.msg_args("undo-unknown", &[("id", target.into())]);
+    let generation = journal.generation(target).ok_or_else(unknown)?;
+    let plan = kura_alpm::restore::plan(&journal, target).ok_or_else(unknown)?;
+    if plan.steps.is_empty() {
+        return Err(l.msg("undo-nothing"));
+    }
+    if let Err(problems) = kura_alpm::restore::sources(&conf.cache_dir, &plan, &generation) {
+        return Err(problems
+            .iter()
+            .map(|p| kura_helper::text::problem(&l, p))
+            .collect::<Vec<_>>()
+            .join("\n"));
+    }
+    let apps = kura_alpm::apps(&conf).unwrap_or_default();
+    let when = present::when(&l, generation.created, kura_alpm::background::now());
+    Ok(Prepared {
+        preview: preview_groups(&l, &plan, &apps).to_string(),
+        news: "[]".into(),
+        summary: l.msg("undo-limits"),
+        headline: l.msg_args("undo-title", &[("id", target.into()), ("when", when.into())]),
+        plan,
+    })
+}
+
+/// What the Overview and History pages show, read in a background thread.
+struct Overview {
+    distro: String,
+    state: i32,
+    status_text: String,
+    last_check: String,
+    history: String,
+    security: String,
+    error: String,
+    counts: Option<(i32, i32, i32, i32)>,
+}
+
+fn overview(l: &Localizer) -> Overview {
+    let distro = std::fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|t| {
+            t.lines()
+                .find_map(|l| l.strip_prefix("NAME=").map(|v| v.trim_matches('"').to_owned()))
+        })
+        .unwrap_or_else(|| "Linux".to_owned());
+    let status = kura_alpm::background::read_status(Path::new(kura_alpm::background::STATUS));
+    let now = kura_alpm::background::now();
+    let (state, status_text) = match status.state() {
+        State::Security => (4, present::security_headline(l, &status.security)),
+        State::Unknown => (0, l.msg("tray-unknown")),
+        State::UpToDate => (1, l.msg("tray-uptodate")),
+        State::UpdatesReady => (
+            2,
+            l.msg_args(
+                "tray-updates",
+                &[("count", (status.updates + status.aur_updates).into())],
+            ),
+        ),
+        State::NeedsAttention => (3, l.msg("tray-attention")),
+    };
+    let last_check = if status.checked > 0 {
+        l.msg_args(
+            "gui-last-check",
+            &[("when", present::when(l, status.checked, now).into())],
+        )
+    } else {
+        String::new()
+    };
+    let history = kura_alpm::history::load(Path::new(kura_alpm::history::JOURNAL))
+        .map_or_else(
+            |_| json!([]),
+            |j| {
+                Value::Array(
+                    j.records()
+                        .iter()
+                        .rev()
+                        .map(|r| json!({"id": r.id, "when": present::when(l, r.created, now), "text": present::record_text(l, r)}))
+                        .collect(),
+                )
+            },
+        )
+        .to_string();
+    let security = security_value(l, &status.security).to_string();
+    let loaded = kura_alpm::load_config().and_then(|conf| kura_alpm::installed(&conf));
+    let error = loaded
+        .as_ref()
+        .err()
+        .map(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))
+        .unwrap_or_default();
+    let counts = loaded.ok().map(|set| {
+        let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
+        let foreign = set.iter().filter(|p| p.repo.is_none()).count();
+        (
+            count(set.len()),
+            count(explicit),
+            count(foreign),
+            count(set.orphans().len()),
+        )
+    });
+    Overview {
+        distro,
+        state,
+        status_text,
+        last_check,
+        history,
+        security,
+        error,
+        counts,
+    }
 }
 
 /// The local time zone's offset from UTC in seconds, from `date`.
@@ -804,71 +927,30 @@ impl qobject::Kura {
     }
 
     fn refresh(mut self: Pin<&mut Self>) {
-        let l = &self.localizer;
-        let distro = std::fs::read_to_string("/etc/os-release")
-            .ok()
-            .and_then(|t| {
-                t.lines()
-                    .find_map(|l| l.strip_prefix("NAME=").map(|v| v.trim_matches('"').to_owned()))
-            })
-            .unwrap_or_else(|| "Linux".to_owned());
-
-        let status = kura_alpm::background::read_status(Path::new(kura_alpm::background::STATUS));
-        let now = kura_alpm::background::now();
-        let (state, text) = match status.state() {
-            State::Security => (4, present::security_headline(l, &status.security)),
-            State::Unknown => (0, l.msg("tray-unknown")),
-            State::UpToDate => (1, l.msg("tray-uptodate")),
-            State::UpdatesReady => (2, l.msg_args("tray-updates", &[("count", status.updates.into())])),
-            State::NeedsAttention => (3, l.msg("tray-attention")),
-        };
-        let last_check = if status.checked > 0 {
-            l.msg_args(
-                "gui-last-check",
-                &[("when", present::when(l, status.checked, now).into())],
-            )
-        } else {
-            String::new()
-        };
-        let history = kura_alpm::history::load(Path::new(kura_alpm::history::JOURNAL))
-            .map_or_else(
-                |_| json!([]),
-                |j| {
-                    Value::Array(
-                        j.records()
-                            .iter()
-                            .rev()
-                            .map(|r| {
-                                json!({"id": r.id, "when": present::when(l, r.created, now), "text": present::record_text(l, r)})
-                            })
-                            .collect(),
-                    )
-                },
-            )
-            .to_string();
-        let security = security_value(l, &status.security).to_string();
-        let loaded = kura_alpm::load_config().and_then(|conf| kura_alpm::installed(&conf));
-        let error_text = loaded
-            .as_ref()
-            .err()
-            .map(|e| l.msg_args("error-database", &[("reason", e.to_string().into())]))
-            .unwrap_or_default();
-
-        self.as_mut().set_distro(QString::from(&distro));
-        self.as_mut().set_state(state);
-        self.as_mut().set_status_text(QString::from(&text));
-        self.as_mut().set_last_check(QString::from(&last_check));
-        self.as_mut().set_history_json(QString::from(&history));
-        self.as_mut().set_security_json(QString::from(&security));
-        self.as_mut().set_error(QString::from(&error_text));
-        if let Ok(set) = loaded {
-            let explicit = set.iter().filter(|p| p.reason == InstallReason::Explicit).count();
-            let foreign = set.iter().filter(|p| p.repo.is_none()).count();
-            self.as_mut().set_packages(count(set.len()));
-            self.as_mut().set_explicit_count(count(explicit));
-            self.as_mut().set_foreign_count(count(foreign));
-            self.as_mut().set_orphan_count(count(set.orphans().len()));
+        if *self.refreshing() {
+            return;
         }
+        self.as_mut().set_refreshing(true);
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let o = overview(&Localizer::from_env());
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_distro(QString::from(&o.distro));
+                this.as_mut().set_state(o.state);
+                this.as_mut().set_status_text(QString::from(&o.status_text));
+                this.as_mut().set_last_check(QString::from(&o.last_check));
+                this.as_mut().set_history_json(QString::from(&o.history));
+                this.as_mut().set_security_json(QString::from(&o.security));
+                this.as_mut().set_error(QString::from(&o.error));
+                if let Some((packages, explicit, foreign, orphans)) = o.counts {
+                    this.as_mut().set_packages(packages);
+                    this.as_mut().set_explicit_count(explicit);
+                    this.as_mut().set_foreign_count(foreign);
+                    this.as_mut().set_orphan_count(orphans);
+                }
+                this.as_mut().set_refreshing(false);
+            });
+        });
     }
 
     fn prepare_update(self: Pin<&mut Self>) {
@@ -883,17 +965,23 @@ impl qobject::Kura {
             .localizer
             .msg_args("gui-install-title", &[("name", names.join(", ").into())]);
         let label = self.localizer.msg("gui-install");
-        // Names no repository has come from the AUR.
-        let in_repos = kura_alpm::load_config().is_ok_and(|conf| {
-            names
-                .iter()
-                .all(|n| kura_alpm::in_repos(&conf, n).unwrap_or(false))
-        });
-        if in_repos {
-            self.start_preview(move || prepare_preview(&Request::Install(names)), &title, &label);
-        } else {
-            self.start_preview(move || prepare_aur_preview(&names), &title, &label);
-        }
+        self.start_preview(
+            move || {
+                // Names no repository has come from the AUR.
+                let in_repos = kura_alpm::load_config().is_ok_and(|conf| {
+                    names
+                        .iter()
+                        .all(|n| kura_alpm::in_repos(&conf, n).unwrap_or(false))
+                });
+                if in_repos {
+                    prepare_preview(&Request::Install(names))
+                } else {
+                    prepare_aur_preview(&names)
+                }
+            },
+            &title,
+            &label,
+        );
     }
 
     fn prepare_remove(self: Pin<&mut Self>, name: &QString) {
@@ -1010,10 +1098,20 @@ impl qobject::Kura {
     }
 
     fn refresh_health(mut self: Pin<&mut Self>) {
-        let value = kura_alpm::load_config()
-            .and_then(|conf| kura_alpm::system::collect(&conf))
-            .map_or_else(|_| json!({}), |info| health_value(&self.localizer, &info));
-        self.as_mut().set_health_json(QString::from(&value.to_string()));
+        if *self.health_loading() {
+            return;
+        }
+        self.as_mut().set_health_loading(true);
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let value = kura_alpm::load_config()
+                .and_then(|conf| kura_alpm::system::collect(&conf))
+                .map_or_else(|_| json!({}), |info| health_value(&Localizer::from_env(), &info));
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_health_json(QString::from(&value.to_string()));
+                this.as_mut().set_health_loading(false);
+            });
+        });
     }
 
     fn search(self: Pin<&mut Self>, query: &QString) {
@@ -1096,66 +1194,13 @@ impl qobject::Kura {
         });
     }
 
-    fn prepare_restore(mut self: Pin<&mut Self>, generation: i32) {
-        if *self.busy() {
-            return;
-        }
+    fn prepare_restore(self: Pin<&mut Self>, generation: i32) {
         let Ok(target) = u64::try_from(generation) else {
             return;
         };
-        let l = &self.localizer;
-        let journal = kura_alpm::history::load(Path::new(kura_alpm::history::JOURNAL));
-        let conf = kura_alpm::load_config();
-        let prepared = match (journal, conf) {
-            (Ok(journal), Ok(conf)) => {
-                let generation = journal.generation(target);
-                match (kura_alpm::restore::plan(&journal, target), generation) {
-                    (Some(plan), Some(generation)) if !plan.steps.is_empty() => {
-                        match kura_alpm::restore::sources(&conf.cache_dir, &plan, &generation) {
-                            Ok(_) => {
-                                let apps = kura_alpm::apps(&conf).unwrap_or_default();
-                                let when = present::when(l, generation.created, kura_alpm::background::now());
-                                Ok((
-                                    plan.clone(),
-                                    preview_groups(l, &plan, &apps).to_string(),
-                                    l.msg_args("undo-title", &[("id", target.into()), ("when", when.into())]),
-                                ))
-                            }
-                            Err(problems) => Err(problems
-                                .iter()
-                                .map(|p| kura_helper::text::problem(l, p))
-                                .collect::<Vec<_>>()
-                                .join("\n")),
-                        }
-                    }
-                    (Some(_), Some(_)) => Err(l.msg("undo-nothing")),
-                    _ => Err(l.msg_args("undo-unknown", &[("id", target.into())])),
-                }
-            }
-            (Err(e), _) | (_, Err(e)) => {
-                Err(l.msg_args("error-database", &[("reason", e.to_string().into())]))
-            }
-        };
-        let limits = l.msg("undo-limits");
-        match prepared {
-            Ok((plan, preview, title)) => {
-                let label = self.localizer.msg("gui-go-back");
-                self.as_mut().set_preview_title(QString::from(&title));
-                self.as_mut().set_action_label(QString::from(&label));
-                self.as_mut().set_preview_json(QString::from(&preview));
-                self.as_mut().set_news_json(QString::from("[]"));
-                self.as_mut().set_summary_text(QString::from(&limits));
-                self.as_mut().set_progress_text(QString::default());
-                self.as_mut().set_message(QString::default());
-                self.as_mut().set_can_install(true);
-                self.as_mut().rust_mut().pending = Some(plan);
-            }
-            Err(text) => {
-                self.as_mut().set_preview_json(QString::from("[]"));
-                self.as_mut().set_can_install(false);
-                self.as_mut().set_message(QString::from(&text));
-            }
-        }
+        let title = self.localizer.msg("gui-go-back");
+        let label = self.localizer.msg("gui-go-back");
+        self.start_preview(move || prepare_restore_preview(target), &title, &label);
     }
 
     fn install_update(mut self: Pin<&mut Self>) {
