@@ -360,13 +360,7 @@ fn prepare_preview(request: &Request) -> Result<Prepared, String> {
     } else {
         json!([])
     };
-    let solved = repair.map(|r| {
-        format!(
-            "{}\n{}",
-            l.msg_args("solver-found", &[("count", r.remove.len().into())]),
-            l.msg("solver-tested")
-        )
-    });
+    let solved = repair.map(|r| kura_helper::text::repair(&l, &r));
     // AUR updates come after the repository update, in their own preview.
     let aur_ready = if matches!(request, Request::Update) {
         aur_ready(&conf)

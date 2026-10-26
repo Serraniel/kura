@@ -24,8 +24,8 @@ pub struct Unsatisfied {
 pub struct Repair {
     /// Packages to remove together with the update.
     pub remove: Vec<String>,
-    /// The rule that found it, for the details view and problem reports.
-    pub rule: &'static str,
+    /// The rule or flow that found it, for the details view and problem reports.
+    pub rule: String,
 }
 
 /// `target` and every installed package that needs it, directly or indirectly.
@@ -69,13 +69,17 @@ pub fn stale_chain(problems: &[Unsatisfied], set: &PackageSet) -> Option<Repair>
     }
     Some(Repair {
         remove: remove.into_iter().map(str::to_owned).collect(),
-        rule: "stale-chain",
+        rule: "stale-chain".into(),
     })
 }
 
-/// All rules, in order of preference. The first proposal wins.
-pub fn propose(problems: &[Unsatisfied], set: &PackageSet) -> Option<Repair> {
-    stale_chain(problems, set)
+/// Flows for known cases first, then the built-in rules. The first
+/// proposal wins.
+pub fn propose(problems: &[Unsatisfied], set: &PackageSet, flows: &[crate::flows::Flow]) -> Option<Repair> {
+    flows
+        .iter()
+        .find_map(|f| crate::flows::propose(f, problems, set))
+        .or_else(|| stale_chain(problems, set))
 }
 
 #[cfg(test)]
@@ -114,7 +118,7 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>(),
         );
-        let repair = propose(&problem(), &set).unwrap();
+        let repair = propose(&problem(), &set, &[]).unwrap();
         assert_eq!(repair.remove, ["lib32-audit", "lib32-libcap", "lib32-pam"]);
         assert_eq!(repair.rule, "stale-chain");
     }
@@ -122,7 +126,7 @@ mod tests {
     #[test]
     fn keeps_chains_an_app_needs() {
         // steam needs lib32-libcap, so removing the chain would break an app.
-        assert_eq!(propose(&problem(), &cachyos()), None);
+        assert_eq!(propose(&problem(), &cachyos(), &[]), None);
     }
 
     #[test]
@@ -138,12 +142,12 @@ mod tests {
             target: "lib32-audit".into(),
             dependency: "nothing>=1".into(),
         }];
-        assert_eq!(propose(&unknown_dep, &set), None);
+        assert_eq!(propose(&unknown_dep, &set, &[]), None);
         let unknown_target = vec![Unsatisfied {
             target: "ghost".into(),
             dependency: "audit".into(),
         }];
-        assert_eq!(propose(&unknown_target, &set), None);
-        assert_eq!(propose(&[], &set), None);
+        assert_eq!(propose(&unknown_target, &set, &[]), None);
+        assert_eq!(propose(&[], &set, &[]), None);
     }
 }

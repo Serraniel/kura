@@ -83,6 +83,24 @@ pub fn event(l: &Localizer, event: &Event) -> String {
     }
 }
 
+/// What kura says about a repair it found and tested: the flow's own
+/// explanation when a flow found it.
+pub fn repair(l: &Localizer, repair: &kura_core::solver::Repair) -> String {
+    let mut out = l.msg_args("solver-found", &[("count", repair.remove.len().into())]);
+    let lang = l.language();
+    if let Some(flow) = kura_alpm::prepare::load_flows()
+        .into_iter()
+        .find(|f| f.id == repair.rule)
+    {
+        out = format!(
+            "{}\n{}",
+            flow.name.get(&[lang.as_str()]),
+            flow.description.get(&[lang.as_str()])
+        );
+    }
+    format!("{out}\n{}", l.msg("solver-tested"))
+}
+
 /// What to tell the user about a reply. `Changed` asks for a new review.
 pub fn reply(l: &Localizer, reply: &Reply) -> String {
     match reply {
