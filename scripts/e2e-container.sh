@@ -24,6 +24,12 @@ polkit.addRule(function (action, subject) {
 });
 RULES
 
+# D-Bus starts kura-helper through its setuid launch helper. Some container
+# images lose the setuid bit or the group; set them like the dbus package does.
+ls -l /usr/lib/dbus-daemon-launch-helper
+chown root:dbus /usr/lib/dbus-daemon-launch-helper
+chmod 4750 /usr/lib/dbus-daemon-launch-helper
+
 mkdir -p /run/dbus
 dbus-daemon --system --fork
 /usr/lib/polkit-1/polkitd --no-debug &
