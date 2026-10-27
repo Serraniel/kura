@@ -348,6 +348,10 @@ fn progress_printer(l: &Localizer) -> impl FnMut(Event) + '_ {
     let mut seen = BTreeSet::new();
     let mut tracker = kura_core::progress::Tracker::default();
     move |event| {
+        // Raw program output stays in the window's details panel.
+        if matches!(event, Event::Output { .. }) {
+            return;
+        }
         let line = kura_helper::text::event(l, &event);
         if seen.insert(line.clone()) {
             clear_status();

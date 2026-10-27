@@ -372,7 +372,7 @@ fn trial_then_apply(
 ) -> Result<(), ApplyError> {
     if kura_alpm::aur::settings().trial_runs {
         let _ = events.send(Event::Trial);
-        match kura_helper::trial::run(plan) {
+        match kura_helper::trial::run(plan, events) {
             kura_helper::trial::Outcome::Passed => {}
             kura_helper::trial::Outcome::Failed(reason) => return Err(ApplyError::TrialFailed(reason)),
             kura_helper::trial::Outcome::Skipped(why) => eprintln!("kura: no trial run: {why}"),

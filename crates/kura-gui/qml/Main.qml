@@ -88,6 +88,13 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    Timer {
+        interval: 200
+        repeat: true
+        running: kura.showLog
+        onTriggered: kura.flushLog()
+    }
+
     Shortcut {
         sequence: "F4"
         onActivated: kura.toggleLog()

@@ -14,10 +14,8 @@ use kura_alpm::apply::{ApplyError, Event};
 use kura_core::action::Action;
 use kura_core::plan::{Plan, PlanKind, Step};
 
-fn run_program(program: &str, args: &[&str]) -> Result<(), String> {
-    let out = Command::new(program)
-        .args(args)
-        .output()
+fn run_program(events: &Sender<Event>, program: &str, args: &[&str]) -> Result<(), String> {
+    let out = crate::console::run(Command::new(program).args(args), "", events)
         .map_err(|e| format!("{program}: {e}"))?;
     if out.status.success() {
         Ok(())
@@ -33,10 +31,10 @@ fn run_program(program: &str, args: &[&str]) -> Result<(), String> {
 const PACMAN_CONF: &str = "/etc/pacman.conf";
 
 /// Makes the boot loader start `kernel` by default.
-fn set_default_kernel(kernel: &str) -> Result<(), String> {
+fn set_default_kernel(kernel: &str, events: &Sender<Event>) -> Result<(), String> {
     let grub_cfg = fs::read_to_string("/boot/grub/grub.cfg").unwrap_or_default();
     if let Some(id) = kura_core::kernels::grub_entry_id(&grub_cfg, kernel) {
-        return run_program("grub-set-default", &[&id]);
+        return run_program(events, "grub-set-default", &[&id]);
     }
     let entries: Vec<(String, String)> = ["/boot", "/efi", "/boot/efi"]
         .iter()
@@ -55,7 +53,7 @@ fn set_default_kernel(kernel: &str) -> Result<(), String> {
         .collect();
     let entry = kura_core::kernels::sdboot_entry(&entries, kernel)
         .ok_or_else(|| format!("no boot entry for {kernel}"))?;
-    run_program("bootctl", &["set-default", &format!("{entry}.conf")])
+    run_program(events, "bootctl", &["set-default", &format!("{entry}.conf")])
 }
 
 /// Changes `pacman.conf` after keeping a copy of the old file next to it.
@@ -78,13 +76,19 @@ fn edit_pacman_conf(change: impl FnOnce(&str) -> String) -> Result<(), String> {
 /// Runs one action on the real system.
 pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(), String> {
     match action {
-        Action::Enable { unit } => run_program("systemctl", &["enable", "--now", unit]),
-        Action::SnapperRootConfig { keep_mount } => snapper_config("root", Path::new("/"), *keep_mount),
-        Action::TrustKey { key, keyserver } => {
-            run_program("pacman-key", &["--recv-keys", key, "--keyserver", keyserver])?;
-            run_program("pacman-key", &["--lsign-key", key])
+        Action::Enable { unit } => run_program(events, "systemctl", &["enable", "--now", unit]),
+        Action::SnapperRootConfig { keep_mount } => {
+            snapper_config("root", Path::new("/"), *keep_mount, events)
         }
-        Action::ForgetKey { key } => run_program("pacman-key", &["--delete", key]),
+        Action::TrustKey { key, keyserver } => {
+            run_program(
+                events,
+                "pacman-key",
+                &["--recv-keys", key, "--keyserver", keyserver],
+            )?;
+            run_program(events, "pacman-key", &["--lsign-key", key])
+        }
+        Action::ForgetKey { key } => run_program(events, "pacman-key", &["--delete", key]),
         Action::InstallFrom { urls } => {
             kura_alpm::apply::install_urls(conf, urls, events).map_err(|e| e.to_string())
         }
@@ -100,9 +104,9 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
         Action::InstallFromRepo { repo, packages } => {
             kura_alpm::apply::install_from_repo(repo, packages, events).map_err(|e| e.to_string())
         }
-        Action::RegenerateGrub => run_program("grub-mkconfig", &["-o", "/boot/grub/grub.cfg"]),
-        Action::SetDefaultKernel { kernel } => set_default_kernel(kernel),
-        Action::AddUserToGroup { user, group } => run_program("gpasswd", &["-a", user, group]),
+        Action::RegenerateGrub => run_program(events, "grub-mkconfig", &["-o", "/boot/grub/grub.cfg"]),
+        Action::SetDefaultKernel { kernel } => set_default_kernel(kernel, events),
+        Action::AddUserToGroup { user, group } => run_program(events, "gpasswd", &["-a", user, group]),
         Action::SetArchitecture { value } => {
             edit_pacman_conf(|c| kura_core::pacman_conf::set_option(c, "Architecture", value))
         }
@@ -116,9 +120,20 @@ pub fn run(action: &Action, conf: &Config, events: &Sender<Event>) -> Result<(),
 /// taken away for a moment, snapper's subvolume is replaced by the empty
 /// mount point again and the same mount comes back. The mount is restored
 /// even when snapper fails.
-pub fn snapper_config(name: &str, path: &Path, keep_mount: bool) -> Result<(), String> {
+pub fn snapper_config(
+    name: &str,
+    path: &Path,
+    keep_mount: bool,
+    events: &Sender<Event>,
+) -> Result<(), String> {
     let path_str = path.to_str().ok_or("path is not UTF-8")?;
-    let create = || run_program("snapper", &["--no-dbus", "-c", name, "create-config", path_str]);
+    let create = || {
+        run_program(
+            events,
+            "snapper",
+            &["--no-dbus", "-c", name, "create-config", path_str],
+        )
+    };
     if !keep_mount {
         return create();
     }
@@ -128,18 +143,19 @@ pub fn snapper_config(name: &str, path: &Path, keep_mount: bool) -> Result<(), S
     let mount = kura_core::snapshots::mount_entry(&mounts, dir_str)
         .ok_or_else(|| format!("{dir_str} is not mounted"))?;
 
-    run_program("umount", &[dir_str])?;
+    run_program(events, "umount", &[dir_str])?;
     let result = (|| {
         // Only an empty mount point can be removed; anything else stops here.
         fs::remove_dir(&dir).map_err(|e| format!("{dir_str}: {e}"))?;
         create()?;
-        run_program("btrfs", &["subvolume", "delete", dir_str])?;
+        run_program(events, "btrfs", &["subvolume", "delete", dir_str])?;
         Ok::<(), String>(())
     })();
     if !dir.exists() {
         fs::create_dir(&dir).map_err(|e| format!("{dir_str}: {e}"))?;
     }
     run_program(
+        events,
         "mount",
         &["-t", &mount.fs, "-o", &mount.options, &mount.device, dir_str],
     )?;
