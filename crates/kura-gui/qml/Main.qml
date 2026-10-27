@@ -64,42 +64,68 @@ Kirigami.ApplicationWindow {
                 text: kura.tr("nav-settings")
                 icon.name: "settings-configure"
                 onTriggered: root.show(settingsPage)
-            },
-            Kirigami.Action {
-                text: kura.tr("gui-log")
-                icon.name: "utilities-terminal"
-                checkable: true
-                checked: kura.showLog
-                shortcut: "F4"
-                onTriggered: kura.toggleLog()
             }
         ]
     }
 
-    // The details panel: a read-only record of what kura does, like
-    // Dolphin's terminal panel. It takes room from the pages, never grows
-    // the window.
-    footer: ColumnLayout {
-        visible: kura.showLog
+    // A moving bar with a caption, shown while kura reads in the background.
+    component LoadingBar: ColumnLayout {
+        property bool running
+        property alias text: caption.text
+        visible: running
         spacing: 0
-        Kirigami.Separator {
+        Controls.ProgressBar {
+            indeterminate: true
             Layout.fillWidth: true
         }
-        Controls.ScrollView {
+        Controls.Label {
+            id: caption
+            color: Kirigami.Theme.disabledTextColor
+            font: Kirigami.Theme.smallFont
+            elide: Text.ElideRight
             Layout.fillWidth: true
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 8
-            Controls.TextArea {
-                id: logArea
-                text: kura.logText.length > 0 ? kura.logText : kura.tr("gui-log-empty")
-                readOnly: true
-                selectByMouse: true
-                wrapMode: Text.NoWrap
-                font.family: "monospace"
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                background: Rectangle {
-                    color: Kirigami.Theme.backgroundColor
+            Layout.margins: Kirigami.Units.smallSpacing
+        }
+    }
+
+    Shortcut {
+        sequence: "F4"
+        onActivated: kura.toggleLog()
+    }
+
+    // The details panel: a read-only record of what kura does, like
+    // Dolphin's terminal panel. It takes room from the pages, never grows
+    // the window. Kirigami reserves the footer's height even when it is
+    // hidden and moves it left by the sidebar width, so the footer has no
+    // height while closed and the panel puts itself back at the left edge.
+    footer: Item {
+        id: logPanel
+        visible: kura.showLog
+        height: kura.showLog ? logColumn.implicitHeight : 0
+        ColumnLayout {
+            id: logColumn
+            x: -logPanel.x
+            width: root.width
+            spacing: 0
+            Kirigami.Separator {
+                Layout.fillWidth: true
+            }
+            Controls.ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 8
+                Controls.TextArea {
+                    id: logArea
+                    text: kura.logText.length > 0 ? kura.logText : kura.tr("gui-log-empty")
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: Text.NoWrap
+                    font.family: "monospace"
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    background: Rectangle {
+                        color: Kirigami.Theme.backgroundColor
+                    }
+                    onTextChanged: cursorPosition = length
                 }
-                onTextChanged: cursorPosition = length
             }
         }
     }
@@ -151,9 +177,9 @@ Kirigami.ApplicationWindow {
             title: kura.tr("nav-overview")
 
             // Shown while kura reads in the background; the page stays usable.
-            header: Controls.ProgressBar {
-                indeterminate: true
-                visible: kura.refreshing
+            header: LoadingBar {
+                running: kura.refreshing
+                text: kura.tr("gui-loading-status")
             }
 
             ColumnLayout {
@@ -381,9 +407,9 @@ Kirigami.ApplicationWindow {
             title: kura.tr("nav-history")
 
             // Shown while kura reads in the background; the page stays usable.
-            header: Controls.ProgressBar {
-                indeterminate: true
-                visible: kura.refreshing
+            header: LoadingBar {
+                running: kura.refreshing
+                text: kura.tr("gui-loading-status")
             }
             property var records: JSON.parse(kura.historyJson)
 
@@ -528,9 +554,9 @@ Kirigami.ApplicationWindow {
             title: kura.tr("nav-health")
 
             // Shown while kura reads in the background; the page stays usable.
-            header: Controls.ProgressBar {
-                indeterminate: true
-                visible: kura.healthLoading
+            header: LoadingBar {
+                running: kura.healthLoading
+                text: kura.tr("gui-loading-health")
             }
             property var health: JSON.parse(kura.healthJson)
 
@@ -662,6 +688,21 @@ Kirigami.ApplicationWindow {
                 }
                 Controls.Label {
                     text: kura.tr("gui-auto-security-hint")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                }
+                Controls.Switch {
+                    Kirigami.FormData.label: kura.tr("gui-log") + ":"
+                    checked: kura.showLog
+                    onToggled: kura.toggleLog()
+                }
+                Controls.Label {
+                    text: kura.tr("gui-log-hint")
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
                     Layout.maximumWidth: Kirigami.Units.gridUnit * 25

@@ -156,10 +156,6 @@ impl PackageSet {
 
     /// Packages that directly depend on `name` (through any name it provides).
     pub fn required_by(&self, name: &str) -> BTreeSet<&str> {
-        self.dependants(name, false)
-    }
-
-    fn dependants(&self, name: &str, include_optional: bool) -> BTreeSet<&str> {
         let Some(target) = self.packages.get(name) else {
             return BTreeSet::new();
         };
@@ -168,15 +164,7 @@ impl PackageSet {
         self.packages
             .values()
             .filter(|p| p.name != name)
-            .filter(|p| {
-                let req = p.depends.iter().map(|d| dep_name(d));
-                let opt = p.optdepends.iter().map(|d| optdep_name(d));
-                if include_optional {
-                    req.chain(opt).any(|d| names.contains(d))
-                } else {
-                    req.into_iter().any(|d| names.contains(d))
-                }
-            })
+            .filter(|p| p.depends.iter().any(|d| names.contains(dep_name(d))))
             .map(|p| p.name.as_str())
             .collect()
     }
@@ -184,21 +172,44 @@ impl PackageSet {
     /// Dependencies that nothing needs any more, including packages that only
     /// such orphans needed. Optional dependencies of installed packages are kept.
     pub fn orphans(&self) -> BTreeSet<&str> {
-        let mut removed: BTreeSet<&str> = BTreeSet::new();
-        loop {
-            let next: Vec<&str> = self
-                .packages
-                .values()
-                .filter(|p| p.reason == InstallReason::Dependency)
-                .filter(|p| !removed.contains(p.name.as_str()))
-                .filter(|p| self.dependants(&p.name, true).iter().all(|d| removed.contains(d)))
-                .map(|p| p.name.as_str())
-                .collect();
-            if next.is_empty() {
-                return removed;
+        // Who needs each package, built once: asking `dependants` for every
+        // package in every round takes minutes on a full desktop.
+        let mut needed_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for p in self.packages.values() {
+            let deps = p.depends.iter().map(|d| dep_name(d));
+            let opt = p.optdepends.iter().map(|d| optdep_name(d));
+            for dep in deps.chain(opt) {
+                for target in self.providers.get(dep).into_iter().flatten() {
+                    if *target != p.name {
+                        needed_by.entry(target).or_default().insert(&p.name);
+                    }
+                }
             }
-            removed.extend(next);
         }
+        let unneeded = |name: &str, removed: &BTreeSet<&str>| {
+            self.packages
+                .get(name)
+                .is_some_and(|p| p.reason == InstallReason::Dependency)
+                && needed_by
+                    .get(name)
+                    .is_none_or(|by| by.iter().all(|d| removed.contains(d)))
+        };
+        // Removing a package can only free what it depends on: look at those again.
+        let mut removed: BTreeSet<&str> = BTreeSet::new();
+        let mut queue: VecDeque<&str> = self.packages.keys().map(String::as_str).collect();
+        while let Some(name) = queue.pop_front() {
+            if removed.contains(name) || !unneeded(name, &removed) {
+                continue;
+            }
+            removed.insert(name);
+            let p = &self.packages[name];
+            let deps = p.depends.iter().map(|d| dep_name(d));
+            let opt = p.optdepends.iter().map(|d| optdep_name(d));
+            for dep in deps.chain(opt) {
+                queue.extend(self.providers.get(dep).into_iter().flatten().map(String::as_str));
+            }
+        }
+        removed
     }
 
     /// Explicitly installed packages that need `name`, directly or indirectly.
@@ -285,6 +296,20 @@ mod tests {
             s.orphans().into_iter().collect::<Vec<_>>(),
             ["c-ares", "electron36"]
         );
+    }
+
+    #[test]
+    fn orphans_of_a_full_desktop_are_quick() {
+        // A long chain of unneeded dependencies: the old way took minutes.
+        let list: Vec<_> = (0..1000)
+            .map(|i| {
+                InstalledPackage::new(format!("lib{i}"), "1-1", InstallReason::Dependency)
+                    .with_depends([format!("lib{}", i + 1)])
+            })
+            .collect();
+        let start = std::time::Instant::now();
+        assert_eq!(PackageSet::new(list).orphans().len(), 1000);
+        assert!(start.elapsed() < std::time::Duration::from_secs(5));
     }
 
     #[test]
