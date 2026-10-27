@@ -9,6 +9,7 @@
 
 pub mod actions;
 pub mod aur;
+pub mod console;
 pub mod report;
 pub mod text;
 pub mod trial;

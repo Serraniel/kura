@@ -22,7 +22,7 @@ fn keeps_the_existing_snapshots_mount() {
     let before = std::fs::read_to_string("/proc/mounts").unwrap();
     let before = kura_core::snapshots::mount_entry(&before, target).expect("mounted before");
 
-    kura_helper::actions::snapper_config("kuratest", root, true).unwrap();
+    kura_helper::actions::snapper_config("kuratest", root, true, &std::sync::mpsc::channel().0).unwrap();
 
     let after = std::fs::read_to_string("/proc/mounts").unwrap();
     let after = kura_core::snapshots::mount_entry(&after, target).expect("mounted after");

@@ -81,6 +81,8 @@ pub fn event(l: &Localizer, event: &Event) -> String {
         Event::Hook { name, .. } => l.msg_args("apply-hook", &[("name", name.clone().into())]),
         Event::CleaningUp => l.msg("apply-cleanup"),
         Event::UpdatingKeyring => l.msg("apply-keyring"),
+        // Raw output stays as the program printed it.
+        Event::Output { line } => line.clone(),
     }
 }
 

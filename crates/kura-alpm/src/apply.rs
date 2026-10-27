@@ -10,7 +10,7 @@
 use std::collections::BTreeSet;
 use std::sync::mpsc::Sender;
 
-use alpm::{Alpm, AnyEvent, CommitData, Event as AlpmEvent, Progress, Question};
+use alpm::{Alpm, AnyEvent, CommitData, Event as AlpmEvent, LogLevel, Progress, Question};
 use kura_core::plan::{Plan, RemovalReason, Step};
 
 use crate::prepare::{Problem, Request, available_upgrades, build, flags};
@@ -52,6 +52,9 @@ pub enum Event {
         current: usize,
         total: usize,
     },
+    /// A raw line for the details panel: a command kura runs, what it
+    /// prints, or what libalpm, install scripts and hooks print.
+    Output { line: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -261,13 +264,37 @@ fn install_callbacks(handle: &Alpm, plan: &Plan, events: &Sender<Event>) {
 
     let tx = events.clone();
     handle.set_event_cb(tx, |event: AnyEvent, tx: &mut Sender<Event>| {
-        if let AlpmEvent::HookRunStart(h) = event.event() {
-            let _ = tx.send(Event::Hook {
-                name: h.name().to_owned(),
-                current: h.position(),
-                total: h.total(),
-            });
+        match event.event() {
+            AlpmEvent::HookRunStart(h) => {
+                let _ = tx.send(Event::Hook {
+                    name: h.name().to_owned(),
+                    current: h.position(),
+                    total: h.total(),
+                });
+            }
+            // What install scripts and hooks print, line by line.
+            AlpmEvent::ScriptletInfo(s) => {
+                let _ = tx.send(Event::Output {
+                    line: s.line().trim_end().to_owned(),
+                });
+            }
+            _ => {}
         }
+    });
+
+    // Warnings and errors as pacman prints them.
+    let tx = events.clone();
+    handle.set_log_cb(tx, |level: LogLevel, message: &str, tx: &mut Sender<Event>| {
+        let prefix = if level.contains(LogLevel::ERROR) {
+            "error: "
+        } else if level.contains(LogLevel::WARNING) {
+            "warning: "
+        } else {
+            return;
+        };
+        let _ = tx.send(Event::Output {
+            line: format!("{prefix}{}", message.trim_end()),
+        });
     });
 }
 

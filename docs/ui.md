@@ -12,9 +12,13 @@ goes through the translation files.
 - Colours, fonts and icons come from the desktop theme. kura sets none,
   except its own logo, which is built in so it shows even without the
   installed icon.
-- Bottom, opt-in (F4 or "Show details"): a read-only panel with what kura
-  does, line by line, like Dolphin's terminal panel. It takes room from the
-  page; the window does not grow. The choice is remembered.
+- Bottom, opt-in (F4 or "Show details" in Settings): a read-only panel like
+  Dolphin's terminal panel. Each step kura takes has a time in front. Below
+  it, indented, comes the raw output: every program the helper runs as
+  `$ command`, everything it prints, and what libalpm, install scripts and
+  hooks print. AUR builds mark their lines with the package base, because
+  several build at once. The panel takes room from the page; the window
+  does not grow. The choice is remembered.
 
 ## Pages
 

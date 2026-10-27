@@ -40,29 +40,29 @@ fn tail(log: &[u8]) -> String {
 }
 
 /// Builds one package base in the sandbox and returns the package files.
-pub fn build(build: &AurBuild, threads: usize) -> Result<Vec<PathBuf>, String> {
+/// Everything the build prints goes to `events`, marked with the base.
+pub fn build(build: &AurBuild, threads: usize, events: &Sender<Event>) -> Result<Vec<PathBuf>, String> {
     checked(build)?;
-    let out = Command::new("systemd-run")
-        .args([
-            "--wait",
-            "--pipe",
-            "--collect",
-            "--quiet",
-            "--property=DynamicUser=yes",
-            "--property=StateDirectory=kura-build",
-            "--property=ProtectHome=yes",
-            "--property=PrivateTmp=yes",
-            "--property=NoNewPrivileges=yes",
-            &format!("--setenv=MAKEFLAGS=-j{threads}"),
-            &format!("--setenv=HOME={BUILD_ROOT}"),
-            "--",
-            HELPER,
-            "build",
-            &build.base,
-            &build.commit,
-        ])
-        .stdin(Stdio::null())
-        .output()
+    let mut cmd = Command::new("systemd-run");
+    cmd.args([
+        "--wait",
+        "--pipe",
+        "--collect",
+        "--quiet",
+        "--property=DynamicUser=yes",
+        "--property=StateDirectory=kura-build",
+        "--property=ProtectHome=yes",
+        "--property=PrivateTmp=yes",
+        "--property=NoNewPrivileges=yes",
+        &format!("--setenv=MAKEFLAGS=-j{threads}"),
+        &format!("--setenv=HOME={BUILD_ROOT}"),
+        "--",
+        HELPER,
+        "build",
+        &build.base,
+        &build.commit,
+    ]);
+    let out = crate::console::run(&mut cmd, &format!("[{}] ", build.base), events)
         .map_err(|e| format!("systemd-run: {e}"))?;
     if !out.status.success() {
         return Err(format!("{}:\n{}", build.base, tail(&out.stderr)));
@@ -87,6 +87,8 @@ pub fn build(build: &AurBuild, threads: usize) -> Result<Vec<PathBuf>, String> {
 }
 
 fn run(program: &str, args: &[&str], dir: &Path, env: &[(&str, &Path)]) -> Result<(), String> {
+    // The helper outside shows this line and all output in the details panel.
+    eprintln!("$ {program} {}", args.join(" "));
     // makepkg talks on stdout; stdout is reserved for the list of files.
     let status = Command::new(program)
         .args(args)
@@ -319,8 +321,9 @@ fn build_all(
                 });
                 let tx = tx.clone();
                 let threads = jobs.threads_each;
+                let events = events.clone();
                 std::thread::spawn(move || {
-                    let result = self::build(&build, threads);
+                    let result = self::build(&build, threads, &events);
                     let _ = tx.send((build.base, result));
                 });
             }
