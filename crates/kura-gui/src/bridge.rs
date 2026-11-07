@@ -34,7 +34,6 @@ pub mod qobject {
         #[qproperty(f64, progress_value, cxx_name = "progressValue")]
         #[qproperty(QString, progress_detail, cxx_name = "progressDetail")]
         // The details panel: what kura did, line by line, and whether it shows.
-        #[qproperty(QString, log_text, cxx_name = "logText")]
         #[qproperty(bool, show_log, cxx_name = "showLog")]
         // Status and history, and the health page, are being read.
         #[qproperty(bool, refreshing)]
@@ -161,6 +160,11 @@ pub mod qobject {
         fn listen_for_show(self: Pin<&mut Kura>);
 
         // Another start of kura wants this window to come forward.
+        /// New lines for the details panel, which keeps them itself.
+        #[qsignal]
+        #[cxx_name = "logAdded"]
+        fn log_added(self: Pin<&mut Kura>, lines: &QString);
+
         #[qsignal]
         #[cxx_name = "showRequested"]
         fn show_requested(self: Pin<&mut Kura>, updates: bool);
@@ -224,13 +228,11 @@ pub struct KuraRust {
     progress_text: QString,
     progress_value: f64,
     progress_detail: QString,
-    log_text: QString,
     show_log: bool,
     refreshing: bool,
     health_loading: bool,
     log: Vec<String>,
     /// Lines were added since the panel text was last built.
-    log_dirty: bool,
     preview_json: QString,
     news_json: QString,
     summary_text: QString,
@@ -270,7 +272,6 @@ impl Default for KuraRust {
             progress_text: QString::default(),
             progress_value: -1.0,
             progress_detail: QString::default(),
-            log_text: QString::default(),
             show_log: read_settings()
                 .get("log_panel")
                 .and_then(Value::as_bool)
@@ -278,7 +279,6 @@ impl Default for KuraRust {
             refreshing: false,
             health_loading: false,
             log: Vec::new(),
-            log_dirty: false,
             preview_json: QString::from("[]"),
             news_json: QString::from("[]"),
             summary_text: QString::default(),
@@ -531,16 +531,6 @@ fn seconds() -> f64 {
         .map_or(0.0, |d| d.as_secs_f64())
 }
 
-/// Lines the details panel keeps.
-const LOG_KEEP: usize = 5000;
-
-/// Drops the oldest lines once there are twice as many as the panel keeps.
-fn trim(log: &mut Vec<String>) {
-    if log.len() > 2 * LOG_KEEP {
-        log.drain(..log.len() - LOG_KEEP);
-    }
-}
-
 /// Shows download progress of a preview while it is prepared.
 fn forward_progress(
     rx: std::sync::mpsc::Receiver<kura_alpm::apply::Event>,
@@ -573,7 +563,8 @@ fn forward_progress(
 fn apply_progress(events: cxx_qt::CxxQtThread<qobject::Kura>) -> impl FnMut(kura_alpm::apply::Event) {
     let l = Localizer::from_env();
     let mut tracker = kura_core::progress::Tracker::default();
-    let mut last_line = String::new();
+    // Parallel downloads take turns reporting, so a line can come back.
+    let mut seen = BTreeSet::new();
     move |event| {
         if let kura_alpm::apply::Event::Output { line } = event {
             let _ = events.queue(move |mut this| this.as_mut().append_output(&line));
@@ -584,8 +575,7 @@ fn apply_progress(events: cxx_qt::CxxQtThread<qobject::Kura>) -> impl FnMut(kura
         kura_helper::text::track(&mut tracker, &event, now);
         let value = tracker.fraction().unwrap_or(-1.0);
         let detail = kura_helper::text::progress(&l, &tracker, now);
-        let fresh = last_line != line;
-        last_line.clone_from(&line);
+        let fresh = seen.insert(line.clone());
         let _ = events.queue(move |mut this| {
             this.as_mut().set_progress_text(QString::from(&line));
             this.as_mut().set_progress_value(value);
@@ -1401,26 +1391,21 @@ impl qobject::Kura {
     }
 
     fn flush_log(mut self: Pin<&mut Self>) {
-        if !self.log_dirty {
+        if self.log.is_empty() {
             return;
         }
-        let text = {
-            let mut rust = self.as_mut().rust_mut();
-            rust.log_dirty = false;
-            let extra = rust.log.len().saturating_sub(LOG_KEEP);
-            rust.log.drain(..extra);
-            rust.log.join("\n")
-        };
-        self.as_mut().set_log_text(QString::from(&text));
+        let lines = std::mem::take(&mut self.as_mut().rust_mut().log).join(
+            "
+",
+        );
+        self.as_mut().log_added(&QString::from(&lines));
     }
 
     /// Adds a raw line (a command or what it printed) to the details
     /// panel, indented below the step it belongs to.
     fn append_output(mut self: Pin<&mut Self>, line: &str) {
         let mut rust = self.as_mut().rust_mut();
-        rust.log.push(format!("          {line}"));
-        rust.log_dirty = true;
-        trim(&mut rust.log);
+        rust.log.push(line.to_owned());
     }
 
     /// Adds a line with the time to the details panel.
@@ -1436,10 +1421,8 @@ impl qobject::Kura {
         let stamp = format!("{:02}:{:02}:{:02}", t / 3600, t / 60 % 60, t % 60);
         let mut rust = self.as_mut().rust_mut();
         for part in line.lines() {
-            rust.log.push(format!("{stamp}  {part}"));
+            rust.log.push(format!("# {stamp}  {part}"));
         }
-        rust.log_dirty = true;
-        trim(&mut rust.log);
     }
 
     fn set_tray_monochrome(mut self: Pin<&mut Self>, on: bool) {
