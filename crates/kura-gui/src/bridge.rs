@@ -1016,10 +1016,23 @@ impl qobject::Kura {
         });
     }
 
-    fn prepare_update(self: Pin<&mut Self>) {
+    fn prepare_update(mut self: Pin<&mut Self>) {
+        // Coming back to the page keeps the preview that is ready.
+        let ready = self
+            .pending
+            .as_ref()
+            .is_some_and(|plan| plan.kind == kura_core::plan::PlanKind::SystemUpdate);
+        if ready && *self.can_install() {
+            return;
+        }
         let title = self.localizer.msg("nav-updates");
         let label = self.localizer.msg("gui-install");
-        self.start_preview(|| prepare_preview(&Request::Update), &title, &label);
+        // The result of the last change stays readable above the new preview.
+        let (message, failed) = (self.message().clone(), *self.failed());
+        self.as_mut()
+            .start_preview(|| prepare_preview(&Request::Update), &title, &label);
+        self.as_mut().set_message(message);
+        self.as_mut().set_failed(failed);
     }
 
     fn prepare_install(self: Pin<&mut Self>, names: &QString) {
@@ -1278,6 +1291,8 @@ impl qobject::Kura {
         };
         self.as_mut().set_busy(true);
         self.as_mut().set_can_install(false);
+        self.as_mut().set_message(QString::default());
+        self.as_mut().set_failed(false);
         let qt = self.qt_thread();
         // Apps a repair removed come back right after the update.
         let again: Vec<String> = plan

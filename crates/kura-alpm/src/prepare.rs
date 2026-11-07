@@ -124,6 +124,10 @@ fn prepare_workdir(real_dbpath: &str, workdir: &Path) -> Result<(), Error> {
         let _ = fs::remove_file(&local);
         std::os::unix::fs::symlink(&target, &local).map_err(io(&local))?;
     }
+    // Copies from older versions carry the date of the copy, so they may be
+    // out of date and still look new. They are replaced once.
+    let marker = workdir.join(TIMES_KEPT);
+    let untrusted = !marker.exists();
     if let Ok(entries) = fs::read_dir(Path::new(real_dbpath).join("sync")) {
         for entry in entries.flatten() {
             let from = entry.path();
@@ -132,12 +136,23 @@ fn prepare_workdir(real_dbpath: &str, workdir: &Path) -> Result<(), Error> {
             }
             let to = sync.join(entry.file_name());
             let modified = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
-            if modified(&to) < modified(&from) {
-                fs::copy(&from, &to).map_err(io(&to))?;
+            if untrusted || modified(&to) < modified(&from) {
+                copy_with_date(&from, &to).map_err(io(&to))?;
             }
         }
     }
-    Ok(())
+    fs::write(&marker, "").map_err(io(&marker))
+}
+
+/// Marks a private database copy whose files keep the date of the original.
+const TIMES_KEPT: &str = "times-kept";
+
+/// Copies a database with its date. libalpm asks the mirror for anything newer
+/// than that date, so with the date of the copy, it would miss newer databases.
+fn copy_with_date(from: &Path, to: &Path) -> std::io::Result<()> {
+    fs::copy(from, to)?;
+    let date = fs::metadata(from)?.modified()?;
+    fs::File::options().write(true).open(to)?.set_modified(date)
 }
 
 /// Opens a handle for a preview. With `workdir`, a private database copy is
@@ -587,5 +602,67 @@ mod tests {
         // A second run keeps the link and does not fail.
         prepare_workdir(real.to_str().unwrap(), &work).unwrap();
         fs::remove_dir_all(base).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod workdir_tests {
+    use std::time::{Duration, SystemTime};
+
+    use super::*;
+
+    fn dated(path: &Path, content: &str, date: SystemTime) {
+        fs::write(path, content).unwrap();
+        fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(date)
+            .unwrap();
+    }
+
+    /// A real database dir and a private work dir, with one database each.
+    fn setup(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let base = std::env::temp_dir().join(format!("kura-workdir-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let (real, work) = (base.join("real"), base.join("work"));
+        fs::create_dir_all(real.join("sync")).unwrap();
+        fs::create_dir_all(work.join("sync")).unwrap();
+        (real, work)
+    }
+
+    fn date(hour: u64) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000 + hour * 3600)
+    }
+
+    #[test]
+    fn a_copy_keeps_the_date_of_the_original() {
+        let (real, work) = setup("date");
+        dated(&real.join("sync/eos.db"), "new", date(1));
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        let copy = work.join("sync/eos.db");
+        assert_eq!(fs::read_to_string(&copy).unwrap(), "new");
+        assert_eq!(fs::metadata(&copy).unwrap().modified().unwrap(), date(1));
+    }
+
+    #[test]
+    fn an_old_copy_that_only_looks_new_is_replaced_once() {
+        let (real, work) = setup("old-copy");
+        dated(&real.join("sync/eos.db"), "new", date(1));
+        // Copied by an older version: old content with the later date of the copy.
+        dated(&work.join("sync/eos.db"), "old", date(2));
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        assert_eq!(fs::read_to_string(work.join("sync/eos.db")).unwrap(), "new");
+    }
+
+    #[test]
+    fn a_newer_download_is_not_overwritten() {
+        let (real, work) = setup("newer");
+        dated(&real.join("sync/eos.db"), "old", date(1));
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        // The preview found a newer database than the real one.
+        dated(&work.join("sync/eos.db"), "newer", date(2));
+        prepare_workdir(real.to_str().unwrap(), &work).unwrap();
+        assert_eq!(fs::read_to_string(work.join("sync/eos.db")).unwrap(), "newer");
     }
 }

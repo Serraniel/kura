@@ -213,6 +213,7 @@ error-write = { $path } konnte nicht geschrieben werden: { $reason }
 
 nav-overview = Übersicht
 nav-updates = Updates
+nav-updates-busy = Updates – läuft…
 gui-review = Ansehen und installieren
 gui-check-now = Jetzt nach Updates suchen
 gui-install = Installieren
