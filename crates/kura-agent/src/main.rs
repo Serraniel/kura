@@ -15,41 +15,64 @@ use std::time::{Duration, SystemTime};
 use kura_core::status::{State, Status};
 use kura_i18n::Localizer;
 use zbus::object_server::SignalEmitter;
-use zbus::zvariant::{OwnedObjectPath, Value};
+use zbus::zvariant::{OwnedObjectPath, OwnedValue, Structure, Value};
 
 const POLL: Duration = Duration::from_secs(30);
 
 /// What the tray shows for a status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Look {
-    /// `StatusNotifierItem` status: `Passive`, `Active` or `NeedsAttention`.
+    /// `StatusNotifierItem` status: `Passive` or `Active`. Never
+    /// `NeedsAttention`: desktops let such an icon pulse. The badge says it.
     status: &'static str,
     icon: String,
     tooltip: String,
+    /// Second tooltip line: updates next to something more important.
+    detail: String,
+}
+
+/// The icon name: the logo with badges for what is going on.
+fn icon_name(status: &Status, monochrome: bool) -> String {
+    let warning = if !status.security.is_empty() {
+        "-security"
+    } else if status.blocked || !status.news.is_empty() || status.aur_rebuild > 0 {
+        "-attention"
+    } else {
+        ""
+    };
+    let updates = if status.updates + status.aur_updates > 0 {
+        "-updates"
+    } else {
+        ""
+    };
+    let symbolic = if monochrome { "-symbolic" } else { "" };
+    format!("kura{warning}{updates}{symbolic}")
 }
 
 fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
-    let icon = if monochrome { "kura-symbolic" } else { "kura" };
+    let updates = || {
+        l.msg_args(
+            "tray-updates",
+            &[("count", (status.updates + status.aur_updates).into())],
+        )
+    };
     let (sni, title) = match status.state() {
         State::Security => (
-            "NeedsAttention",
+            "Active",
             kura_i18n::present::security_headline(l, &status.security),
         ),
-        State::NeedsAttention => ("NeedsAttention", l.msg("tray-attention")),
-        State::UpdatesReady => (
-            "Active",
-            l.msg_args(
-                "tray-updates",
-                &[("count", (status.updates + status.aur_updates).into())],
-            ),
-        ),
+        State::NeedsAttention => ("Active", l.msg("tray-attention")),
+        State::UpdatesReady => ("Active", updates()),
         State::UpToDate => ("Passive", l.msg("tray-uptodate")),
         State::Unknown => ("Passive", l.msg("tray-unknown")),
     };
+    let more = matches!(status.state(), State::Security | State::NeedsAttention)
+        && status.updates + status.aur_updates > 0;
     Look {
         status: sni,
-        icon: icon.to_owned(),
+        icon: icon_name(status, monochrome),
         tooltip: title,
+        detail: if more { updates() } else { String::new() },
     }
 }
 
@@ -128,8 +151,15 @@ fn read_settings() -> Settings {
         .unwrap_or_default()
 }
 
-fn open_window() {
-    let _ = std::process::Command::new("kura-gui").spawn();
+/// Opens the window, or brings it forward when it is open already.
+fn open_window(updates: bool) {
+    let mut gui = std::process::Command::new("kura-gui");
+    if updates {
+        gui.arg("--updates");
+    }
+    if let Ok(mut child) = gui.spawn() {
+        std::thread::spawn(move || child.wait());
+    }
 }
 
 struct Item {
@@ -173,7 +203,7 @@ impl Item {
     }
     #[zbus(property)]
     fn menu(&self) -> OwnedObjectPath {
-        OwnedObjectPath::try_from("/NO_DBUSMENU").expect("valid path")
+        OwnedObjectPath::try_from(MENU_PATH).expect("valid path")
     }
     #[zbus(property)]
     fn tool_tip(&self) -> ToolTip {
@@ -181,21 +211,21 @@ impl Item {
             self.look.icon.clone(),
             Vec::new(),
             self.look.tooltip.clone(),
-            String::new(),
+            self.look.detail.clone(),
         )
     }
 
     fn activate(&self, x: i32, y: i32) {
         let _ = (x, y);
-        open_window();
+        open_window(false);
     }
     fn secondary_activate(&self, x: i32, y: i32) {
         let _ = (x, y);
-        open_window();
+        open_window(false);
     }
     fn context_menu(&self, x: i32, y: i32) {
         let _ = (x, y);
-        open_window();
+        open_window(false);
     }
     fn scroll(&self, delta: i32, orientation: &str) {
         let _ = (delta, orientation);
@@ -212,6 +242,164 @@ impl Item {
 }
 
 const ITEM_PATH: &str = "/StatusNotifierItem";
+const MENU_PATH: &str = "/MenuBar";
+
+const MENU_STATUS: i32 = 1;
+const MENU_OPEN: i32 = 2;
+const MENU_CHECK: i32 = 3;
+const MENU_SEPARATOR: i32 = 4;
+const MENU_QUIT: i32 = 5;
+
+type Properties = HashMap<String, OwnedValue>;
+/// Id, properties and children of a menu entry.
+type MenuNode = (i32, Properties, Vec<OwnedValue>);
+
+/// A menu entry's properties.
+fn entry(pairs: &[(&str, Value<'_>)]) -> Properties {
+    pairs
+        .iter()
+        .filter_map(|(k, v)| Some(((*k).to_owned(), v.try_to_owned().ok()?)))
+        .collect()
+}
+
+/// The right-click menu of the tray icon, for `com.canonical.dbusmenu`.
+struct Menu {
+    /// The first line: what is going on right now.
+    status: String,
+    open: String,
+    check: String,
+    quit: String,
+    revision: u32,
+}
+
+impl Menu {
+    fn new(l: &Localizer, status: String) -> Self {
+        Self {
+            status,
+            open: l.msg("notify-open"),
+            check: l.msg("gui-check-now"),
+            quit: l.msg("tray-quit"),
+            revision: 1,
+        }
+    }
+
+    fn entries(&self) -> Vec<(i32, Properties)> {
+        let label = |text: &str| ("label", Value::from(text.replace('_', "__")));
+        vec![
+            (
+                MENU_STATUS,
+                entry(&[label(&self.status), ("enabled", Value::from(false))]),
+            ),
+            (MENU_OPEN, entry(&[label(&self.open)])),
+            (MENU_CHECK, entry(&[label(&self.check)])),
+            (MENU_SEPARATOR, entry(&[("type", Value::from("separator"))])),
+            (MENU_QUIT, entry(&[label(&self.quit)])),
+        ]
+    }
+
+    /// What a click on `id` does; false when the id does nothing.
+    fn clicked(id: i32) -> bool {
+        match id {
+            MENU_OPEN => open_window(false),
+            MENU_CHECK => open_window(true),
+            MENU_QUIT => std::process::exit(0),
+            _ => return false,
+        }
+        true
+    }
+}
+
+// D-Bus properties and methods always take `&self`, even for constant values,
+// and get their arguments by value, needed or not.
+#[allow(
+    clippy::unused_self,
+    clippy::unnecessary_literal_bound,
+    clippy::needless_pass_by_value
+)]
+#[zbus::interface(name = "com.canonical.dbusmenu")]
+impl Menu {
+    #[zbus(property)]
+    fn version(&self) -> u32 {
+        3
+    }
+    #[zbus(property)]
+    fn text_direction(&self) -> &str {
+        "ltr"
+    }
+    #[zbus(property)]
+    fn status(&self) -> &str {
+        "normal"
+    }
+    #[zbus(property)]
+    fn icon_theme_path(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The menu is flat, so every request gets the whole of it.
+    fn get_layout(
+        &self,
+        parent_id: i32,
+        recursion_depth: i32,
+        property_names: Vec<String>,
+    ) -> (u32, MenuNode) {
+        let _ = (parent_id, recursion_depth, property_names);
+        let children = self
+            .entries()
+            .into_iter()
+            .filter_map(|(id, properties)| {
+                let child: Value<'_> = Structure::from((id, properties, Vec::<OwnedValue>::new())).into();
+                child.try_to_owned().ok()
+            })
+            .collect();
+        let root = entry(&[("children-display", Value::from("submenu"))]);
+        (self.revision, (0, root, children))
+    }
+
+    fn get_group_properties(&self, ids: Vec<i32>, property_names: Vec<String>) -> Vec<(i32, Properties)> {
+        let _ = property_names;
+        self.entries()
+            .into_iter()
+            .filter(|(id, _)| ids.is_empty() || ids.contains(id))
+            .collect()
+    }
+
+    fn get_property(&self, id: i32, name: &str) -> zbus::fdo::Result<OwnedValue> {
+        self.entries()
+            .into_iter()
+            .find(|(entry, _)| *entry == id)
+            .and_then(|(_, mut properties)| properties.remove(name))
+            .ok_or_else(|| zbus::fdo::Error::InvalidArgs(format!("{id} {name}")))
+    }
+
+    fn event(&self, id: i32, event_id: &str, data: OwnedValue, timestamp: u32) {
+        let _ = (data, timestamp);
+        if event_id == "clicked" {
+            Self::clicked(id);
+        }
+    }
+
+    fn event_group(&self, events: Vec<(i32, String, OwnedValue, u32)>) -> Vec<i32> {
+        for (id, event_id, ..) in &events {
+            if event_id == "clicked" {
+                Self::clicked(*id);
+            }
+        }
+        Vec::new()
+    }
+
+    fn about_to_show(&self, id: i32) -> bool {
+        let _ = id;
+        false
+    }
+
+    fn about_to_show_group(&self, ids: Vec<i32>) -> (Vec<i32>, Vec<i32>) {
+        let _ = ids;
+        (Vec::new(), Vec::new())
+    }
+
+    #[zbus(signal)]
+    async fn layout_updated(emitter: &SignalEmitter<'_>, revision: u32, parent: i32) -> zbus::Result<()>;
+}
 
 /// Registers the item with the desktop's tray. Returns false without a tray.
 fn register(conn: &zbus::blocking::Connection, name: &str) -> bool {
@@ -281,7 +469,7 @@ fn watch_notification_clicks(conn: &zbus::blocking::Connection, sent: Sent) {
         for signal in signals {
             let clicked = signal.body().deserialize::<(u32, String)>();
             if clicked.is_ok_and(|(id, _)| sent.lock().is_ok_and(|s| s.contains(&id))) {
-                open_window();
+                open_window(false);
             }
         }
     });
@@ -301,9 +489,11 @@ fn main() -> Result<(), String> {
     let item = Item {
         look: look(&status, &l, settings.tray_monochrome),
     };
+    let menu = Menu::new(&l, look(&status, &l, settings.tray_monochrome).tooltip);
     let conn = zbus::blocking::connection::Builder::session()
         .and_then(|b| b.name(name.as_str()))
         .and_then(|b| b.serve_at(ITEM_PATH, item))
+        .and_then(|b| b.serve_at(MENU_PATH, menu))
         .and_then(zbus::blocking::connection::Builder::build)
         .map_err(|e| e.to_string())?;
     let has_tray = register(&conn, &name);
@@ -369,6 +559,15 @@ fn main() -> Result<(), String> {
             let _ = zbus::block_on(Item::new_tool_tip(emitter));
             let _ = zbus::block_on(Item::new_status(emitter, new_look.status));
         }
+        if has_tray && let Ok(iface) = conn.object_server().interface::<_, Menu>(MENU_PATH) {
+            let revision = {
+                let mut menu = iface.get_mut();
+                menu.status.clone_from(&new_look.tooltip);
+                menu.revision += 1;
+                menu.revision
+            };
+            let _ = zbus::block_on(Menu::layout_updated(iface.signal_emitter(), revision, 0));
+        }
     }
 }
 
@@ -411,8 +610,10 @@ mod tests {
         let shown = look(&s, &l, false);
         assert_eq!(
             (shown.status, shown.tooltip.as_str()),
-            ("NeedsAttention", "kdenlive has a known security problem")
+            ("Active", "kdenlive has a known security problem")
         );
+        assert_eq!(shown.icon, "kura-security-updates");
+        assert_eq!(shown.detail, "3 updates are ready");
         assert!(should_notify(&status(3, &["news"], false), &s));
         assert!(!should_notify(&s, &s.clone()));
     }
@@ -428,12 +629,33 @@ mod tests {
         let ready = look(&status(3, &[], false), &l, true);
         assert_eq!(
             (ready.status, ready.icon.as_str(), ready.tooltip.as_str()),
-            ("Active", "kura-symbolic", "3 updates are ready")
+            ("Active", "kura-updates-symbolic", "3 updates are ready")
         );
+        assert_eq!(ready.detail, "");
+        let attention = look(&status(3, &["news"], false), &l, false);
         assert_eq!(
-            look(&status(3, &["news"], false), &l, false).status,
-            "NeedsAttention"
+            (attention.status, attention.icon.as_str()),
+            ("Active", "kura-attention-updates")
         );
+        let calm = look(&status(0, &[], false), &l, true);
+        assert_eq!(calm.icon, "kura-symbolic");
+        assert_eq!(look(&status(0, &[], true), &l, false).icon, "kura-attention");
+    }
+
+    #[test]
+    fn menu_shows_the_status_and_its_actions() {
+        let menu = Menu::new(&en(), "a_b".to_owned());
+        let entries = menu.entries();
+        let ids: Vec<i32> = entries.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids,
+            [MENU_STATUS, MENU_OPEN, MENU_CHECK, MENU_SEPARATOR, MENU_QUIT]
+        );
+        let label = |i: usize| String::try_from(entries[i].1["label"].try_clone().unwrap()).unwrap();
+        // A single underscore would underline the next letter.
+        assert_eq!(label(0), "a__b");
+        assert_eq!(label(1), "Open kura");
+        assert!(!Menu::clicked(MENU_STATUS));
     }
 
     #[test]

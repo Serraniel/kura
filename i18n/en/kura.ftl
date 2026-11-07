@@ -143,6 +143,7 @@ tray-updates =
 tray-attention = An update needs your attention
 tray-unknown = kura has not looked for updates yet
 tray-open-hint = Click to open kura.
+tray-quit = Quit
 notify-updates-body = Open kura to see what changes before installing.
 notify-attention-body = Open kura to see what to do. Nothing has been changed.
 notify-open = Open kura

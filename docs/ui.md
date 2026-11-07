@@ -41,6 +41,13 @@ The overview and the tray show exactly one of these, most important first:
 4. Updates ready.
 5. Everything is up to date.
 
+The tray icon never pulses. It shows the logo with badges: a red warning sign
+for a security problem, an orange one when an update needs a step, a green
+arrow when updates are ready, and the warning sign and the arrow together when
+both apply. Right-clicking opens a menu with the status, "Open kura", "Look for
+updates now" and "Quit". kura has one window: opening it again brings it
+forward.
+
 ## Flows
 
 - **First start:** language taken from the desktop, mirrors ranked, system

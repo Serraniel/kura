@@ -150,6 +150,21 @@ pub mod qobject {
         #[cxx_name = "toggleLog"]
         fn toggle_log(self: Pin<&mut Kura>);
 
+        // Whether this start should open the updates page right away.
+        #[qinvokable]
+        #[cxx_name = "startOnUpdates"]
+        fn start_on_updates(self: &Kura) -> bool;
+
+        // Passes on requests from later starts as showRequested.
+        #[qinvokable]
+        #[cxx_name = "listenForShow"]
+        fn listen_for_show(self: Pin<&mut Kura>);
+
+        // Another start of kura wants this window to come forward.
+        #[qsignal]
+        #[cxx_name = "showRequested"]
+        fn show_requested(self: Pin<&mut Kura>, updates: bool);
+
         // Shows new lines in the details panel. Called by a timer, so fast
         // output does not rebuild the text for every line.
         #[qinvokable]
@@ -1351,6 +1366,23 @@ impl qobject::Kura {
         }
         self.as_mut().set_show_log(on);
         self.flush_log();
+    }
+
+    #[allow(clippy::unused_self)] // an invokable needs its object
+    fn start_on_updates(&self) -> bool {
+        crate::instance::wants_updates()
+    }
+
+    fn listen_for_show(self: Pin<&mut Self>) {
+        let Some(requests) = crate::instance::requests() else {
+            return;
+        };
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            for updates in requests {
+                let _ = qt.queue(move |this| this.show_requested(updates));
+            }
+        });
     }
 
     fn flush_log(mut self: Pin<&mut Self>) {
