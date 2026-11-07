@@ -33,7 +33,7 @@ struct Look {
 
 /// The icon name: the logo with badges for what is going on.
 fn icon_name(status: &Status, monochrome: bool) -> String {
-    let warning = if !status.security.is_empty() {
+    let warning = if status.security.iter().any(kura_core::security::Finding::urgent) {
         "-security"
     } else if status.blocked || !status.news.is_empty() || status.aur_rebuild > 0 {
         "-attention"
@@ -59,7 +59,7 @@ fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
     let (sni, title) = match status.state() {
         State::Security => (
             "Active",
-            kura_i18n::present::security_headline(l, &status.security),
+            kura_i18n::present::security_headline(l, &kura_core::security::urgent(&status.security)),
         ),
         State::NeedsAttention => ("Active", l.msg("tray-attention")),
         State::UpdatesReady => ("Active", updates()),
@@ -117,7 +117,12 @@ fn new_drivers(known: &[kura_core::drivers::Suggestion]) -> Vec<kura_core::drive
 
 /// Whether a change from `before` to `after` is worth a notification.
 fn should_notify(before: &Status, after: &Status) -> bool {
-    let advisories = |s: &Status| s.security.iter().map(|f| f.advisory.clone()).collect::<Vec<_>>();
+    let advisories = |s: &Status| {
+        kura_core::security::urgent(&s.security)
+            .into_iter()
+            .map(|f| f.advisory)
+            .collect::<Vec<_>>()
+    };
     match after.state() {
         State::Security => advisories(before) != advisories(after),
         State::NeedsAttention => before.state() != State::NeedsAttention || before.news != after.news,
@@ -616,6 +621,19 @@ mod tests {
         assert_eq!(shown.detail, "3 updates are ready");
         assert!(should_notify(&status(3, &["news"], false), &s));
         assert!(!should_notify(&s, &s.clone()));
+
+        // Low risk with no fix: no badge and no notification, until a fix exists.
+        let before = status(0, &[], false);
+        let mut calm = before.clone();
+        calm.security = s.security.clone();
+        calm.security[0].fixed = None;
+        calm.security[0].severity = kura_core::security::Severity::Low;
+        assert_eq!(look(&calm, &l, false).icon, "kura");
+        assert!(!should_notify(&before, &calm));
+        let mut fixable = calm.clone();
+        fixable.security[0].fixed = Some("2".into());
+        assert_eq!(look(&fixable, &l, false).icon, "kura-security");
+        assert!(should_notify(&calm, &fixable));
     }
 
     #[test]

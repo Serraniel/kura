@@ -77,6 +77,18 @@ impl Finding {
     pub fn has_fix(&self) -> bool {
         self.fixed.is_some()
     }
+
+    /// Worth a warning: the user can fix it now, or the risk is high. The
+    /// rest is listed calmly, because a warning that stays for months with
+    /// nothing to do teaches people to ignore warnings.
+    pub fn urgent(&self) -> bool {
+        self.has_fix() || self.severity >= Severity::High
+    }
+}
+
+/// The findings that warn the user.
+pub fn urgent(findings: &[Finding]) -> Vec<Finding> {
+    findings.iter().filter(|f| f.urgent()).cloned().collect()
 }
 
 /// The result of matching advisories against the installed packages.
@@ -206,6 +218,27 @@ pub fn auto_install(enabled: bool, status: &crate::status::Status, fixes: usize)
 mod tests {
     use super::*;
     use crate::package::{InstallReason, InstalledPackage};
+
+    #[test]
+    fn only_high_risk_or_fixable_findings_are_urgent() {
+        let finding = |severity, fixed: Option<&str>| Finding {
+            advisory: "AVG-1".into(),
+            package: "pass".into(),
+            installed: "1-1".into(),
+            fixed: fixed.map(str::to_owned),
+            severity,
+            kind: "kind".into(),
+            cves: Vec::new(),
+            apps: Vec::new(),
+        };
+        assert!(!finding(Severity::Low, None).urgent());
+        assert!(!finding(Severity::Medium, None).urgent());
+        assert!(finding(Severity::High, None).urgent());
+        assert!(finding(Severity::Critical, None).urgent());
+        assert!(finding(Severity::Low, Some("2-1")).urgent());
+        let all = [finding(Severity::Low, None), finding(Severity::High, None)];
+        assert_eq!(urgent(&all), [finding(Severity::High, None)]);
+    }
 
     const TRACKER: &str = r#"[
       {"name": "AVG-1", "packages": ["ffmpeg"], "status": "Fixed", "severity": "High",
