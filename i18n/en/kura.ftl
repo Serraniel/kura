@@ -162,6 +162,7 @@ security-more-apps =
        *[other] { $app } and { $count } other apps have a known security problem
     }
 security-system = The system has a known security problem
+security-apps-more = { $apps } and { $count } more
 security-fix = An update fixes it. Please install it soon.
 security-nofix = There is no fix yet. kura checks every day and tells you when there is one.
 security-none = No known security problems.

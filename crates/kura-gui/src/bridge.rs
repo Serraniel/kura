@@ -1532,11 +1532,7 @@ fn security_value(l: &Localizer, findings: &[kura_core::security::Finding]) -> V
         findings
             .iter()
             .map(|f| {
-                let who = if f.apps.is_empty() {
-                    l.msg("security-system")
-                } else {
-                    f.apps.join(", ")
-                };
+                let who = present::finding_apps(l, f);
                 let mut lines = vec![l.msg_args(
                     "security-detail",
                     &[
