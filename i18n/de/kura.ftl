@@ -119,6 +119,7 @@ apply-trial-skipped = Die Kopie ließ sich nicht verwenden. Dieses Update läuft
 apply-trial-failed = Das Update ist in einer Kopie des Systems fehlgeschlagen, daher hat kura nichts geändert. Grund: { $reason }
 apply-downloading = { $file } wird heruntergeladen
 apply-building = { $name } wird gebaut ({ $current }/{ $total })
+apply-still-building = { $name } wird noch gebaut: bisher { $minutes } Min., { $size } im Ordner
 apply-checking = Pakete werden geprüft …
 apply-installing = { $package } wird installiert ({ $current }/{ $total })
 apply-removing = { $package } wird entfernt ({ $current }/{ $total })

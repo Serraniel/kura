@@ -54,6 +54,8 @@ pub enum Event {
         current: usize,
         total: usize,
     },
+    /// A build is still running, for builds that print nothing for a long time.
+    StillBuilding { base: String, minutes: u64, bytes: u64 },
     /// A raw line for the details panel: a command kura runs, what it
     /// prints, or what libalpm, install scripts and hooks print.
     Output { line: String },

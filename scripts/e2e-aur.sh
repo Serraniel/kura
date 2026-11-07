@@ -42,6 +42,12 @@ pacman -Qi pfetch | grep -q "Explicitly installed"
 printf 'y\n' | kura install neofetch
 pacman -Q neofetch
 
+# A package compiled from source: its build runs programs it just made.
+printf 'y\n' | kura install dee
+pacman -Q dee
+# Build folders are gone afterwards, and the keyring stays.
+if ls -d /var/lib/private/kura-build/dee-*; then exit 1; fi
+
 # Nothing from the build sandbox stays readable to other users.
 test "$(stat -c %a /var/lib/private)" = 700
 

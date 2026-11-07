@@ -119,6 +119,7 @@ apply-trial-skipped = The copy could not be used, so this update runs without th
 apply-trial-failed = The update failed in a copy of the system, so kura changed nothing. Reason: { $reason }
 apply-downloading = Downloading { $file }
 apply-building = Building { $name } ({ $current }/{ $total })
+apply-still-building = Still building { $name }: { $minutes } min so far, { $size } in its folder
 apply-checking = Checking the packages…
 apply-installing = Installing { $package } ({ $current }/{ $total })
 apply-removing = Removing { $package } ({ $current }/{ $total })
