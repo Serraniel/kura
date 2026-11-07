@@ -150,8 +150,12 @@ pub fn inside() -> i32 {
     let _ = printer.join();
     match result {
         Ok(()) => 0,
-        // A changed plan is no failure of the update itself.
-        Err(kura_alpm::apply::ApplyError::Changed(_) | kura_alpm::apply::ApplyError::Locked) => 1,
+        // A changed plan is no failure of the update itself. The reason goes
+        // last, because the helper outside reports the last line.
+        Err(e @ (kura_alpm::apply::ApplyError::Changed(_) | kura_alpm::apply::ApplyError::Locked)) => {
+            eprintln!("{e}");
+            1
+        }
         Err(e) => {
             eprintln!("{e}");
             FAILED

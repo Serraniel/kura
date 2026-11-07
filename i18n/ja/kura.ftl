@@ -184,6 +184,7 @@ error-write = { $path } に書き込めませんでした: { $reason }
 
 nav-overview = 概要
 nav-updates = アップデート
+nav-updates-busy = アップデート – 実行中…
 gui-review = 確認してインストール
 gui-check-now = 今すぐアップデートを確認
 gui-install = インストール

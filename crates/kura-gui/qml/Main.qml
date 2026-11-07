@@ -55,7 +55,8 @@ Kirigami.ApplicationWindow {
                 onTriggered: { kura.refresh(); root.show(overviewPage) }
             },
             Kirigami.Action {
-                text: kura.tr("nav-updates")
+                // Work goes on while other pages are open, and this says so.
+                text: kura.tr(kura.busy ? "nav-updates-busy" : "nav-updates")
                 icon.name: "update-none"
                 onTriggered: { root.show(updatesPage); kura.prepareUpdate() }
             },

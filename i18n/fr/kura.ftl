@@ -226,6 +226,7 @@ error-write = Impossible d’écrire { $path } : { $reason }
 
 nav-overview = Vue d’ensemble
 nav-updates = Mises à jour
+nav-updates-busy = Mises à jour – en cours…
 gui-review = Voir et installer
 gui-check-now = Rechercher des mises à jour maintenant
 gui-install = Installer

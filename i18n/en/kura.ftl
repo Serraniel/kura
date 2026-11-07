@@ -213,6 +213,7 @@ error-write = Could not write { $path }: { $reason }
 
 nav-overview = Overview
 nav-updates = Updates
+nav-updates-busy = Updates – working…
 gui-review = Review and install
 gui-check-now = Look for updates now
 gui-install = Install

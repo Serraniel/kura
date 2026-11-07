@@ -243,6 +243,10 @@ impl Helper {
         // `forward` ends when `run` drops its sender.
         let (reply, ()) = futures_lite::future::zip(work, forward).await;
         self.busy.store(false, Ordering::Release);
+        match &reply {
+            Reply::Changed { .. } => eprintln!("kura: result: changed since the preview"),
+            other => eprintln!("kura: result: {other:?}"),
+        }
         reply
     }
 }
