@@ -63,8 +63,8 @@ into a single helper call so the user enters the password once per flow.
 
 - Default: download in the background, then ask. One click shows the preview.
 - Check interval is configurable. Default: weekly. Security checks: daily.
-- Security issues always produce a warning. Automatic installation of
-  security updates is an opt-in setting.
+- Security issues that concern the installed version always produce a
+  warning. Automatic installation of security updates is an opt-in setting.
 - Never do a partial upgrade (sync without upgrading everything). Background
   checks use a separate copy of the sync databases, like `checkupdates`.
 - Read Arch news before every update. If a news item concerns a package in
@@ -148,6 +148,11 @@ next update brings the new versions back, so going back is a temporary fix.
 - Data source for user-facing warnings: the Arch Security Tracker. Sources
   that do not map to Arch package names cleanly (OSV, NVD) appear only in the
   details panel, to avoid false alarms.
+- The tracker keeps reports open for years, often long after the problem is
+  fixed. kura warns when an update fixes a problem, or when the installed
+  version is the one the report names. An open report about an older version
+  only appears in a list in System health. The risk: if a newer version still
+  has the problem and the tracker was not updated, kura does not warn.
 - Warnings name the application the user knows (found by walking reverse
   dependencies up to explicitly installed packages, with names and icons from
   AppStream). System libraries are reported as "System". The vulnerable

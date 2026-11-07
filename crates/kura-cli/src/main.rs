@@ -1124,9 +1124,9 @@ fn security(l: &Localizer) -> Result<String, String> {
     let advisories =
         kura_alpm::background::fetch_advisories().ok_or_else(|| l.msg("security-unavailable"))?;
     let set = load(l)?;
-    let findings = kura_core::security::scan(&advisories, &set);
-    let mut out = kura_i18n::present::security_headline(l, &findings) + "\n";
-    for f in &findings {
+    let scan = kura_core::security::scan(&advisories, &set);
+    let mut out = kura_i18n::present::security_headline(l, &scan.findings) + "\n";
+    for f in &scan.findings {
         let _ = writeln!(
             out,
             "\n  {} ({})\n    {}",
@@ -1159,6 +1159,17 @@ fn security(l: &Localizer) -> Result<String, String> {
             }
         }
         let _ = writeln!(out, "    {} {}", f.advisory, f.cves.join(" "));
+    }
+    if !scan.older.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{}\n{}",
+            l.msg_args("security-older-title", &[("count", scan.older.len().into())]),
+            l.msg("security-older-hint")
+        );
+        for f in &scan.older {
+            let _ = writeln!(out, "  {}", kura_i18n::present::older_report(l, f));
+        }
     }
     Ok(out)
 }

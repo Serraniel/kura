@@ -1152,9 +1152,15 @@ impl qobject::Kura {
         self.as_mut().set_health_loading(true);
         let qt = self.qt_thread();
         std::thread::spawn(move || {
-            let value = kura_alpm::load_config()
+            let l = Localizer::from_env();
+            let mut value = kura_alpm::load_config()
                 .and_then(|conf| kura_alpm::system::collect(&conf))
-                .map_or_else(|_| json!({}), |info| health_value(&Localizer::from_env(), &info));
+                .map_or_else(|_| json!({}), |info| health_value(&l, &info));
+            let status = kura_alpm::background::read_status(Path::new(kura_alpm::background::STATUS));
+            value["older"] = json!({
+                "title": l.msg_args("security-older-title", &[("count", status.older_reports.len().into())]),
+                "lines": status.older_reports.iter().map(|f| present::older_report(&l, f)).collect::<Vec<_>>(),
+            });
             let _ = qt.queue(move |mut this| {
                 this.as_mut().set_health_json(QString::from(&value.to_string()));
                 this.as_mut().set_health_loading(false);
