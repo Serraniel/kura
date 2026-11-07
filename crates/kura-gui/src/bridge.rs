@@ -444,7 +444,10 @@ fn overview(l: &Localizer) -> Overview {
     let status = kura_alpm::background::read_status(Path::new(kura_alpm::background::STATUS));
     let now = kura_alpm::background::now();
     let (state, status_text) = match status.state() {
-        State::Security => (4, present::security_headline(l, &status.security)),
+        State::Security => (
+            4,
+            present::security_headline(l, &kura_core::security::urgent(&status.security)),
+        ),
         State::Unknown => (0, l.msg("tray-unknown")),
         State::UpToDate => (1, l.msg("tray-uptodate")),
         State::UpdatesReady => (
@@ -1526,9 +1529,11 @@ fn health_value(l: &Localizer, info: &kura_alpm::system::Info) -> Value {
 
 /// Security findings as cards, named by the apps that use the vulnerable part.
 fn security_value(l: &Localizer, findings: &[kura_core::security::Finding]) -> Value {
+    let (urgent, calm): (Vec<_>, Vec<_>) = findings.iter().partition(|f| f.urgent());
     Value::Array(
-        findings
-            .iter()
+        urgent
+            .into_iter()
+            .chain(calm)
             .map(|f| {
                 let who = present::finding_apps(l, f);
                 let mut lines = vec![l.msg_args(
@@ -1539,19 +1544,13 @@ fn security_value(l: &Localizer, findings: &[kura_core::security::Finding]) -> V
                         ("kind", f.kind.clone().into()),
                     ],
                 )];
-                lines.push(match &f.fixed {
-                    Some(v) => format!(
-                        "{} · {}",
-                        l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
-                        l.msg("security-fix")
-                    ),
-                    None => l.msg("security-nofix"),
-                });
+                lines.push(present::finding_advice(l, f));
                 lines.push(format!("{} {}", f.advisory, f.cves.join(" ")));
                 json!({
                     "title": format!("{who} ({})", present::severity(l, f.severity)),
                     "lines": lines,
                     "fixed": f.fixed.is_some(),
+                    "urgent": f.urgent(),
                 })
             })
             .collect(),

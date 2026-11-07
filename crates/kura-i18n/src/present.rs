@@ -76,6 +76,19 @@ pub fn is_build_tool(plan: &kura_core::plan::Plan, step: &Step) -> bool {
             if !plan.builds.iter().any(|b| b.packages.contains(name)))
 }
 
+/// What the user can do about a finding.
+pub fn finding_advice(l: &Localizer, f: &Finding) -> String {
+    match &f.fixed {
+        Some(v) => format!(
+            "{} · {}",
+            l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
+            l.msg("security-fix")
+        ),
+        None if f.urgent() => l.msg("security-nofix"),
+        None => l.msg("security-nofix-calm"),
+    }
+}
+
 /// One sentence naming what is affected, by the apps the user knows.
 pub fn security_headline(l: &Localizer, findings: &[Finding]) -> String {
     let apps = kura_core::security::affected_apps(findings);
@@ -307,6 +320,17 @@ mod tests {
             "1 updated, 1 removed (changed outside kura)"
         );
         assert_eq!(record_text(&l("ja"), &update), "更新 1 件、削除 1 件");
+    }
+
+    #[test]
+    fn advice_says_what_to_do() {
+        let en = Localizer::new(&[Locale::parse("en").unwrap()]);
+        let mut f = finding(&[], true);
+        assert!(finding_advice(&en, &f).starts_with("Fixed in 2"));
+        f.fixed = None;
+        assert!(finding_advice(&en, &f).starts_with("There is no fix yet"));
+        f.severity = Severity::Medium;
+        assert!(finding_advice(&en, &f).contains("do not need to do anything"));
     }
 
     fn finding(apps: &[&str], fixed: bool) -> Finding {

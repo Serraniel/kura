@@ -46,6 +46,10 @@ The overview and the tray show exactly one of these, most important first:
 4. Updates ready.
 5. Everything is up to date.
 
+A security problem with low or medium risk and no fix is not on this list. It
+appears on the overview as a calm note that says nothing needs to be done, with
+no badge and no notification. See [decisions.md](decisions.md).
+
 The tray icon never pulses. It shows the logo with badges: a red warning sign
 for a security problem, an orange one when an update needs a step, a green
 arrow when updates are ready, and the warning sign and the arrow together when

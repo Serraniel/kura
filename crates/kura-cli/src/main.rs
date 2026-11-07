@@ -1125,7 +1125,12 @@ fn security(l: &Localizer) -> Result<String, String> {
         kura_alpm::background::fetch_advisories().ok_or_else(|| l.msg("security-unavailable"))?;
     let set = load(l)?;
     let scan = kura_core::security::scan(&advisories, &set);
-    let mut out = kura_i18n::present::security_headline(l, &scan.findings) + "\n";
+    let urgent = kura_core::security::urgent(&scan.findings);
+    let mut out = if urgent.is_empty() && !scan.findings.is_empty() {
+        l.msg("security-only-calm")
+    } else {
+        kura_i18n::present::security_headline(l, &urgent)
+    } + "\n";
     for f in &scan.findings {
         let _ = writeln!(
             out,
@@ -1145,19 +1150,7 @@ fn security(l: &Localizer) -> Result<String, String> {
                 ]
             ),
         );
-        match &f.fixed {
-            Some(v) => {
-                let _ = writeln!(
-                    out,
-                    "    {} · {}",
-                    l.msg_args("security-fixed-in", &[("version", v.clone().into())]),
-                    l.msg("security-fix")
-                );
-            }
-            None => {
-                let _ = writeln!(out, "    {}", l.msg("security-nofix"));
-            }
-        }
+        let _ = writeln!(out, "    {}", kura_i18n::present::finding_advice(l, f));
         let _ = writeln!(out, "    {} {}", f.advisory, f.cves.join(" "));
     }
     if !scan.older.is_empty() {

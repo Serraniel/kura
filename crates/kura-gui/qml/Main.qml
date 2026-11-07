@@ -276,7 +276,7 @@ Kirigami.ApplicationWindow {
                     Kirigami.InlineMessage {
                         Layout.fillWidth: true
                         visible: true
-                        type: Kirigami.MessageType.Error
+                        type: modelData.urgent ? Kirigami.MessageType.Error : Kirigami.MessageType.Information
                         text: "<b>" + modelData.title + "</b><br>" + modelData.lines.join("<br>")
                     }
                 }

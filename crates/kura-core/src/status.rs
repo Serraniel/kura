@@ -94,7 +94,7 @@ impl Status {
     pub fn state(&self) -> State {
         if self.checked == 0 {
             State::Unknown
-        } else if !self.security.is_empty() {
+        } else if self.security.iter().any(Finding::urgent) {
             State::Security
         } else if self.blocked || !self.news.is_empty() || self.aur_rebuild > 0 {
             State::NeedsAttention
@@ -120,7 +120,7 @@ mod tests {
             package: package.into(),
             installed: installed.into(),
             fixed: None,
-            severity: Severity::Low,
+            severity: Severity::High,
             kind: "kind".into(),
             cves: Vec::new(),
             apps: Vec::new(),
@@ -201,6 +201,10 @@ mod tests {
             apps: vec!["kdenlive".into()],
         });
         assert_eq!(s.state(), State::Security);
+        // Low risk and no fix: no warning.
+        s.security[0].fixed = None;
+        s.security[0].severity = crate::security::Severity::Medium;
+        assert_eq!(s.state(), State::NeedsAttention);
     }
 
     #[test]
