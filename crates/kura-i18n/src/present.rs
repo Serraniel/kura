@@ -91,6 +91,25 @@ pub fn security_headline(l: &Localizer, findings: &[Finding]) -> String {
     }
 }
 
+/// Who a finding concerns, short enough for a banner: a library that nearly
+/// everything needs would otherwise list hundreds of apps.
+pub fn finding_apps(l: &Localizer, f: &Finding) -> String {
+    const SHOWN: usize = 3;
+    if f.apps.is_empty() {
+        return l.msg("security-system");
+    }
+    if f.apps.len() <= SHOWN {
+        return f.apps.join(", ");
+    }
+    l.msg_args(
+        "security-apps-more",
+        &[
+            ("apps", f.apps[..SHOWN].join(", ").into()),
+            ("count", (f.apps.len() - SHOWN).into()),
+        ],
+    )
+}
+
 /// One line for a report about an older version than the installed one.
 pub fn older_report(l: &Localizer, f: &Finding) -> String {
     let detail = l.msg_args(
@@ -396,6 +415,20 @@ mod tests {
             packages: vec!["amd-ucode".into()],
         };
         assert_eq!(driver(&l("de"), &m).0, "Prozessor-Korrekturen von AMD");
+    }
+
+    #[test]
+    fn long_app_lists_are_shortened() {
+        let en = l("en");
+        assert_eq!(
+            finding_apps(&en, &finding(&[], false)),
+            "The system has a known security problem"
+        );
+        assert_eq!(finding_apps(&en, &finding(&["a", "b", "c"], false)), "a, b, c");
+        assert_eq!(
+            finding_apps(&en, &finding(&["a", "b", "c", "d", "e"], false)),
+            "a, b, c and 2 more"
+        );
     }
 
     #[test]

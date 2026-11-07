@@ -137,6 +137,7 @@ notify-auto-security-body = 既知のセキュリティ問題 { $count } 件を�
 security-one-app = { $app } に既知のセキュリティ問題があります
 security-more-apps = { $app } とほかのアプリ { $count } 件に既知のセキュリティ問題があります
 security-system = システムに既知のセキュリティ問題があります
+security-apps-more = { $apps } ほか { $count } 件
 security-fix = アップデートで修正されます。早めにインストールしてください。
 security-nofix = まだ修正はありません。kura が毎日確認し、修正が出たらお知らせします。
 security-none = 既知のセキュリティ問題はありません。

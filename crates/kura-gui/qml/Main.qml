@@ -54,7 +54,7 @@ Kirigami.ApplicationWindow {
             Kirigami.Action {
                 text: kura.tr("nav-overview")
                 icon.name: "go-home"
-                onTriggered: root.show(overviewPage)
+                onTriggered: { kura.refresh(); root.show(overviewPage) }
             },
             Kirigami.Action {
                 text: kura.tr("nav-updates")
