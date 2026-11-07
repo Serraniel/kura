@@ -148,9 +148,9 @@ mod tests {
         assert_eq!(status.updates, 0);
         assert!(status.downloaded);
         assert!(!status.blocked);
-        assert!(status.news.is_empty());
+        assert_eq!(status.news, [] as [String; 0]);
         assert_eq!(status.security, [finding("same", "1-1")]);
-        assert!(status.older_reports.is_empty());
+        assert_eq!(status.older_reports, []);
         assert_eq!(status.state(), State::Security);
     }
 
