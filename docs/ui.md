@@ -13,12 +13,15 @@ goes through the translation files.
   except its own logo. The logo appears in the title bar and the tray, not
   again inside the window.
 - Bottom, opt-in (F4 or "Show details" in Settings): a read-only panel like
-  Dolphin's terminal panel. Each step kura takes has a time in front. Below
-  it, indented, comes the raw output: every program the helper runs as
-  `$ command`, everything it prints, and what libalpm, install scripts and
-  hooks print. AUR builds mark their lines with the package base, because
-  several build at once. The panel takes room from the page; the window
-  does not grow. The choice is remembered.
+  Dolphin's terminal panel. It reads like a shell session, line by line as
+  things happen: every program the helper runs as `$ command`, everything it
+  prints, and what libalpm, install scripts and hooks print. kura's own steps
+  are comments with a time, `# 15:54:14  Installing…`. Packages are installed
+  through libalpm, not by a command, so those steps have no `$` line. kura
+  does not show a command it did not run. AUR builds and trial runs mark
+  their lines, because they run beside other work. The view follows new lines
+  until the user scrolls up or selects text. The panel takes room from the
+  page; the window does not grow. The choice is remembered.
 
 ## Pages
 

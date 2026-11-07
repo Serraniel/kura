@@ -24,6 +24,7 @@ Kirigami.ApplicationWindow {
             refresh()
             listenForShow()
         }
+        onLogAdded: (lines) => logArea.add(lines)
         onShowRequested: (updates) => {
             root.visible = true
             root.raise()
@@ -106,7 +107,7 @@ Kirigami.ApplicationWindow {
     Timer {
         interval: 200
         repeat: true
-        running: kura.showLog
+        running: true
         onTriggered: kura.flushLog()
     }
 
@@ -115,7 +116,7 @@ Kirigami.ApplicationWindow {
         onActivated: kura.toggleLog()
     }
 
-    // The details panel: a read-only record of what kura does, like
+    // The details panel: a read-only console of what kura does, like
     // Dolphin's terminal panel. It takes room from the pages, never grows
     // the window. Kirigami reserves the footer's height even when it is
     // hidden and moves it left by the sidebar width, so the footer has no
@@ -133,11 +134,15 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
             }
             Controls.ScrollView {
+                id: logScroll
                 Layout.fillWidth: true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 8
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 12
+                Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
+                Kirigami.Theme.inherit: false
                 Controls.TextArea {
                     id: logArea
-                    text: kura.logText.length > 0 ? kura.logText : kura.tr("gui-log-empty")
+                    placeholderText: kura.tr("gui-log-empty")
+                    textFormat: TextEdit.PlainText
                     readOnly: true
                     selectByMouse: true
                     wrapMode: Text.NoWrap
@@ -146,7 +151,24 @@ Kirigami.ApplicationWindow {
                     background: Rectangle {
                         color: Kirigami.Theme.backgroundColor
                     }
-                    onTextChanged: cursorPosition = length
+
+                    // Follows new lines like a terminal. Scrolling up or
+                    // selecting text holds the view until the user is back
+                    // at the end.
+                    function add(lines) {
+                        const view = logScroll.contentItem
+                        const follow = view.atYEnd && selectedText.length === 0
+                        const y = view.contentY
+                        append(lines)
+                        if (lineCount > 10000) {
+                            remove(0, text.indexOf("\n", length / 2) + 1)
+                        }
+                        if (follow) {
+                            cursorPosition = length
+                        } else {
+                            view.contentY = y
+                        }
+                    }
                 }
             }
         }

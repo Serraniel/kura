@@ -139,9 +139,14 @@ pub fn inside() -> i32 {
     // Output lines go to stderr, where the helper outside shows them.
     let (events, received) = std::sync::mpsc::channel();
     let printer = std::thread::spawn(move || {
+        let l = kura_i18n::Localizer::from_env();
+        let mut seen = std::collections::BTreeSet::new();
         for event in received {
-            if let Event::Output { line } = event {
+            let line = crate::text::event(&l, &event);
+            if let Event::Output { .. } = event {
                 eprintln!("{line}");
+            } else if seen.insert(line.clone()) {
+                eprintln!("# {line}");
             }
         }
     });
