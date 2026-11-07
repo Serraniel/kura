@@ -46,6 +46,8 @@ pub enum Event {
     Configuring { action: kura_core::action::Action },
     /// The update runs in a throwaway snapshot first.
     Trial,
+    /// The throwaway snapshot could not be used; the update goes on without it.
+    TrialSkipped,
     /// An AUR package base is being built.
     Building {
         base: String,

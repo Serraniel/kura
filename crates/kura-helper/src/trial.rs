@@ -26,11 +26,12 @@ pub enum Outcome {
     Passed,
     /// The update failed in the snapshot, with the reason.
     Failed(String),
-    /// No trial was possible (not btrfs, no nspawn, …).
+    /// The trial could not be set up or did not finish.
     Skipped(String),
 }
 
-fn root_is_btrfs() -> bool {
+/// Trial runs need a snapshot of `/`, which only btrfs can make.
+pub fn possible() -> bool {
     kura_core::hardware::root_fs(&std::fs::read_to_string("/proc/mounts").unwrap_or_default()).as_deref()
         == Some("btrfs")
 }
@@ -50,9 +51,6 @@ fn quiet(events: &Sender<Event>, program: &str, args: &[&str]) -> Result<(), Str
 
 /// Runs `plan` in a snapshot of `/` and throws the snapshot away.
 pub fn run(plan: &Plan, events: &Sender<Event>) -> Outcome {
-    if !root_is_btrfs() {
-        return Outcome::Skipped("root is not btrfs".into());
-    }
     if Path::new(SNAPSHOT).exists() {
         let _ = quiet(events, "btrfs", &["subvolume", "delete", SNAPSHOT]);
     }
@@ -74,6 +72,11 @@ fn in_container(plan: &Plan, events: &Sender<Event>) -> Outcome {
     cmd.args([
         "--quiet",
         "--register=no",
+        // The snapshot has the machine id of the host, so its journal stays out.
+        "--link-journal=no",
+        // Package scripts run as they do on the real system. Without this,
+        // a future systemd limits them, and prints a note about it until then.
+        "--restrict-address-families=",
         "--as-pid2",
         "--pipe",
         &format!("--directory={SNAPSHOT}"),

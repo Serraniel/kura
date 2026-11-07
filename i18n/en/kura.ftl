@@ -115,6 +115,7 @@ progress-minutes = { $minutes ->
    *[other] about { $minutes } minutes left
 }
 apply-trial = Trying the update in a copy of the system first…
+apply-trial-skipped = The copy could not be used, so this update runs without the trial.
 apply-trial-failed = The update failed in a copy of the system, so kura changed nothing. Reason: { $reason }
 apply-downloading = Downloading { $file }
 apply-building = Building { $name } ({ $current }/{ $total })

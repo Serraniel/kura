@@ -128,6 +128,7 @@ progress-minutes = { $minutes ->
    *[other] environ { $minutes } minutes restantes
 }
 apply-trial = Essai de la mise à jour dans une copie du système…
+apply-trial-skipped = La copie n'a pas pu être utilisée : cette mise à jour se poursuit sans essai.
 apply-trial-failed = La mise à jour a échoué dans une copie du système, kura n'a donc rien modifié. Raison : { $reason }
 apply-downloading = Téléchargement de { $file }
 apply-building = Compilation de { $name } ({ $current }/{ $total })

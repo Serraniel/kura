@@ -53,6 +53,7 @@ pub fn event(l: &Localizer, event: &Event) -> String {
     match event {
         Event::Refreshing => l.msg("apply-refreshing"),
         Event::Trial => l.msg("apply-trial"),
+        Event::TrialSkipped => l.msg("apply-trial-skipped"),
         Event::Configuring { action } => kura_i18n::present::action(l, action),
         Event::Building { base, current, total } => l.msg_args(
             "apply-building",
