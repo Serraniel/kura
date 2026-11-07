@@ -38,5 +38,11 @@ for bundle in "$here"/../data/bundles/*.toml; do
 done
 install -Dm644 "$here/org.kura.app.desktop" "$dest/usr/share/applications/org.kura.app.desktop"
 install -Dm644 "$here/org.kura.agent.desktop" "$dest/etc/xdg/autostart/org.kura.agent.desktop"
-install -Dm644 "$here/icons/kura.svg" "$dest/usr/share/icons/hicolor/scalable/apps/kura.svg"
-install -Dm644 "$here/icons/kura-symbolic.svg" "$dest/usr/share/icons/hicolor/symbolic/apps/kura-symbolic.svg"
+for icon in "$here"/icons/*-symbolic.svg; do
+  install -Dm644 "$icon" "$dest/usr/share/icons/hicolor/symbolic/apps/$(basename "$icon")"
+done
+for icon in "$here"/icons/*.svg; do
+  case "$icon" in *-symbolic.svg) ;; *)
+    install -Dm644 "$icon" "$dest/usr/share/icons/hicolor/scalable/apps/$(basename "$icon")"
+  esac
+done

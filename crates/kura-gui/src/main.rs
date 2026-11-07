@@ -7,10 +7,14 @@
 #![allow(unsafe_code, clippy::unnecessary_box_returns)]
 
 mod bridge;
+mod instance;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QString, QUrl};
 
 fn main() {
+    if !instance::claim() {
+        return;
+    }
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();
 

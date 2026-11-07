@@ -20,13 +20,29 @@ Kirigami.ApplicationWindow {
 
     Kura {
         id: kura
-        Component.onCompleted: refresh()
+        Component.onCompleted: {
+            refresh()
+            listenForShow()
+        }
+        onShowRequested: (updates) => {
+            root.visible = true
+            root.raise()
+            root.requestActivate()
+            if (updates) root.openUpdates()
+        }
     }
 
     function show(page) {
         pageStack.clear()
         pageStack.push(page)
     }
+
+    function openUpdates() {
+        show(updatesPage)
+        kura.prepareUpdate()
+    }
+
+    Component.onCompleted: if (kura.startOnUpdates()) Qt.callLater(openUpdates)
 
     globalDrawer: Kirigami.GlobalDrawer {
         title: "kura"
