@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::package::PackageSet;
 use crate::security::Finding;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -70,6 +71,22 @@ pub enum State {
 }
 
 impl Status {
+    /// Brings the status up to date after packages changed, without asking
+    /// any server. A finding goes away when its version is no longer
+    /// installed. The next check finds it again if the new version has the
+    /// same problem.
+    pub fn after_change(&mut self, installed: &PackageSet, updates: usize) {
+        let current = |f: &Finding| installed.get(&f.package).is_some_and(|p| p.version == f.installed);
+        self.security.retain(current);
+        self.older_reports.retain(current);
+        self.updates = updates;
+        if updates == 0 {
+            self.downloaded = true;
+            self.blocked = false;
+            self.news.clear();
+        }
+    }
+
     pub fn state(&self) -> State {
         if self.checked == 0 {
             State::Unknown
@@ -88,6 +105,59 @@ impl Status {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_finished_update_clears_what_it_solved() {
+        use crate::package::{InstallReason, InstalledPackage};
+        use crate::security::Severity;
+
+        let finding = |package: &str, installed: &str| Finding {
+            advisory: "AVG-1".into(),
+            package: package.into(),
+            installed: installed.into(),
+            fixed: None,
+            severity: Severity::Low,
+            kind: "kind".into(),
+            cves: Vec::new(),
+            apps: Vec::new(),
+        };
+        let mut status = Status {
+            checked: 1,
+            updates: 8,
+            blocked: true,
+            news: vec!["news".into()],
+            security: vec![finding("same", "1-1"), finding("newer", "1-1"), finding("gone", "1-1")],
+            older_reports: vec![finding("gone", "1-1")],
+            ..Status::default()
+        };
+        let installed = PackageSet::new([
+            InstalledPackage::new("same", "1-1", InstallReason::Explicit),
+            InstalledPackage::new("newer", "2-1", InstallReason::Explicit),
+        ]);
+
+        status.after_change(&installed, 0);
+
+        assert_eq!(status.updates, 0);
+        assert!(status.downloaded);
+        assert!(!status.blocked);
+        assert!(status.news.is_empty());
+        assert_eq!(status.security, [finding("same", "1-1")]);
+        assert!(status.older_reports.is_empty());
+        assert_eq!(status.state(), State::Security);
+    }
+
+    #[test]
+    fn updates_still_waiting_keep_their_news() {
+        let mut status = Status {
+            checked: 1,
+            updates: 8,
+            news: vec!["news".into()],
+            ..Status::default()
+        };
+        status.after_change(&PackageSet::new([]), 2);
+        assert_eq!(status.updates, 2);
+        assert_eq!(status.news, ["news"]);
+    }
 
     #[test]
     fn state_follows_priority() {
