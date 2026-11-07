@@ -436,31 +436,34 @@ fn build_all(
         // The run cannot succeed any more, so nobody waits for the others.
         if failure.is_some() && !stopped {
             stopped = true;
-            for build in approved
-                .builds
-                .iter()
-                .filter(|b| started.contains(b.base.as_str()) && !finished.contains(&b.base))
-            {
-                let tag = format!("[{}] ", build.base);
-                let _ = crate::console::run(
-                    Command::new("systemctl").args(["stop", &unit(build)]),
-                    &tag,
-                    events,
-                );
-            }
+            stop_builds(
+                approved
+                    .builds
+                    .iter()
+                    .filter(|b| started.contains(b.base.as_str()) && !finished.contains(&b.base)),
+                events,
+            );
         }
     }
     remove_build_folders();
-    match failure {
-        Some(message) => {
-            // Build tools have no use after a failure either. Not being able
-            // to remove them must not hide why the build failed.
-            if let Err(e) = remove_build_tools(conf, approved, events) {
-                eprintln!("kura: {e}");
-            }
-            Err(ApplyError::Failed(message))
-        }
-        None => remove_build_tools(conf, approved, events),
+    // Left-over tools are no reason to report a failure: what the user asked
+    // for is installed or not, and the next update offers to clean them up.
+    if let Err(e) = remove_build_tools(conf, approved, events) {
+        let _ = events.send(Event::Output {
+            line: format!("kura: build tools not removed: {e}"),
+        });
+    }
+    failure.map_or(Ok(()), |message| Err(ApplyError::Failed(message)))
+}
+
+fn stop_builds<'a>(builds: impl Iterator<Item = &'a AurBuild>, events: &Sender<Event>) {
+    for build in builds {
+        let tag = format!("[{}] ", build.base);
+        let _ = crate::console::run(
+            Command::new("systemctl").args(["stop", &unit(build)]),
+            &tag,
+            events,
+        );
     }
 }
 
@@ -507,7 +510,6 @@ fn remove_build_tools(conf: &Config, approved: &Plan, events: &Sender<Event>) ->
         builds: Vec::new(),
     };
     kura_alpm::apply::apply(conf, &plan, events)
-        .map_err(|e| ApplyError::Failed(format!("removing build tools: {e}")))
 }
 
 #[cfg(test)]
