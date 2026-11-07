@@ -18,7 +18,9 @@ goes through the translation files.
   prints, and what libalpm, install scripts and hooks print. kura's own steps
   are comments with a time, `# 15:54:14  Installing…`. Packages are installed
   through libalpm, not by a command, so those steps have no `$` line. kura
-  does not show a command it did not run. AUR builds and trial runs mark
+  does not show a command it did not run. A build that takes long reports its
+  time and folder size every minute, because many programs print nothing
+  while they work. AUR builds and trial runs mark
   their lines, because they run beside other work. The view follows new lines
   until the user scrolls up or selects text. The panel takes room from the
   page; the window does not grow. The choice is remembered.

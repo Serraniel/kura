@@ -42,6 +42,13 @@ pacman -Qi pfetch | grep -q "Explicitly installed"
 printf 'y\n' | kura install neofetch
 pacman -Q neofetch
 
+# Packages compiled from source, in parallel: their builds run programs they
+# just made, and share the sandbox's folder.
+printf 'y\n' | kura install dee yay
+pacman -Q dee yay
+# Build folders are gone afterwards, and the keyring stays.
+if ls -d /var/lib/private/kura-build/dee-*; then exit 1; fi
+
 # Nothing from the build sandbox stays readable to other users.
 test "$(stat -c %a /var/lib/private)" = 700
 

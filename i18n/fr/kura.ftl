@@ -132,6 +132,7 @@ apply-trial-skipped = La copie n'a pas pu être utilisée : cette mise à jour s
 apply-trial-failed = La mise à jour a échoué dans une copie du système, kura n'a donc rien modifié. Raison : { $reason }
 apply-downloading = Téléchargement de { $file }
 apply-building = Compilation de { $name } ({ $current }/{ $total })
+apply-still-building = Compilation de { $name } toujours en cours : { $minutes } min, { $size } dans son dossier
 apply-checking = Vérification des paquets…
 apply-installing = Installation de { $package } ({ $current }/{ $total })
 apply-removing = Suppression de { $package } ({ $current }/{ $total })

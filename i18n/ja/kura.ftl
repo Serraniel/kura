@@ -105,6 +105,7 @@ apply-trial-skipped = コピーを使えなかったため、試行なしでこ�
 apply-trial-failed = システムのコピーでアップデートが失敗したため、kura は何も変更していません。理由: { $reason }
 apply-downloading = { $file } をダウンロードしています
 apply-building = { $name } をビルドしています ({ $current }/{ $total })
+apply-still-building = { $name } をビルドしています: { $minutes } 分経過、フォルダーのサイズは { $size }
 apply-checking = パッケージを確認しています…
 apply-installing = { $package } をインストールしています ({ $current }/{ $total })
 apply-removing = { $package } を削除しています ({ $current }/{ $total })

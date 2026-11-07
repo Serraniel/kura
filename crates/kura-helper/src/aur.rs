@@ -12,7 +12,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc::{self, RecvTimeoutError, Sender};
+use std::time::{Duration, Instant};
 
 use kura_alpm::Config;
 use kura_alpm::apply::{ApplyError, Event};
@@ -23,6 +24,63 @@ use kura_core::plan::{AurBuild, Plan, PlanKind, Step};
 /// Seen by root through systemd's symlink to `/var/lib/private/kura-build`.
 const BUILD_ROOT: &str = "/var/lib/kura-build";
 const HELPER: &str = "/usr/lib/kura/kura-helper";
+/// How often a running build says that it is still working.
+const STILL_RUNNING: Duration = Duration::from_secs(60);
+
+/// The sandbox of a build. The commit is plain hex, which a base need not be.
+fn unit(build: &AurBuild) -> String {
+    format!("kura-build-{}.service", build.commit)
+}
+
+/// Bytes below `path`, without following links.
+fn size_of(path: &Path) -> u64 {
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return 0;
+    };
+    if !meta.is_dir() {
+        return meta.len();
+    }
+    std::fs::read_dir(path).map_or(0, |entries| entries.flatten().map(|e| size_of(&e.path())).sum())
+}
+
+/// Reports time and folder size until `stop` is dropped: many programs print
+/// nothing while they download or compile, and a quiet build looks stuck.
+fn watch(build: &AurBuild, events: &Sender<Event>) -> (Sender<()>, std::thread::JoinHandle<()>) {
+    let (stop, stopped) = mpsc::channel::<()>();
+    let (base, dir, events) = (
+        build.base.clone(),
+        format!("{}-{}", build.base, build.commit),
+        events.clone(),
+    );
+    let watcher = std::thread::spawn(move || {
+        let started = Instant::now();
+        while matches!(
+            stopped.recv_timeout(STILL_RUNNING),
+            Err(RecvTimeoutError::Timeout)
+        ) {
+            let bytes = std::fs::canonicalize(BUILD_ROOT).map_or(0, |root| size_of(&root.join(&dir)));
+            let _ = events.send(Event::StillBuilding {
+                base: base.clone(),
+                minutes: started.elapsed().as_secs() / 60,
+                bytes,
+            });
+        }
+    });
+    (stop, watcher)
+}
+
+/// Removes everything builds left behind, except the keyring. Compiled
+/// sources can take many gigabytes.
+fn remove_build_folders() {
+    let Ok(entries) = std::fs::canonicalize(BUILD_ROOT).and_then(std::fs::read_dir) else {
+        return;
+    };
+    for entry in entries.flatten().filter(|e| e.file_name() != "gnupg") {
+        if let Err(e) = std::fs::remove_dir_all(entry.path()) {
+            eprintln!("kura: {} not removed: {e}", entry.path().display());
+        }
+    }
+}
 
 fn checked(build: &AurBuild) -> Result<(), String> {
     if aur::valid_base(&build.base) && aur::valid_commit(&build.commit) {
@@ -49,7 +107,12 @@ pub fn build(build: &AurBuild, threads: usize, events: &Sender<Event>) -> Result
         "--pipe",
         "--collect",
         "--quiet",
+        &format!("--unit={}", unit(build)),
         "--property=DynamicUser=yes",
+        // Builds share one folder, and systemd gives that folder to the user
+        // of each build that starts. With one user per build, they lock each
+        // other out when they run in parallel.
+        "--property=User=kura-build",
         "--property=StateDirectory=kura-build",
         "--property=ProtectHome=yes",
         "--property=PrivateTmp=yes",
@@ -62,8 +125,11 @@ pub fn build(build: &AurBuild, threads: usize, events: &Sender<Event>) -> Result
         &build.base,
         &build.commit,
     ]);
-    let out = crate::console::run(&mut cmd, &format!("[{}] ", build.base), events)
-        .map_err(|e| format!("systemd-run: {e}"))?;
+    let (stop, watcher) = watch(build, events);
+    let out = crate::console::run(&mut cmd, &format!("[{}] ", build.base), events);
+    drop(stop);
+    let _ = watcher.join();
+    let out = out.map_err(|e| format!("systemd-run: {e}"))?;
     if !out.status.success() {
         return Err(format!("{}:\n{}", build.base, tail(&out.stderr)));
     }
@@ -300,8 +366,10 @@ fn build_all(
     let (tx, rx) = mpsc::channel::<(String, Result<Vec<PathBuf>, String>)>();
     let mut started = BTreeSet::new();
     let mut done = BTreeSet::new();
+    let mut finished = BTreeSet::new();
     let mut running = 0usize;
     let mut failure: Option<String> = None;
+    let mut stopped = false;
 
     loop {
         if failure.is_none() {
@@ -333,6 +401,7 @@ fn build_all(
         }
         let Ok((base, result)) = rx.recv() else { break };
         running -= 1;
+        finished.insert(base.clone());
         match result {
             Ok(files) => {
                 let build = approved
@@ -359,15 +428,46 @@ fn build_all(
                     Ok(()) => {
                         done.insert(base);
                     }
-                    Err(e) => failure = Some(format!("{base}: {e}")),
+                    Err(e) => {
+                        failure.get_or_insert(format!("{base}: {e}"));
+                    }
                 }
             }
-            Err(e) => failure = Some(e),
+            Err(e) => {
+                failure.get_or_insert(e);
+            }
+        }
+        // The run cannot succeed any more, so nobody waits for the others.
+        if failure.is_some() && !stopped {
+            stopped = true;
+            stop_running(approved, &started, &finished, events);
         }
     }
-    match failure {
-        Some(message) => Err(ApplyError::Failed(message)),
-        None => remove_build_tools(conf, approved, events),
+    remove_build_folders();
+    // Left-over tools are no reason to report a failure: what the user asked
+    // for is installed or not, and the next update offers to clean them up.
+    if let Err(e) = remove_build_tools(conf, approved, events) {
+        let _ = events.send(Event::Output {
+            line: format!("kura: build tools not removed: {e}"),
+        });
+    }
+    failure.map_or(Ok(()), |message| Err(ApplyError::Failed(message)))
+}
+
+fn stop_running(
+    approved: &Plan,
+    started: &BTreeSet<String>,
+    finished: &BTreeSet<String>,
+    events: &Sender<Event>,
+) {
+    let running = |b: &&AurBuild| started.contains(&b.base) && !finished.contains(&b.base);
+    for build in approved.builds.iter().filter(running) {
+        let tag = format!("[{}] ", build.base);
+        let _ = crate::console::run(
+            Command::new("systemctl").args(["stop", &unit(build)]),
+            &tag,
+            events,
+        );
     }
 }
 
@@ -414,12 +514,24 @@ fn remove_build_tools(conf: &Config, approved: &Plan, events: &Sender<Event>) ->
         builds: Vec::new(),
     };
     kura_alpm::apply::apply(conf, &plan, events)
-        .map_err(|e| ApplyError::Failed(format!("removing build tools: {e}")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_folder_size_counts_files_below_it_but_not_links() {
+        let dir = std::env::temp_dir().join(format!("kura-size-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(dir.join("a"), [0; 10]).unwrap();
+        std::fs::write(dir.join("sub/b"), [0; 5]).unwrap();
+        std::os::unix::fs::symlink("/usr", dir.join("link")).unwrap();
+        let link = std::fs::symlink_metadata(dir.join("link")).unwrap().len();
+        assert_eq!(size_of(&dir), 15 + link);
+        assert_eq!(size_of(&dir.join("missing")), 0);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn names_from_package_files() {

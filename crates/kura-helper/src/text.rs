@@ -63,6 +63,14 @@ pub fn event(l: &Localizer, event: &Event) -> String {
                 ("total", (*total).into()),
             ],
         ),
+        Event::StillBuilding { base, minutes, bytes } => l.msg_args(
+            "apply-still-building",
+            &[
+                ("name", base.clone().into()),
+                ("minutes", (*minutes).into()),
+                ("size", l.size(*bytes).into()),
+            ],
+        ),
         Event::Downloading { file, .. } => l.msg_args("apply-downloading", &[("file", file.clone().into())]),
         Event::Progress {
             phase: Phase::Installing,
