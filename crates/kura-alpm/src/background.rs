@@ -151,6 +151,19 @@ pub fn check(
     Ok((status, plan))
 }
 
+/// Updates the status after packages changed, using only what is on this
+/// computer, so the tray and the window don't show the old state until the
+/// next check.
+pub fn refresh_after_change(conf: &Config, path: &Path) -> Result<(), Error> {
+    let mut status = read_status(path);
+    if status.checked == 0 {
+        return Ok(());
+    }
+    let updates = available_upgrades(&crate::handle(conf)?).len();
+    status.after_change(&crate::installed(conf)?, updates);
+    write_status(path, &status)
+}
+
 /// Writes the status atomically so readers never see half a file.
 pub fn write_status(path: &Path, status: &Status) -> Result<(), Error> {
     let io = |source| Error::Io {

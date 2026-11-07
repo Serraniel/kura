@@ -43,6 +43,10 @@ version=$(sed -n '/^%VERSION%$/{n;p}' "$db/desc")
 sed -i "/^%VERSION%$/{n;s/.*/0.1-1/}" "$db/desc"
 mv "$db" /var/lib/pacman/local/figlet-0.1-1
 
+# The tray reads this status. It knows about the waiting update…
+/usr/lib/kura/kura-helper check
+if grep -q '"updates":0' /var/lib/kura/status.json; then exit 1; fi
+
 since=$(date '+%F %T')
 printf 'y\ny\n' | kura update 2>&1 | tee /tmp/kura-update.log
 
@@ -58,5 +62,8 @@ fi
 # The real update ran after it, and the snapshot is gone.
 test "$(pacman -Q figlet)" = "figlet $version"
 test ! -e /var/lib/kura/trial
+# …and no longer shows it once it is installed.
+cat /var/lib/kura/status.json
+grep -q '"updates":0' /var/lib/kura/status.json
 
 echo "e2e-trial passed"

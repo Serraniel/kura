@@ -108,6 +108,16 @@ fn run(plan: &Plan, events: &mpsc::Sender<Event>, caller: Option<&str>) -> Reply
         _ => kura_alpm::apply::apply(&conf, plan, events),
     };
     let _ = std::fs::remove_file(cause);
+    if plan.kind == PlanKind::AurInstall && result.is_ok() {
+        let path = Path::new(kura_alpm::background::STATUS);
+        let mut status = kura_alpm::background::read_status(path);
+        if status.checked != 0 {
+            count_aur(&conf, &mut status);
+            if let Err(e) = kura_alpm::background::write_status(path, &status) {
+                eprintln!("kura: status not updated: {e}");
+            }
+        }
+    }
     match result {
         Ok(()) => Reply::Done,
         Err(ApplyError::Changed(plan)) => Reply::Changed { plan: *plan },
@@ -292,6 +302,25 @@ fn rank() -> Reply {
     }
 }
 
+/// Counts what is waiting from the AUR. Asks the AUR.
+fn count_aur(conf: &kura_alpm::Config, status: &mut kura_core::status::Status) {
+    let settings = kura_alpm::aur::settings();
+    if !settings.aur {
+        return;
+    }
+    match kura_alpm::aur::updates(conf, &settings, kura_alpm::background::now(), true) {
+        Ok(updates) => {
+            status.aur_updates = updates.iter().filter(|u| u.waits_until.is_none()).count();
+            status.aur_waiting = updates.len() - status.aur_updates;
+        }
+        Err(e) => eprintln!("kura: AUR not checked: {e}"),
+    }
+    match kura_alpm::aur::needs_rebuild(conf) {
+        Ok(broken) => status.aur_rebuild = broken.len(),
+        Err(e) => eprintln!("kura: AUR packages not checked for missing libraries: {e}"),
+    }
+}
+
 /// Written after each ranking; the background check ranks again after 30 days.
 const MIRRORS_RANKED: &str = "/var/lib/kura/mirrors-ranked";
 
@@ -342,19 +371,7 @@ fn check() -> Result<(), String> {
             }
         }
     }
-    if settings.aur {
-        match kura_alpm::aur::updates(&conf, &settings, now(), true) {
-            Ok(updates) => {
-                status.aur_updates = updates.iter().filter(|u| u.waits_until.is_none()).count();
-                status.aur_waiting = updates.len() - status.aur_updates;
-            }
-            Err(e) => eprintln!("kura: AUR not checked: {e}"),
-        }
-        match kura_alpm::aur::needs_rebuild(&conf) {
-            Ok(broken) => status.aur_rebuild = broken.len(),
-            Err(e) => eprintln!("kura: AUR packages not checked for missing libraries: {e}"),
-        }
-    }
+    count_aur(&conf, &mut status);
     write_status(Path::new(STATUS), &status).map_err(|e| e.to_string())?;
     eprintln!(
         "kura: {} updates, {} from the AUR ({} waiting), downloaded: {}, security findings: {}",
@@ -409,6 +426,11 @@ fn record() -> Result<(), String> {
     {
         Some(r) => eprintln!("kura: saved generation {}", r.id),
         None => eprintln!("kura: nothing changed"),
+    }
+    // Runs after every transaction, so this also covers pacman used directly.
+    let status = Path::new(kura_alpm::background::STATUS);
+    if let Err(e) = kura_alpm::background::refresh_after_change(&conf, status) {
+        eprintln!("kura: status not updated: {e}");
     }
     Ok(())
 }
