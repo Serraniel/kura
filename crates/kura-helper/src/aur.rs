@@ -109,6 +109,10 @@ pub fn build(build: &AurBuild, threads: usize, events: &Sender<Event>) -> Result
         "--quiet",
         &format!("--unit={}", unit(build)),
         "--property=DynamicUser=yes",
+        // Builds share one folder, and systemd gives that folder to the user
+        // of each build that starts. With one user per build, they lock each
+        // other out when they run in parallel.
+        "--property=User=kura-build",
         "--property=StateDirectory=kura-build",
         "--property=ProtectHome=yes",
         "--property=PrivateTmp=yes",
@@ -436,13 +440,7 @@ fn build_all(
         // The run cannot succeed any more, so nobody waits for the others.
         if failure.is_some() && !stopped {
             stopped = true;
-            stop_builds(
-                approved
-                    .builds
-                    .iter()
-                    .filter(|b| started.contains(b.base.as_str()) && !finished.contains(&b.base)),
-                events,
-            );
+            stop_running(approved, &started, &finished, events);
         }
     }
     remove_build_folders();
@@ -456,8 +454,14 @@ fn build_all(
     failure.map_or(Ok(()), |message| Err(ApplyError::Failed(message)))
 }
 
-fn stop_builds<'a>(builds: impl Iterator<Item = &'a AurBuild>, events: &Sender<Event>) {
-    for build in builds {
+fn stop_running(
+    approved: &Plan,
+    started: &BTreeSet<String>,
+    finished: &BTreeSet<String>,
+    events: &Sender<Event>,
+) {
+    let running = |b: &&AurBuild| started.contains(&b.base) && !finished.contains(&b.base);
+    for build in approved.builds.iter().filter(running) {
         let tag = format!("[{}] ", build.base);
         let _ = crate::console::run(
             Command::new("systemctl").args(["stop", &unit(build)]),
