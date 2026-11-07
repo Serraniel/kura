@@ -45,8 +45,6 @@ Kirigami.ApplicationWindow {
     Component.onCompleted: if (kura.startOnUpdates()) Qt.callLater(openUpdates)
 
     globalDrawer: Kirigami.GlobalDrawer {
-        title: "kura"
-        titleIcon: "qrc:/kura/kura.svg"
         modal: !root.wideScreen
         collapsible: false
         isMenu: false

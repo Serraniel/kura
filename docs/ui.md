@@ -10,8 +10,8 @@ goes through the translation files.
   pages scroll inside the window.
 - Left: navigation (Kirigami global drawer). Right: the page.
 - Colours, fonts and icons come from the desktop theme. kura sets none,
-  except its own logo, which is built in so it shows even without the
-  installed icon.
+  except its own logo. The logo appears in the title bar and the tray, not
+  again inside the window.
 - Bottom, opt-in (F4 or "Show details" in Settings): a read-only panel like
   Dolphin's terminal panel. Each step kura takes has a time in front. Below
   it, indented, comes the raw output: every program the helper runs as
