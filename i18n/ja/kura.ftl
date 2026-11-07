@@ -101,6 +101,7 @@ progress-of = { $done } / { $total }
 progress-under-minute = 残り 1 分未満
 progress-minutes = 残り約 { $minutes } 分
 apply-trial = まずシステムのコピーでアップデートを試しています…
+apply-trial-skipped = コピーを使えなかったため、試行なしでこのアップデートを続けます。
 apply-trial-failed = システムのコピーでアップデートが失敗したため、kura は何も変更していません。理由: { $reason }
 apply-downloading = { $file } をダウンロードしています
 apply-building = { $name } をビルドしています ({ $current }/{ $total })

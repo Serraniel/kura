@@ -83,6 +83,37 @@ jobs:
       - name: Run end-to-end test
         run: scripts/e2e-container.sh target/debug
 
+  e2e-trial:
+    name: e2e-trial
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Trial runs need btrfs as the root file system. With Docker's btrfs
+    # storage driver, the root of the container is a btrfs subvolume.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Move Docker to btrfs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y btrfs-progs
+          sudo systemctl stop docker docker.socket
+          sudo rm -rf /var/lib/docker
+          sudo mkdir -p /var/lib/docker
+          sudo truncate -s 30G /mnt/docker-btrfs.img
+          sudo mkfs.btrfs -q /mnt/docker-btrfs.img
+          sudo mount -o loop /mnt/docker-btrfs.img /var/lib/docker
+          echo '{"storage-driver":"btrfs","features":{"containerd-snapshotter":false}}' \
+            | sudo tee /etc/docker/daemon.json
+          sudo systemctl start docker
+          docker info --format '{{.Driver}}' | grep -qx btrfs
+      - name: Boot an Arch system with systemd
+        run: |
+          docker run -d --name arch --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/src" \
+            --tmpfs /run --tmpfs /tmp \
+            archlinux:base-devel /usr/lib/systemd/systemd
+      - name: Update with a trial run
+        run: docker exec arch /src/scripts/e2e-trial.sh
+
   e2e-aur:
     name: e2e-aur
     runs-on: ubuntu-latest

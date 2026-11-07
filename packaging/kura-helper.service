@@ -17,4 +17,5 @@ ExecStart=/usr/lib/kura/kura-helper serve
 LockPersonality=yes
 RestrictRealtime=yes
 ProtectClock=yes
-ProtectHostname=yes
+# "yes" would also forbid the call that systemd-nspawn makes for trial runs.
+ProtectHostname=private
