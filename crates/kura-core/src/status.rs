@@ -76,7 +76,11 @@ impl Status {
     /// installed. The next check finds it again if the new version has the
     /// same problem.
     pub fn after_change(&mut self, installed: &PackageSet, updates: usize) {
-        let current = |f: &Finding| installed.get(&f.package).is_some_and(|p| p.version == f.installed);
+        let current = |f: &Finding| {
+            installed
+                .get(&f.package)
+                .is_some_and(|p| p.version == f.installed)
+        };
         self.security.retain(current);
         self.older_reports.retain(current);
         self.updates = updates;
@@ -126,7 +130,11 @@ mod tests {
             updates: 8,
             blocked: true,
             news: vec!["news".into()],
-            security: vec![finding("same", "1-1"), finding("newer", "1-1"), finding("gone", "1-1")],
+            security: vec![
+                finding("same", "1-1"),
+                finding("newer", "1-1"),
+                finding("gone", "1-1"),
+            ],
             older_reports: vec![finding("gone", "1-1")],
             ..Status::default()
         };
