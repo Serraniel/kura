@@ -9,6 +9,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use kura_core::status::{State, Status};
@@ -54,10 +55,16 @@ fn look(status: &Status, l: &Localizer, monochrome: bool) -> Look {
 
 /// Tells the user that kura installed security updates on its own, as
 /// they allowed in the settings.
-fn notify_auto_installed(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, fixed: usize) {
+fn notify_auto_installed(
+    conn: &zbus::blocking::Connection,
+    sent: &Sent,
+    l: &Localizer,
+    look: &Look,
+    fixed: usize,
+) {
     let title = l.msg("notify-auto-security-title");
     let body = l.msg_args("notify-auto-security-body", &[("count", fixed.into())]);
-    send(conn, l, look, &title, &body);
+    send(conn, sent, l, look, &title, &body);
 }
 
 /// The PCI devices present now, by their sysfs names.
@@ -218,19 +225,22 @@ fn register(conn: &zbus::blocking::Connection, name: &str) -> bool {
     .is_ok()
 }
 
-fn notify(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, state: State) {
+/// The ids of the notifications kura sent.
+type Sent = Arc<Mutex<BTreeSet<u32>>>;
+
+fn notify(conn: &zbus::blocking::Connection, sent: &Sent, l: &Localizer, look: &Look, state: State) {
     let body = if state == State::NeedsAttention {
         l.msg("notify-attention-body")
     } else {
         l.msg("notify-updates-body")
     };
-    send(conn, l, look, &look.tooltip, &body);
+    send(conn, sent, l, look, &look.tooltip, &body);
 }
 
-fn send(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, title: &str, body: &str) {
+fn send(conn: &zbus::blocking::Connection, sent: &Sent, l: &Localizer, look: &Look, title: &str, body: &str) {
     let actions = vec!["default".to_owned(), l.msg("notify-open")];
     let hints: HashMap<&str, Value<'_>> = HashMap::from([("desktop-entry", Value::from("org.kura.app"))]);
-    let _ = conn.call_method(
+    let reply = conn.call_method(
         Some("org.freedesktop.Notifications"),
         "/org/freedesktop/Notifications",
         Some("org.freedesktop.Notifications"),
@@ -246,10 +256,16 @@ fn send(conn: &zbus::blocking::Connection, l: &Localizer, look: &Look, title: &s
             -1i32,
         ),
     );
+    if let Ok(id) = reply.and_then(|m| m.body().deserialize::<u32>())
+        && let Ok(mut sent) = sent.lock()
+    {
+        sent.insert(id);
+    }
 }
 
-/// Opens the window when the user clicks a kura notification.
-fn watch_notification_clicks(conn: &zbus::blocking::Connection) {
+/// Opens the window when the user clicks a kura notification. The desktop
+/// announces the clicks on every program's notifications to everyone.
+fn watch_notification_clicks(conn: &zbus::blocking::Connection, sent: Sent) {
     let Ok(proxy) = zbus::blocking::Proxy::new(
         conn,
         "org.freedesktop.Notifications",
@@ -262,8 +278,11 @@ fn watch_notification_clicks(conn: &zbus::blocking::Connection) {
         return;
     };
     std::thread::spawn(move || {
-        for _ in signals {
-            open_window();
+        for signal in signals {
+            let clicked = signal.body().deserialize::<(u32, String)>();
+            if clicked.is_ok_and(|(id, _)| sent.lock().is_ok_and(|s| s.contains(&id))) {
+                open_window();
+            }
         }
     });
 }
@@ -288,13 +307,15 @@ fn main() -> Result<(), String> {
         .and_then(zbus::blocking::connection::Builder::build)
         .map_err(|e| e.to_string())?;
     let has_tray = register(&conn, &name);
-    watch_notification_clicks(&conn);
+    let sent = Sent::default();
+    watch_notification_clicks(&conn, Arc::clone(&sent));
     if matches!(
         status.state(),
         State::Security | State::NeedsAttention | State::UpdatesReady
     ) {
         notify(
             &conn,
+            &sent,
             &l,
             &look(&status, &l, settings.tray_monochrome),
             status.state(),
@@ -315,6 +336,7 @@ fn main() -> Result<(), String> {
                 let (title, text) = kura_i18n::present::driver(&l, d);
                 send(
                     &conn,
+                    &sent,
                     &l,
                     &look(&status, &l, settings.tray_monochrome),
                     &title,
@@ -334,10 +356,10 @@ fn main() -> Result<(), String> {
         let fresh = kura_alpm::background::read_status(status_path);
         let new_look = look(&fresh, &l, settings.tray_monochrome);
         if fresh.auto_installed > status.auto_installed {
-            notify_auto_installed(&conn, &l, &new_look, fresh.auto_fixed);
+            notify_auto_installed(&conn, &sent, &l, &new_look, fresh.auto_fixed);
         }
         if should_notify(&status, &fresh) {
-            notify(&conn, &l, &new_look, fresh.state());
+            notify(&conn, &sent, &l, &new_look, fresh.state());
         }
         status = fresh;
         if has_tray && let Ok(iface) = conn.object_server().interface::<_, Item>(ITEM_PATH) {
