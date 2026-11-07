@@ -91,6 +91,19 @@ pub fn security_headline(l: &Localizer, findings: &[Finding]) -> String {
     }
 }
 
+/// One line for a report about an older version than the installed one.
+pub fn older_report(l: &Localizer, f: &Finding) -> String {
+    let detail = l.msg_args(
+        "security-detail",
+        &[
+            ("package", f.package.clone().into()),
+            ("installed", f.installed.clone().into()),
+            ("kind", f.kind.clone().into()),
+        ],
+    );
+    format!("{detail} ({} {})", f.advisory, f.cves.join(" "))
+}
+
 pub fn severity(l: &Localizer, s: Severity) -> String {
     l.msg(match s {
         Severity::Low => "severity-low",
@@ -383,6 +396,13 @@ mod tests {
             packages: vec!["amd-ucode".into()],
         };
         assert_eq!(driver(&l("de"), &m).0, "Prozessor-Korrekturen von AMD");
+    }
+
+    #[test]
+    fn older_reports_name_package_and_advisory() {
+        let en = l("en");
+        let line = older_report(&en, &finding(&[], false));
+        assert!(line.contains("AVG-"), "{line}");
     }
 
     #[test]

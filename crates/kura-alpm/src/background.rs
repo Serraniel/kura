@@ -134,9 +134,9 @@ pub fn check(
                 .collect()
         })
         .unwrap_or_default();
-    let security = match advisories {
+    let scan = match advisories {
         Some(list) => kura_core::security::scan(list, &crate::installed(conf)?),
-        None => Vec::new(),
+        None => kura_core::security::Scan::default(),
     };
     let status = Status {
         checked: now(),
@@ -144,7 +144,8 @@ pub fn check(
         downloaded,
         blocked,
         news,
-        security,
+        security: scan.findings,
+        older_reports: scan.older,
         ..Status::default()
     };
     Ok((status, plan))

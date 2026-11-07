@@ -25,6 +25,10 @@ pub struct Status {
     /// Known vulnerabilities in installed packages.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub security: Vec<Finding>,
+    /// Open reports about older versions than the installed ones. Listed in
+    /// System health, no warning. See [`crate::security::Scan`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub older_reports: Vec<Finding>,
     /// AUR updates past their cooling period.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub aur_updates: usize,

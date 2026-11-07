@@ -79,21 +79,54 @@ impl Finding {
     }
 }
 
-/// Whether an installed version is affected by an advisory.
-fn affects(advisory: &Advisory, installed: &str) -> bool {
+/// The result of matching advisories against the installed packages.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Scan {
+    /// Problems that concern the installed version. These warn the user.
+    pub findings: Vec<Finding>,
+    /// Open reports about an older version than the installed one. The
+    /// tracker keeps such reports open for years, usually long after the
+    /// problem is fixed, so they are only listed. Nobody confirmed that they
+    /// are fixed, though.
+    pub older: Vec<Finding>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Match {
+    Confirmed,
+    Older,
+    No,
+}
+
+/// A version without its package release: `2:8.0.1-3` -> `2:8.0.1`.
+fn upstream(version: &str) -> &str {
+    version.rsplit_once('-').map_or(version, |(v, _)| v)
+}
+
+/// How an advisory relates to an installed version.
+fn relation(advisory: &Advisory, installed: &str) -> Match {
     match advisory.status.as_str() {
-        "Vulnerable" => vercmp(installed, &advisory.affected) != Ordering::Less,
-        "Fixed" => advisory
-            .fixed
-            .as_deref()
-            .is_some_and(|f| vercmp(installed, f) == Ordering::Less),
-        _ => false,
+        "Vulnerable" if vercmp(installed, &advisory.affected) == Ordering::Less => Match::No,
+        // A new package release of the same version usually has the same problem.
+        "Vulnerable" if vercmp(upstream(installed), upstream(&advisory.affected)) == Ordering::Equal => {
+            Match::Confirmed
+        }
+        "Vulnerable" => Match::Older,
+        "Fixed"
+            if advisory
+                .fixed
+                .as_deref()
+                .is_some_and(|f| vercmp(installed, f) == Ordering::Less) =>
+        {
+            Match::Confirmed
+        }
+        _ => Match::No,
     }
 }
 
 /// Matches advisories against installed packages. Most severe first.
-pub fn scan(advisories: &[Advisory], installed: &PackageSet) -> Vec<Finding> {
-    let mut findings = Vec::new();
+pub fn scan(advisories: &[Advisory], installed: &PackageSet) -> Scan {
+    let mut scan = Scan::default();
     for adv in advisories {
         for name in &adv.packages {
             let Some(pkg) = installed.get(name) else { continue };
@@ -101,15 +134,17 @@ pub fn scan(advisories: &[Advisory], installed: &PackageSet) -> Vec<Finding> {
             if !matches!(pkg.repo.as_deref(), Some("core" | "extra" | "multilib")) {
                 continue;
             }
-            if !affects(adv, &pkg.version) {
-                continue;
-            }
+            let list = match relation(adv, &pkg.version) {
+                Match::Confirmed => &mut scan.findings,
+                Match::Older => &mut scan.older,
+                Match::No => continue,
+            };
             let fixed = if adv.status == "Fixed" {
                 adv.fixed.clone()
             } else {
                 None
             };
-            findings.push(Finding {
+            list.push(Finding {
                 advisory: adv.name.clone(),
                 package: name.clone(),
                 installed: pkg.version.clone(),
@@ -125,12 +160,14 @@ pub fn scan(advisories: &[Advisory], installed: &PackageSet) -> Vec<Finding> {
             });
         }
     }
-    findings.sort_by(|a, b| {
-        b.severity
-            .cmp(&a.severity)
-            .then_with(|| a.package.cmp(&b.package))
-    });
-    findings
+    for list in [&mut scan.findings, &mut scan.older] {
+        list.sort_by(|a, b| {
+            b.severity
+                .cmp(&a.severity)
+                .then_with(|| a.package.cmp(&b.package))
+        });
+    }
+    scan
 }
 
 /// The apps named in findings, for one short sentence. "System" findings have no apps.
@@ -181,7 +218,9 @@ mod tests {
       {"name": "AVG-4", "packages": ["vlc"], "status": "Not affected", "severity": "Low",
        "type": "unknown", "affected": "1-1", "fixed": null, "issues": []},
       {"name": "AVG-5", "packages": ["yay-bin"], "status": "Vulnerable", "severity": "High",
-       "type": "unknown", "affected": "1-1", "fixed": null, "issues": []}
+       "type": "unknown", "affected": "1-1", "fixed": null, "issues": []},
+      {"name": "AVG-6", "packages": ["pam"], "status": "Vulnerable", "severity": "High",
+       "type": "arbitrary filesystem access", "affected": "1.7.0-2", "fixed": null, "issues": ["CVE-2025-6020"]}
     ]"#;
 
     fn system() -> PackageSet {
@@ -193,7 +232,8 @@ mod tests {
                 .with_repo("extra")
                 .with_depends(["ffmpeg"]),
             InstalledPackage::new("ffmpeg", "2:8.0.1-3", InstallReason::Dependency).with_repo("extra"),
-            InstalledPackage::new("openssl", "3.5.1-1", InstallReason::Dependency).with_repo("core"),
+            InstalledPackage::new("openssl", "3.5.0-2", InstallReason::Dependency).with_repo("core"),
+            InstalledPackage::new("pam", "1.7.3-1", InstallReason::Dependency).with_repo("core"),
             InstalledPackage::new("gimp", "3.0.6-1", InstallReason::Explicit).with_repo("extra"),
             InstalledPackage::new("yay-bin", "13.0.1-1", InstallReason::Explicit),
         ])
@@ -202,7 +242,7 @@ mod tests {
     #[test]
     fn finds_vulnerable_packages_and_names_the_apps() {
         let advisories = parse_tracker(TRACKER).unwrap();
-        let findings = scan(&advisories, &system());
+        let findings = scan(&advisories, &system()).findings;
         let names: Vec<_> = findings
             .iter()
             .map(|f| (f.advisory.as_str(), f.package.as_str()))
@@ -231,8 +271,34 @@ mod tests {
     fn versions_older_than_affected_are_safe() {
         let mut advisories = parse_tracker(TRACKER).unwrap();
         advisories[1].affected = "3.6.0-1".into();
-        let findings = scan(&advisories, &system());
-        assert!(findings.iter().all(|f| f.package != "openssl"));
+        let found = scan(&advisories, &system());
+        assert!(found.findings.iter().all(|f| f.package != "openssl"));
+        assert!(found.older.iter().all(|f| f.package != "openssl"));
+    }
+
+    #[test]
+    fn reports_about_older_versions_do_not_warn() {
+        let advisories = parse_tracker(TRACKER).unwrap();
+        let found = scan(&advisories, &system());
+        assert!(found.findings.iter().all(|f| f.package != "pam"));
+        let older: Vec<_> = found.older.iter().map(|f| f.advisory.as_str()).collect();
+        assert_eq!(older, ["AVG-6"]);
+        assert!(!found.older[0].has_fix());
+    }
+
+    #[test]
+    fn package_releases_do_not_count_as_new_versions() {
+        assert_eq!(upstream("2:8.0.1-3"), "2:8.0.1");
+        assert_eq!(upstream("1.0"), "1.0");
+        let mut advisories = parse_tracker(TRACKER).unwrap();
+        advisories[1].affected = "3.5.0-1".into();
+        let found = scan(&advisories, &system());
+        assert!(found.findings.iter().any(|f| f.package == "openssl"));
+        // A new version with no word about it is an older report.
+        advisories[1].affected = "3.4.9-1".into();
+        let found = scan(&advisories, &system());
+        assert!(found.findings.iter().all(|f| f.package != "openssl"));
+        assert!(found.older.iter().any(|f| f.package == "openssl"));
     }
 
     #[test]

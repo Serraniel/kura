@@ -613,6 +613,37 @@ Kirigami.ApplicationWindow {
                     }
                 }
 
+                // Reports about older versions: no warning, but nothing hidden.
+                Kirigami.Heading {
+                    text: health.older ? health.older.title : ""
+                    level: 3
+                    visible: olderLines.count > 0
+                }
+                Controls.Label {
+                    text: kura.tr("security-older-hint")
+                    visible: olderLines.count > 0
+                    wrapMode: Text.WordWrap
+                    color: Kirigami.Theme.disabledTextColor
+                    Layout.fillWidth: true
+                }
+                Controls.Button {
+                    id: olderToggle
+                    text: kura.tr("gui-older-show")
+                    checkable: true
+                    visible: olderLines.count > 0
+                }
+                Repeater {
+                    id: olderLines
+                    model: health.older ? health.older.lines : []
+                    Controls.Label {
+                        text: modelData
+                        visible: olderToggle.checked
+                        wrapMode: Text.WordWrap
+                        font: Kirigami.Theme.smallFont
+                        Layout.fillWidth: true
+                    }
+                }
+
                 Kirigami.Heading {
                     text: kura.tr("health-suggestions")
                     level: 3
