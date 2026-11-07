@@ -1,14 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <!-- SPDX-FileCopyrightText: 2026 The kura contributors -->
   <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-  <!-- kura: a storehouse (蔵) with a roof, white walls and a door. -->
-  <path d="M4 26 32 10l28 16v4H4z" fill="#2a5c8a"/>
-  <rect x="9" y="31" width="46" height="25" rx="2" fill="#3daee9"/>
-  <rect x="9" y="31" width="46" height="5" fill="#2980b9"/>
-  <rect x="27" y="40" width="10" height="16" rx="1" fill="#fcfcfc"/>
-  <rect x="14" y="40" width="7" height="6" rx="1" fill="#fcfcfc" opacity=".85"/>
-  <rect x="43" y="40" width="7" height="6" rx="1" fill="#fcfcfc" opacity=".85"/>
+  <!-- kura: a Japanese storehouse with a flared roof, white plaster walls, a lattice lower wall and a heavy door. -->
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fbf8f0"/><stop offset=".5" stop-color="#fbf8f0"/><stop offset=".5" stop-color="#e6e0d2"/><stop offset="1" stop-color="#e6e0d2"/></linearGradient>
+    <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b7aa8"/><stop offset="1" stop-color="#35507c"/></linearGradient>
+  </defs>
+  <path d="M8 57h48a2 2 0 0 1 2 2v1.500a1.500 1.500 0 0 1-1.500 1.500h-49A1.500 1.500 0 0 1 6 60.500V59a2 2 0 0 1 2-2z" fill="#6f7680"/>
+  <path d="M32 13 C27 18 19 24 11 28.500V57H53V28.500C45 24 37 18 32 13z" fill="url(#wall)"/>
+  <path d="M11 42H53V57H11z" fill="#2c3b56"/>
+  <path d="M16 43.4l2.600 2.600-2.600 2.600-2.600-2.600zM23 43.4l2.600 2.600-2.600 2.600-2.600-2.600zM41 43.4l2.600 2.600-2.600 2.600-2.600-2.600zM48 43.4l2.600 2.600-2.600 2.600-2.600-2.600zM16 50.4l2.600 2.600-2.600 2.600-2.600-2.600zM23 50.4l2.600 2.600-2.600 2.600-2.600-2.600zM41 50.4l2.600 2.600-2.600 2.600-2.600-2.600zM48 50.4l2.600 2.600-2.600 2.600-2.600-2.600zM19.5 46.9l2.600 2.600-2.600 2.600-2.600-2.600zM44.5 46.9l2.600 2.600-2.600 2.600-2.600-2.600z" fill="#e9e4d6"/>
+  <path d="M26 39h12a1 1 0 0 1 1 1v17H25V40a1 1 0 0 1 1-1z" fill="#c2452d"/>
+  <path d="M31.300 39h1.400v18h-1.400z" fill="#7d2a1b"/>
+  <circle cx="32" cy="28" r="4.500" fill="#2c3b56"/>
+  <circle cx="32" cy="28" r="2.300" fill="#e9e4d6"/>
+  <path d="M32 3C25 11 13 20 1.500 25.500 4 28.800 8 29.800 11.500 28.300 19 24.500 27 18 32 13.500 37 18 45 24.500 52.500 28.300 56 29.800 60 28.800 62.500 25.500 51 20 39 11 32 3z" fill="url(#roof)"/>
   <path d="M46 2 63 32H29z" fill="#da4453" stroke="#fcfcfc" stroke-width="3" stroke-linejoin="round"/>
-  <rect x="43.5" y="11" width="5" height="11" rx="1.5" fill="#fcfcfc"/>
-  <circle cx="46" cy="26.5" r="2.8" fill="#fcfcfc"/>
+  <rect x="43.5" y="11" width="5" height="11" rx="1.500" fill="#fcfcfc"/>
+  <circle cx="46" cy="26.500" r="2.800" fill="#fcfcfc"/>
 </svg>

@@ -2,6 +2,6 @@
   <!-- SPDX-FileCopyrightText: 2026 The kura contributors -->
   <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
   <style id="current-color-scheme">.ColorScheme-Text { color: #232629; } .ColorScheme-NegativeText { color: #da4453; } .ColorScheme-NeutralText { color: #f67400; } .ColorScheme-PositiveText { color: #27ae60; }</style>
-  <path class="ColorScheme-Text" fill="currentColor" d="M8 1 1 5v2h14V5zM2 8v7h5v-4h2v4h5V8z"/>
+  <path class="ColorScheme-Text" fill="currentColor" d="M8 .5C6.300 2.600 3.300 5 .2 6.400 1 7.300 2.200 7.500 3.100 7.100 5 6.100 6.900 4.600 8 3.500 9.100 4.600 11 6.100 12.900 7.100 13.800 7.500 15 7.300 15.800 6.400 12.700 5 9.700 2.600 8 .5zM8 5 3.300 8.300V15.500H6.500V11H9.500V15.500H12.700V8.300z"/>
   <path class="ColorScheme-PositiveText" fill="currentColor" fill-rule="evenodd" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 1.300 2.300 2.700h-1.500v2.700h-1.600V12H9.700z"/>
 </svg>
