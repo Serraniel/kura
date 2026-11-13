@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "phone"
+version = 1
+
+[name]
+en = "Connect your phone"
+de = "Smartphone verbinden"
+fr = "Connecter votre téléphone"
+ja = "スマートフォンと接続"
+
+[description]
+en = "KDE Connect sends files, links and notifications between this computer and your phone over the home network. Install the KDE Connect app on your phone too."
+de = "KDE Connect schickt Dateien, Links und Benachrichtigungen zwischen diesem Computer und Ihrem Smartphone über das Heimnetz. Installieren Sie dazu auch die App KDE Connect auf dem Smartphone."
+fr = "KDE Connect échange fichiers, liens et notifications entre cet ordinateur et votre téléphone sur le réseau domestique. Installez aussi l'application KDE Connect sur votre téléphone."
+ja = "KDE Connect は家庭内ネットワークを通じて、このコンピューターとスマートフォンの間でファイル、リンク、通知をやり取りします。スマートフォンにも KDE Connect アプリをインストールしてください。"
+
+[packages]
+required = ["kdeconnect"]
+recommended = ["sshfs"]
+
+[[packages.optional]]
+name = "scrcpy"
+reason = { en = "Shows and controls an Android phone's screen over USB.", de = "Zeigt und bedient den Bildschirm eines Android-Smartphones per USB.", fr = "Affiche et contrôle l'écran d'un téléphone Android en USB.", ja = "USB 経由で Android スマートフォンの画面を表示・操作します。" }

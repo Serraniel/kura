@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "scanning"
+version = 1
+
+[name]
+en = "Scanning"
+de = "Scannen"
+fr = "Numérisation"
+ja = "スキャン"
+
+[description]
+en = "Scan documents and photos with a scanner or an all-in-one printer, over USB or the home network."
+de = "Dokumente und Fotos mit einem Scanner oder Multifunktionsdrucker scannen, per USB oder im Heimnetz."
+fr = "Numérisez des documents et des photos avec un scanner ou une imprimante multifonction, en USB ou sur le réseau domestique."
+ja = "スキャナーや複合機で書類や写真をスキャンします。USB でも家庭内ネットワークでも使えます。"
+
+[packages]
+required = ["sane", "skanpage"]
+recommended = ["sane-airscan", "ipp-usb"]
+
+[[packages.optional]]
+name = "hplip"
+reason = { en = "Driver for older HP scanners and all-in-one printers.", de = "Treiber für ältere HP-Scanner und -Multifunktionsdrucker.", fr = "Pilote pour les anciens scanners et imprimantes multifonctions HP.", ja = "古い HP スキャナーと複合機用のドライバー。" }

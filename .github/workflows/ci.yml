@@ -15,6 +15,22 @@ env:
   LLVM_PROFDATA: /usr/bin/llvm-profdata
 
 jobs:
+  bundles:
+    name: bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Package and service names in the shipped bundles must exist in Arch.
+    container: archlinux:base
+    steps:
+      - name: Turn on multilib and sync the package and file lists
+        run: |
+          printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          pacman -Syu --noconfirm --needed python
+          pacman -Fy
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check bundles
+        run: python3 scripts/check-bundles.py data/bundles
+
   rust:
     name: rust
     runs-on: ubuntu-latest

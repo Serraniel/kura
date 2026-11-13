@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "video-creation"
+version = 1
+
+[name]
+en = "Recording and video editing"
+de = "Aufnehmen und Videoschnitt"
+fr = "Enregistrement et montage vidéo"
+ja = "録画と動画編集"
+
+[description]
+en = "OBS Studio records your screen and streams it live, Kdenlive cuts videos."
+de = "OBS Studio nimmt Ihren Bildschirm auf und streamt ihn live, Kdenlive schneidet Videos."
+fr = "OBS Studio enregistre votre écran et le diffuse en direct, Kdenlive monte les vidéos."
+ja = "OBS Studio で画面を録画・ライブ配信し、Kdenlive で動画を編集します。"
+
+[packages]
+required = ["obs-studio", "kdenlive"]
+
+[[packages.optional]]
+name = "audacity"
+reason = { en = "Records and edits audio, for example podcasts.", de = "Nimmt Ton auf und bearbeitet ihn, zum Beispiel Podcasts.", fr = "Enregistre et modifie le son, par exemple des podcasts.", ja = "ポッドキャストなどの音声を録音・編集します。" }
+
+[[packages.optional]]
+name = "handbrake"
+reason = { en = "Converts videos into other formats and sizes.", de = "Wandelt Videos in andere Formate und Größen um.", fr = "Convertit les vidéos dans d'autres formats et tailles.", ja = "動画を別の形式やサイズに変換します。" }
