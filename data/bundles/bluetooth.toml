@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "bluetooth"
+version = 1
+
+[name]
+en = "Bluetooth"
+de = "Bluetooth"
+fr = "Bluetooth"
+ja = "Bluetooth"
+
+[description]
+en = "Connect Bluetooth headphones, speakers, mice, keyboards and game controllers. Bluetooth starts with the computer from now on."
+de = "Bluetooth-Kopfhörer, -Lautsprecher, -Mäuse, -Tastaturen und -Controller verbinden. Bluetooth startet ab jetzt mit dem Computer."
+fr = "Connectez casques, enceintes, souris, claviers et manettes Bluetooth. Le Bluetooth démarre désormais avec l'ordinateur."
+ja = "Bluetooth のヘッドホン、スピーカー、マウス、キーボード、ゲームコントローラーを接続します。今後は Bluetooth がコンピューターと一緒に起動します。"
+
+[packages]
+required = ["bluez", "bluedevil"]
+recommended = ["bluez-utils"]
+
+[[actions]]
+enable-service = "bluetooth.service"

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "media-server"
+version = 1
+
+[name]
+en = "Home media server"
+de = "Medienserver für zu Hause"
+fr = "Serveur multimédia domestique"
+ja = "家庭用メディアサーバー"
+
+[description]
+en = "Jellyfin shares your films, series and music with TVs, phones and other computers at home. After installing, open http://localhost:8096 in your web browser to set it up. Jellyfin runs as its own user and cannot read your personal folder, so keep your media in a folder it can read."
+de = "Jellyfin stellt Ihre Filme, Serien und Musik für Fernseher, Smartphones und andere Computer zu Hause bereit. Öffnen Sie nach der Installation http://localhost:8096 im Webbrowser, um es einzurichten. Jellyfin läuft als eigener Benutzer und kann Ihren persönlichen Ordner nicht lesen. Legen Sie Ihre Medien deshalb in einen Ordner, den es lesen kann."
+fr = "Jellyfin partage vos films, séries et musiques avec les téléviseurs, téléphones et autres ordinateurs de la maison. Après l'installation, ouvrez http://localhost:8096 dans votre navigateur pour le configurer. Jellyfin fonctionne sous son propre utilisateur et ne peut pas lire votre dossier personnel : placez vos médias dans un dossier qu'il peut lire."
+ja = "Jellyfin は映画、ドラマ、音楽を家のテレビ、スマートフォン、他のコンピューターと共有します。インストール後、Web ブラウザーで http://localhost:8096 を開いて設定してください。Jellyfin は専用のユーザーで動くため、あなたの個人フォルダーは読めません。メディアは Jellyfin が読めるフォルダーに置いてください。"
+
+[packages]
+required = ["jellyfin-server", "jellyfin-web"]
+
+[[actions]]
+enable-service = "jellyfin.service"

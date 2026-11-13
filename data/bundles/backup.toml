@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "backup"
+version = 1
+
+[name]
+en = "Backups of your files"
+de = "Sicherung Ihrer Dateien"
+fr = "Sauvegarde de vos fichiers"
+ja = "ファイルのバックアップ"
+
+[description]
+en = "Kup copies your personal files to a USB drive or another folder, regularly and on its own. It works next to the system snapshots kura takes, which usually leave out personal files."
+de = "Kup kopiert Ihre persönlichen Dateien regelmäßig und selbstständig auf ein USB-Laufwerk oder in einen anderen Ordner. Es ergänzt die Systemschnappschüsse von kura, die persönliche Dateien meist nicht enthalten."
+fr = "Kup copie vos fichiers personnels sur un disque USB ou dans un autre dossier, régulièrement et tout seul. Il complète les instantanés du système pris par kura, qui laissent généralement de côté les fichiers personnels."
+ja = "Kup は個人ファイルを定期的に自動で USB ドライブや別のフォルダーにコピーします。kura のシステムスナップショットには通常、個人ファイルが含まれないため、それを補います。"
+
+[packages]
+required = ["kup"]
+recommended = ["bup", "rsync"]

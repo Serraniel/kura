@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "virtual-machines"
+version = 1
+
+[name]
+en = "Virtual machines"
+de = "Virtuelle Maschinen"
+fr = "Machines virtuelles"
+ja = "仮想マシン"
+
+[description]
+en = "Run Windows or another Linux in a window, for example to try it or for a program that only runs there. Takes effect after you log out and in again."
+de = "Windows oder ein anderes Linux in einem Fenster ausführen, zum Beispiel zum Ausprobieren oder für ein Programm, das nur dort läuft. Wirkt nach dem Ab- und wieder Anmelden."
+fr = "Faites tourner Windows ou un autre Linux dans une fenêtre, par exemple pour l'essayer ou pour un programme qui ne fonctionne que là. Prend effet après vous être déconnecté puis reconnecté."
+ja = "Windows や別の Linux をウィンドウの中で動かします。試してみるときや、そこでしか動かないプログラムを使うときに便利です。一度ログアウトして再ログインすると有効になります。"
+
+[packages]
+required = ["virt-manager", "qemu-desktop", "libvirt", "dnsmasq"]
+recommended = ["edk2-ovmf"]
+
+[[packages.optional]]
+name = "swtpm"
+reason = { en = "Needed to install Windows 11.", de = "Nötig, um Windows 11 zu installieren.", fr = "Nécessaire pour installer Windows 11.", ja = "Windows 11 のインストールに必要です。" }
+
+[[actions]]
+enable-service = "libvirtd.service"
+
+[[actions]]
+user-group = "libvirt"
