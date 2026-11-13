@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "office"
+version = 1
+
+[name]
+en = "Office"
+de = "Büro"
+fr = "Bureautique"
+ja = "オフィス"
+
+[description]
+en = "LibreOffice for letters, spreadsheets and presentations. It opens and saves Microsoft Office files. Spelling and the menus follow your language."
+de = "LibreOffice für Briefe, Tabellen und Präsentationen. Es öffnet und speichert Microsoft-Office-Dateien. Rechtschreibprüfung und Menüs folgen Ihrer Sprache."
+fr = "LibreOffice pour les lettres, les tableurs et les présentations. Il ouvre et enregistre les fichiers Microsoft Office. La correction orthographique et les menus suivent votre langue."
+ja = "手紙、表計算、プレゼンテーション用の LibreOffice。Microsoft Office のファイルを開いて保存できます。スペルチェックとメニューはあなたの言語に合わせます。"
+
+[packages]
+required = ["libreoffice-fresh"]
+
+[[packages.optional]]
+name = "thunderbird"
+reason = { en = "Email and calendar.", de = "E-Mail und Kalender.", fr = "Courriel et agenda.", ja = "メールとカレンダー。" }

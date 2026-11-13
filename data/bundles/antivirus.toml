@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "antivirus"
+version = 1
+
+[name]
+en = "Virus scanner"
+de = "Virenscanner"
+fr = "Analyse antivirus"
+ja = "ウイルススキャナー"
+
+[description]
+en = "ClamAV checks files and USB sticks for viruses, mostly ones made for Windows, so you do not pass them on. Linux itself rarely needs a virus scanner. The virus list updates itself from the internet several times a day."
+de = "ClamAV prüft Dateien und USB-Sticks auf Viren, vor allem solche für Windows, damit Sie sie nicht weitergeben. Linux selbst braucht selten einen Virenscanner. Die Virenliste aktualisiert sich mehrmals täglich aus dem Internet."
+fr = "ClamAV analyse les fichiers et les clés USB à la recherche de virus, surtout ceux conçus pour Windows, pour éviter de les transmettre. Linux lui-même a rarement besoin d'un antivirus. La liste des virus se met à jour depuis Internet plusieurs fois par jour."
+ja = "ClamAV はファイルや USB メモリにウイルス（主に Windows 向けのもの）がないか調べ、他の人に広げないようにします。Linux 自体にウイルス対策が必要になることはほとんどありません。ウイルス定義はインターネットから 1 日に数回自動で更新されます。"
+
+[packages]
+required = ["clamav", "clamtk"]
+
+[[actions]]
+enable-service = "clamav-freshclam.service"

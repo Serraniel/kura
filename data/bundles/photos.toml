@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "photos"
+version = 1
+
+[name]
+en = "Photos and drawing"
+de = "Fotos und Zeichnen"
+fr = "Photos et dessin"
+ja = "写真とお絵描き"
+
+[description]
+en = "digiKam sorts and finds your photos, GIMP edits them."
+de = "digiKam ordnet und findet Ihre Fotos, GIMP bearbeitet sie."
+fr = "digiKam classe et retrouve vos photos, GIMP les retouche."
+ja = "digiKam で写真を整理・検索し、GIMP で編集します。"
+
+[packages]
+required = ["digikam", "gimp"]
+
+[[packages.optional]]
+name = "krita"
+reason = { en = "Painting and drawing, also with a graphics tablet.", de = "Malen und Zeichnen, auch mit Grafiktablett.", fr = "Peinture et dessin, aussi avec une tablette graphique.", ja = "ペンタブレットにも対応したペイントとお絵描き。" }
+
+[[packages.optional]]
+name = "inkscape"
+reason = { en = "Logos, posters and other vector graphics.", de = "Logos, Plakate und andere Vektorgrafiken.", fr = "Logos, affiches et autres graphiques vectoriels.", ja = "ロゴ、ポスターなどのベクター画像。" }
+
+[[packages.optional]]
+name = "darktable"
+reason = { en = "Develops RAW photos from cameras.", de = "Entwickelt RAW-Fotos von Kameras.", fr = "Développe les photos RAW des appareils photo.", ja = "カメラの RAW 写真を現像します。" }

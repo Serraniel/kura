@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 The kura contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+
+id = "printing"
+version = 1
+
+[name]
+en = "Printing"
+de = "Drucken"
+fr = "Impression"
+ja = "印刷"
+
+[description]
+en = "The print system and the printer settings. Most printers from the last ten years work without a driver, over USB or the home network."
+de = "Das Drucksystem und die Druckereinstellungen. Die meisten Drucker der letzten zehn Jahre funktionieren ohne Treiber, per USB oder im Heimnetz."
+fr = "Le système d'impression et les paramètres des imprimantes. La plupart des imprimantes des dix dernières années fonctionnent sans pilote, en USB ou sur le réseau domestique."
+ja = "印刷システムとプリンター設定です。ここ 10 年ほどのプリンターの多くは、USB でも家庭内ネットワークでもドライバーなしで使えます。"
+
+[packages]
+required = ["cups", "print-manager"]
+recommended = ["avahi", "ipp-usb"]
+
+[[packages.optional]]
+name = "hplip"
+reason = { en = "Driver for older HP printers.", de = "Treiber für ältere HP-Drucker.", fr = "Pilote pour les anciennes imprimantes HP.", ja = "古い HP プリンター用のドライバー。" }
+
+[[packages.optional]]
+name = "gutenprint"
+reason = { en = "Drivers for many older printers, for example from Canon and Epson.", de = "Treiber für viele ältere Drucker, zum Beispiel von Canon und Epson.", fr = "Pilotes pour de nombreuses anciennes imprimantes, par exemple Canon et Epson.", ja = "Canon や Epson など、多くの古いプリンター用のドライバー。" }
+
+[[actions]]
+enable-service = "cups.service"
+
+[[actions]]
+enable-service = "avahi-daemon.service"
