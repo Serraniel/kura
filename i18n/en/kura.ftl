@@ -348,6 +348,7 @@ info-files = Build files
 aur-mixed = Some of these come from the AUR. Install those separately: kura install { $names }
 aur-build-list = Built on this computer from the AUR:
 aur-notice = AUR packages are shared by other users and are not checked by Arch Linux. kura builds them in a separate, restricted environment.
+aur-heavy = Building { $names } can take several hours and needs a lot of memory. Close other programs and leave the computer on until it is done.
 confirm-aur = Build and install this? [y/N]
 aur-off = { $names } is not in the repositories, and the AUR is turned off. To turn it on: kura settings aur on
 aur-check-failed = AUR updates could not be checked: { $reason }

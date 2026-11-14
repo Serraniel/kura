@@ -361,6 +361,7 @@ info-files = Fichiers de compilation
 aur-mixed = Certains viennent de l'AUR. Installez-les séparément : kura install { $names }
 aur-build-list = Compilé sur cet ordinateur depuis l'AUR :
 aur-notice = Les paquets de l'AUR sont partagés par d'autres utilisateurs et ne sont pas vérifiés par Arch Linux. kura les compile dans un environnement séparé et restreint.
+aur-heavy = La compilation de { $names } peut prendre plusieurs heures et demande beaucoup de mémoire. Fermez les autres programmes et laissez l'ordinateur allumé jusqu'à la fin.
 confirm-aur = Compiler et installer ceci ? [o/N]
 aur-off = { $names } n'est pas dans les dépôts et l'AUR est désactivé. Pour l'activer : kura settings aur on
 aur-check-failed = Impossible de vérifier les mises à jour de l'AUR : { $reason }

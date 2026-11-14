@@ -789,9 +789,22 @@ fn prepare_aur_preview(names: &[String]) -> Result<Prepared, String> {
         preview: preview.to_string(),
         news: "[]".into(),
         summary: sizes(&l, &outcome),
-        headline: l.msg("aur-notice"),
+        headline: heavy_note(&l, &plan, l.msg("aur-notice")),
         plan,
     })
+}
+
+/// `text`, followed by a warning when the plan builds a compiler or another
+/// very large program.
+fn heavy_note(l: &Localizer, plan: &Plan, text: String) -> String {
+    let heavy = kura_core::aur::heavy_builds(plan.builds.iter().map(|b| b.base.as_str()));
+    if heavy.is_empty() {
+        return text;
+    }
+    format!(
+        "{text}\n{}",
+        l.msg_args("aur-heavy", &[("names", heavy.join(", ").into())])
+    )
 }
 
 /// The bundles for the Software page.
