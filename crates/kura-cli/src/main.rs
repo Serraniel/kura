@@ -564,6 +564,14 @@ fn aur_change(
         let _ = writeln!(text, "  {} {}{signals}", b.base, b.version);
     }
     let _ = writeln!(text, "\n{}", l.msg("aur-notice"));
+    let heavy = kura_core::aur::heavy_builds(plan.builds.iter().map(|b| b.base.as_str()));
+    if !heavy.is_empty() {
+        let _ = writeln!(
+            text,
+            "{}",
+            l.msg_args("aur-heavy", &[("names", heavy.join(", ").into())])
+        );
+    }
     say(&text);
     confirm_and_apply(l, plan, &outcome, &apps, question_id)
 }

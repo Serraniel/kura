@@ -315,6 +315,7 @@ info-files = ビルドファイル
 aur-mixed = 一部は AUR から提供されています。それらは別にインストールしてください: kura install { $names }
 aur-build-list = AUR からこのコンピューターでビルドするもの:
 aur-notice = AUR のパッケージは他のユーザーが共有しているもので、Arch Linux による確認は受けていません。kura は分離された制限付きの環境でビルドします。
+aur-heavy = { $names } のビルドには数時間かかり、多くのメモリが必要です。他のプログラムを閉じて、終わるまでコンピューターの電源を入れたままにしてください。
 confirm-aur = これをビルドしてインストールしますか? [y/N]
 aur-off = { $names } はリポジトリにありません。また、AUR はオフになっています。オンにするには: kura settings aur on
 aur-check-failed = AUR のアップデートを確認できませんでした: { $reason }

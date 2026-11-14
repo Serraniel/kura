@@ -375,8 +375,82 @@ pub fn jobs(cpus: usize, memory_available: u64, builds: usize) -> Jobs {
     }
 }
 
+/// Compilers and toolchains, also with a version in the name (`gcc13`).
+const TOOLCHAINS: &[&str] = &["gcc", "llvm", "clang", "ghc", "openjdk", "jdk", "zig", "rust"];
+/// Very large programs, also in variants (`firefox-nightly`, `electron25`).
+const LARGE: &[&str] = &[
+    "chromium",
+    "ungoogled-chromium",
+    "electron",
+    "firefox",
+    "librewolf",
+    "thunderbird",
+    "qt5-webengine",
+    "qt6-webengine",
+    "webkit2gtk",
+    "webkitgtk",
+    "libreoffice",
+];
+
+/// The AUR bases among `bases` known to take hours and a lot of memory to
+/// build: compilers and very large programs. Ready-made `-bin` packages are
+/// not built, so they never count.
+pub fn heavy_builds<'a>(bases: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+    let versioned = |rest: &str| {
+        rest.trim_start_matches('-')
+            .bytes()
+            .all(|b| b.is_ascii_digit() || b == b'.')
+    };
+    bases
+        .into_iter()
+        .filter(|base| !base.ends_with("-bin"))
+        .filter(|base| {
+            let stem = base.strip_suffix("-git").unwrap_or(base);
+            TOOLCHAINS
+                .iter()
+                .any(|t| stem.strip_prefix(t).is_some_and(versioned))
+                || LARGE.iter().any(|l| {
+                    stem.strip_prefix(l)
+                        .is_some_and(|rest| rest.is_empty() || rest.starts_with('-') || versioned(rest))
+                })
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn heavy_builds_are_compilers_and_large_programs() {
+        let bases = [
+            "citra",
+            "gcc13",
+            "gcc-13",
+            "llvm17-git",
+            "rust",
+            "rustdesk",
+            "clang-format-static-bin",
+            "firefox-nightly",
+            "electron25",
+            "firefoxpwa",
+            "chromium-bin",
+            "qt5-webengine",
+            "gccgo-x",
+        ];
+        assert_eq!(
+            heavy_builds(bases),
+            [
+                "gcc13",
+                "gcc-13",
+                "llvm17-git",
+                "rust",
+                "firefox-nightly",
+                "electron25",
+                "qt5-webengine"
+            ]
+        );
+    }
     use super::*;
 
     fn info(name: &str, base: &str, depends: &[&str], make: &[&str]) -> Info {
