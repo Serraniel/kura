@@ -66,6 +66,8 @@ pub mod qobject {
         #[qproperty(QString, bundles_json, cxx_name = "bundlesJson")]
         // Repository profiles as JSON: [{"id", "text", "active"}].
         #[qproperty(QString, profiles_json, cxx_name = "profilesJson")]
+        // AUR packages whose rebuild is no longer offered: ["name", ..].
+        #[qproperty(QString, skipped_rebuilds_json, cxx_name = "skippedRebuildsJson")]
         type Kura = super::KuraRust;
     }
 
@@ -175,6 +177,12 @@ pub mod qobject {
         #[cxx_name = "flushLog"]
         fn flush_log(self: Pin<&mut Kura>);
 
+        // Stops (`offer` false) or restarts offering a rebuild of an AUR
+        // package, then prepares the update preview again.
+        #[qinvokable]
+        #[cxx_name = "setRebuildOffer"]
+        fn set_rebuild_offer(self: Pin<&mut Kura>, name: &QString, offer: bool);
+
         // Previews installing a bundle.
         #[qinvokable]
         #[cxx_name = "prepareBundle"]
@@ -207,7 +215,7 @@ use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use kura_alpm::prepare::Request;
 use kura_core::package::InstallReason;
-use kura_core::plan::{Plan, RemovalReason, Step};
+use kura_core::plan::{Plan, PlanKind, RemovalReason, Step};
 use kura_core::status::State;
 use kura_i18n::Localizer;
 use kura_i18n::present;
@@ -251,6 +259,7 @@ pub struct KuraRust {
     auto_security: bool,
     trial_runs: bool,
     profiles_json: QString,
+    skipped_rebuilds_json: QString,
     bundles_json: QString,
     localizer: Localizer,
     pending: Option<Plan>,
@@ -300,6 +309,7 @@ impl Default for KuraRust {
             auto_security: kura_alpm::aur::settings().auto_security,
             trial_runs: kura_alpm::aur::settings().trial_runs,
             profiles_json: QString::from(&profiles_value(&Localizer::from_env()).to_string()),
+            skipped_rebuilds_json: QString::from(&skipped_rebuilds_value().to_string()),
             bundles_json: QString::from(&bundles_value(&Localizer::from_env()).to_string()),
             localizer: Localizer::from_env(),
             pending: None,
@@ -343,7 +353,13 @@ fn preview_groups(l: &Localizer, plan: &Plan, apps: &BTreeSet<String>) -> Value 
     let group = |id: &str, steps: &[&Step]| {
         json!({
             "title": l.msg_args(id, &[("count", steps.len().into())]),
-            "items": steps.iter().map(|s| json!({"name": s.package(), "detail": present::step_text(l, s)})).collect::<Vec<_>>(),
+            "items": steps.iter().map(|s| {
+                // An AUR package built again at the same version can be
+                // turned down (see kura_core::rebuild).
+                let rebuild = plan.kind == PlanKind::AurInstall
+                    && matches!(s, Step::Upgrade { from, to, .. } if from == to);
+                json!({"name": s.package(), "detail": present::step_text(l, s), "rebuild": rebuild})
+            }).collect::<Vec<_>>(),
         })
     };
     let reinstall = |s: &&&Step| {
@@ -876,6 +892,14 @@ fn prepare_kernel_preview(name: &str, add: bool) -> Result<Prepared, String> {
 }
 
 /// The repository profiles for the settings page.
+/// Installed AUR packages whose rebuild the user turned down.
+fn skipped_rebuilds_value() -> Value {
+    let names = kura_alpm::load_config()
+        .and_then(|conf| kura_alpm::aur::skipped_installed(&conf))
+        .unwrap_or_default();
+    json!(names)
+}
+
 fn profiles_value(l: &Localizer) -> Value {
     Value::Array(
         kura_core::profiles::ALL
@@ -1026,6 +1050,40 @@ impl qobject::Kura {
             .start_preview(|| prepare_preview(&Request::Update), &title, &label);
         self.as_mut().set_message(message);
         self.as_mut().set_failed(failed);
+    }
+
+    fn set_rebuild_offer(self: Pin<&mut Self>, name: &QString, offer: bool) {
+        let name = name.to_string();
+        let qt = self.qt_thread();
+        std::thread::spawn(move || {
+            let l = Localizer::from_env();
+            let (text, done) = match kura_helper::set_rebuild_offer(&name, offer) {
+                Ok(kura_helper::Reply::Done) => (String::new(), true),
+                Ok(reply) => (kura_helper::text::reply(&l, &reply), false),
+                Err(e) => (
+                    l.msg_args("error-helper", &[("reason", e.to_string().into())]),
+                    false,
+                ),
+            };
+            let skipped = skipped_rebuilds_value().to_string();
+            let _ = qt.queue(move |mut this| {
+                this.as_mut().set_skipped_rebuilds_json(QString::from(&skipped));
+                if done && !offer {
+                    // The preview showed the rebuild; prepare it without.
+                    this.as_mut().rust_mut().pending = None;
+                    this.as_mut().set_can_install(false);
+                    this.as_mut().prepare_update();
+                    let note = this
+                        .localizer
+                        .msg_args("gui-rebuild-skipped", &[("name", name.into())]);
+                    this.as_mut().set_message(QString::from(&note));
+                    this.as_mut().set_failed(false);
+                } else {
+                    this.as_mut().set_message(QString::from(&text));
+                    this.as_mut().set_failed(!done);
+                }
+            });
+        });
     }
 
     fn prepare_install(self: Pin<&mut Self>, names: &QString) {

@@ -428,6 +428,18 @@ Kirigami.ApplicationWindow {
                                     font.family: "monospace"
                                     color: Kirigami.Theme.disabledTextColor
                                 }
+                                // An abandoned AUR package may never build
+                                // again; the user can stop the offer.
+                                Controls.ToolButton {
+                                    visible: modelData.rebuild === true
+                                    text: kura.tr("gui-rebuild-skip")
+                                    icon.name: "dialog-cancel"
+                                    display: Controls.AbstractButton.TextBesideIcon
+                                    Controls.ToolTip.text: kura.tr("gui-rebuild-skip-hint")
+                                    Controls.ToolTip.visible: hovered
+                                    Controls.ToolTip.delay: Kirigami.Units.toolTipDelay
+                                    onClicked: kura.setRebuildOffer(modelData.name, false)
+                                }
                             }
                         }
                     }
@@ -781,6 +793,27 @@ Kirigami.ApplicationWindow {
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
                     Layout.maximumWidth: Kirigami.Units.gridUnit * 25
+                }
+
+                Kirigami.Separator {
+                    Kirigami.FormData.isSection: true
+                    Kirigami.FormData.label: kura.tr("gui-rebuilds-skipped")
+                    visible: skippedRebuilds.length > 0
+                }
+                Repeater {
+                    id: skippedRebuilds
+                    model: JSON.parse(kura.skippedRebuildsJson)
+                    RowLayout {
+                        Kirigami.FormData.label: modelData + ":"
+                        Controls.Label {
+                            text: kura.tr("gui-rebuild-not-offered")
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+                        Controls.Button {
+                            text: kura.tr("gui-rebuild-offer")
+                            onClicked: kura.setRebuildOffer(modelData, true)
+                        }
+                    }
                 }
 
                 Kirigami.Separator {

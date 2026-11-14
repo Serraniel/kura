@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use kura_core::aur::{self, Info, Maintainer, Resolution, Satisfied, Update};
 use kura_core::package::InstallReason;
 use kura_core::plan::{AurBuild, Plan, PlanKind, Step};
+use kura_core::rebuild::Skipped;
 use kura_core::settings::Settings;
 
 use crate::Config;
@@ -270,9 +271,23 @@ pub fn updates(conf: &Config, settings: &Settings, now: i64, remember: bool) -> 
     ))
 }
 
+/// Rebuilds the user turned down (see [`kura_core::rebuild`]).
+pub fn skipped_rebuilds() -> Skipped {
+    Skipped::parse(&std::fs::read_to_string(kura_core::rebuild::PATH).unwrap_or_default())
+}
+
+/// Installed packages whose rebuild the user turned down, at the version
+/// they turned it down for.
+pub fn skipped_installed(conf: &Config) -> Result<Vec<String>, crate::Error> {
+    let handle = crate::handle(conf)?;
+    let db = handle.localdb();
+    Ok(skipped_rebuilds().current(|n| db.pkg(n).ok().map(|p| p.version().to_string())))
+}
+
 /// Programs and libraries of AUR packages that need a library which is gone,
 /// usually because a repository update changed its version. These packages
 /// must be built again. Returns package names with the missing libraries.
+/// Rebuilds the user turned down are left out.
 pub fn needs_rebuild(conf: &Config) -> Result<Vec<(String, Vec<String>)>, crate::Error> {
     use kura_core::elf;
     use std::io::Read as _;
@@ -286,12 +301,14 @@ pub fn needs_rebuild(conf: &Config) -> Result<Vec<(String, Vec<String>)>, crate:
         .filter_map(|e| std::fs::read_to_string(e.path()).ok())
         .flat_map(|c| elf::ld_conf_dirs(&c))
         .collect();
+    let skipped = skipped_rebuilds();
     let handle = crate::handle(conf)?;
     let foreign: Vec<_> = handle
         .localdb()
         .pkgs()
         .into_iter()
         .filter(|p| !handle.syncdbs().iter().any(|db| db.pkg(p.name()).is_ok()))
+        .filter(|p| !skipped.skips(p.name(), p.version()))
         .collect();
     let mut out = Vec::new();
     for pkg in foreign {

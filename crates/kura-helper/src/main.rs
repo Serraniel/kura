@@ -183,8 +183,68 @@ impl Helper {
         serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
     }
 
+    async fn set_rebuild_offer(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] conn: &zbus::Connection,
+        name: String,
+        offer: bool,
+    ) -> String {
+        self.last_activity.store(now(), Ordering::Relaxed);
+        let reply = match header.sender() {
+            Some(sender) if authorized(conn, sender.as_str(), "org.kura.settings").await => {
+                blocking::unblock(move || write_rebuild_offer(&name, offer)).await
+            }
+            _ => Reply::NotAuthorized,
+        };
+        serde_json::to_string(&reply).unwrap_or_else(|_| r#"{"result":"failed","message":"reply"}"#.into())
+    }
+
     #[zbus(signal)]
     async fn progress(emitter: &SignalEmitter<'_>, event: &str) -> zbus::Result<()>;
+}
+
+/// Stops or restarts offering a rebuild of one AUR package, then updates the
+/// count in the status so the tray follows.
+fn write_rebuild_offer(name: &str, offer: bool) -> Reply {
+    let failed = |message: String| Reply::Failed { message };
+    let Ok(conf) = kura_alpm::load_config() else {
+        return failed("pacman.conf".into());
+    };
+    let path = Path::new(kura_core::rebuild::PATH);
+    let mut skipped = kura_alpm::aur::skipped_rebuilds();
+    let version = if offer {
+        None
+    } else {
+        let installed = kura_alpm::handle(&conf)
+            .ok()
+            .and_then(|h| h.localdb().pkg(name).ok().map(|p| p.version().to_string()));
+        match installed {
+            Some(v) => Some(v),
+            None => return failed(format!("{name}: not installed")),
+        }
+    };
+    if let Err(message) = skipped.set(name, version.as_deref()) {
+        return failed(message);
+    }
+    let tmp = path.with_extension("json.tmp");
+    let written = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::write(&tmp, skipped.to_json()))
+        .and_then(|()| std::fs::rename(&tmp, path));
+    if let Err(e) = written {
+        return failed(format!("{}: {e}", path.display()));
+    }
+    let status_path = Path::new(kura_alpm::background::STATUS);
+    let mut status = kura_alpm::background::read_status(status_path);
+    if status.checked != 0
+        && let Ok(broken) = kura_alpm::aur::needs_rebuild(&conf)
+    {
+        status.aur_rebuild = broken.len();
+        let _ = kura_alpm::background::write_status(status_path, &status);
+    }
+    Reply::Done
 }
 
 /// Writes the system-wide settings. Only known fields within their limits
