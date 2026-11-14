@@ -106,6 +106,10 @@ pub trait Helper {
     /// Saves the system-wide settings (JSON) and returns a [`Reply`] (JSON).
     fn set_settings(&self, settings: &str) -> zbus::Result<String>;
 
+    /// Stops (`offer` false) or restarts offering a rebuild of one AUR
+    /// package and returns a [`Reply`] (JSON).
+    fn set_rebuild_offer(&self, name: &str, offer: bool) -> zbus::Result<String>;
+
     /// Progress of the running plan, as a JSON [`Event`].
     #[zbus(signal)]
     fn progress(&self, event: String) -> zbus::Result<()>;
@@ -183,6 +187,13 @@ pub fn set_settings(settings: &kura_core::settings::Settings) -> Result<Reply, C
     let conn = zbus::blocking::connection::Builder::system()?.build()?;
     let json = serde_json::to_string(settings).map_err(|e| ClientError::Protocol(e.to_string()))?;
     let text = HelperProxyBlocking::new(&conn)?.set_settings(&json)?;
+    serde_json::from_str(&text).map_err(|e| ClientError::Protocol(e.to_string()))
+}
+
+/// Asks the helper to stop or restart offering a rebuild of `name`.
+pub fn set_rebuild_offer(name: &str, offer: bool) -> Result<Reply, ClientError> {
+    let conn = zbus::blocking::connection::Builder::system()?.build()?;
+    let text = HelperProxyBlocking::new(&conn)?.set_rebuild_offer(name, offer)?;
     serde_json::from_str(&text).map_err(|e| ClientError::Protocol(e.to_string()))
 }
 

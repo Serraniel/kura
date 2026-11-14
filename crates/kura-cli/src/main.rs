@@ -901,7 +901,16 @@ fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
                 l.msg_args("settings-days", &[("days", s.aur_cooling_days.into())]),
                 l.msg("settings-auto-security"),
                 on_off(s.auto_security)
-            ) + &format!("{}: {}\n", l.msg("settings-trial"), on_off(s.trial_runs)));
+            ) + &format!("{}: {}\n", l.msg("settings-trial"), on_off(s.trial_runs))
+                + &skipped_rebuilds_line(l));
+        }
+        ["rebuild", name, on @ ("on" | "off")] => {
+            let reply = kura_helper::set_rebuild_offer(name, *on == "on")
+                .map_err(|e| l.msg_args("error-helper", &[("reason", e.to_string().into())]))?;
+            return match reply {
+                Reply::Done => Ok(l.msg("settings-saved") + "\n"),
+                other => Err(kura_helper::text::reply(l, &other)),
+            };
         }
         ["aur", "on"] => s.aur = true,
         ["aur", "off"] => s.aur = false,
@@ -924,6 +933,17 @@ fn settings(l: &Localizer, args: &[String]) -> Result<String, String> {
         Reply::Done => Ok(l.msg("settings-saved") + "\n"),
         other => Err(kura_helper::text::reply(l, &other)),
     }
+}
+
+/// The AUR packages whose rebuild is turned off, as a settings line.
+fn skipped_rebuilds_line(l: &Localizer) -> String {
+    let names = kura_alpm::load_config()
+        .and_then(|conf| kura_alpm::aur::skipped_installed(&conf))
+        .unwrap_or_default();
+    if names.is_empty() {
+        return String::new();
+    }
+    format!("{}: {}\n", l.msg("gui-rebuilds-skipped"), names.join(", "))
 }
 
 /// Installs again what a confirmed repair removed, without asking a second

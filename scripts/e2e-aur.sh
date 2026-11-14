@@ -63,6 +63,14 @@ kura settings auto-security on
 kura settings | grep -q "Install security fixes automatically: on"
 kura settings auto-security off
 
+# A rebuild offer can be turned off for the installed version and back on.
+kura settings rebuild dee off
+grep -q "\"dee\": \"$(pacman -Q dee | cut -d' ' -f2)\"" /var/lib/kura/rebuild-skipped.json
+kura settings | grep -q "Rebuilds turned off: dee"
+if kura settings rebuild not-installed off; then exit 1; fi
+kura settings rebuild dee on
+if kura settings | grep -q "Rebuilds turned off"; then exit 1; fi
+
 # An AUR update: make the installed pfetch look older, then update.
 db=$(echo /var/lib/pacman/local/pfetch-*)
 version=$(sed -n '/^%VERSION%$/{n;p}' "$db/desc")
